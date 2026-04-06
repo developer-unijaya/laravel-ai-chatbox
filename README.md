@@ -130,9 +130,7 @@ php artisan vendor:publish --tag=ai-chatbox-config
 If you plan to use **RAG** or the **database memory driver**, run the migrations:
 
 ```bash
-php artisan migrate
-
-# Or publish first to review the migration files
+# Publish the migration files
 php artisan vendor:publish --tag=ai-chatbox-migrations
 php artisan migrate
 ```
