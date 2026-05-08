@@ -82,7 +82,7 @@ class PromptBuilder
                 $cfg['rag_embedding_url'] ?? null,
                 $cfg['rag_embedding_model'] ?? null,
                 $cfg['api_token'] ?? null,
-                isset($cfg['rag_embedding_timeout']) ? (int) $cfg['rag_embedding_timeout'] : null,
+                (int) ($cfg['rag_embedding_timeout'] ?? 10),
             ));
             $chunks = $retriever->retrieve($query);
 

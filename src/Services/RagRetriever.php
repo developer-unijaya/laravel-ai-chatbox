@@ -31,8 +31,8 @@ class RagRetriever
 
         if ($queryEmbedding === null) {
             Log::warning('AI Chatbox RAG: Query embedding failed — RAG context will not be injected for this message.', [
-                'embedding_url' => config('ai-chatbox.rag_embedding_url'),
-                'embedding_model' => config('ai-chatbox.rag_embedding_model'),
+                'embedding_url' => $this->embedder->resolvedUrl(),
+                'embedding_model' => $this->embedder->resolvedModel(),
             ]);
             return [];
         }
@@ -64,7 +64,7 @@ class RagRetriever
                     'chunk_id' => $chunk->id,
                     'chunk_dims' => count($embedding),
                     'query_dims' => count($queryEmbedding),
-                    'embedding_model' => config('ai-chatbox.rag_embedding_model'),
+                    'embedding_model' => $this->embedder->resolvedModel(),
                 ]);
                 continue;
             }
@@ -81,8 +81,8 @@ class RagRetriever
         if ($nullEmbeddings > 0) {
             Log::warning('AI Chatbox RAG: Skipped chunks with no stored embedding — reprocess the document to fix.', [
                 'skipped_count' => $nullEmbeddings,
-                'embedding_url' => config('ai-chatbox.rag_embedding_url'),
-                'embedding_model' => config('ai-chatbox.rag_embedding_model'),
+                'embedding_url' => $this->embedder->resolvedUrl(),
+                'embedding_model' => $this->embedder->resolvedModel(),
             ]);
         }
 

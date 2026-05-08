@@ -40,19 +40,13 @@ class EmbeddingServiceTest extends TestCase
         $this->assertEqualsWithDelta(3.0, $result[2], 0.001);
     }
 
-    public function test_embed_falls_back_to_config_when_constructor_params_are_null(): void
+    public function test_embed_returns_null_when_no_constructor_args_given(): void
     {
-        $this->app['config']->set('ai-chatbox.rag_embedding_url', 'http://config.example.com/v1/embeddings');
-        $this->app['config']->set('ai-chatbox.rag_embedding_model', 'config-model');
-
-        $this->mockGuzzle([$this->embeddingResponse([0.5, 0.5])]);
-
-        $service = new EmbeddingService(); // no constructor args
+        $service = new EmbeddingService(); // no constructor args — URL is empty
 
         $result = $service->embed('hello');
 
-        $this->assertIsArray($result);
-        $this->assertCount(2, $result);
+        $this->assertNull($result);
     }
 
     public function test_embed_returns_null_when_url_is_empty(): void

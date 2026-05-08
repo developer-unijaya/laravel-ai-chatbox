@@ -6,10 +6,10 @@ use Illuminate\Support\Facades\Log;
 class EmbeddingService
 {
     /**
-     * @param  string|null  $url      Embedding endpoint. Falls back to ai-chatbox.rag_embedding_url.
-     * @param  string|null  $model    Embedding model name. Falls back to ai-chatbox.rag_embedding_model.
-     * @param  string|null  $token    API token. Falls back to ai-chatbox.api_token.
-     * @param  int|null     $timeout  Request timeout in seconds. Falls back to ai-chatbox.rag_embedding_timeout.
+     * @param  string|null  $url      Embedding endpoint — must come from the resolved provider config.
+     * @param  string|null  $model    Embedding model name — must come from the resolved provider config.
+     * @param  string|null  $token    API token — must come from the resolved provider config.
+     * @param  int|null     $timeout  Request timeout in seconds — must come from the resolved provider config.
      */
     public function __construct(
         private readonly ?string $url = null,
@@ -27,12 +27,22 @@ class EmbeddingService
      *
      * @return float[]|null  Null when the API call fails or returns no vector.
      */
+    public function resolvedUrl(): string
+    {
+        return $this->url ?? '';
+    }
+
+    public function resolvedModel(): string
+    {
+        return $this->model ?? '';
+    }
+
     public function embed(string $text): ?array
     {
-        $url = $this->url ?? config('ai-chatbox.rag_embedding_url', '');
-        $model = $this->model ?? config('ai-chatbox.rag_embedding_model', 'nomic-embed-text');
-        $token = $this->token ?? config('ai-chatbox.api_token', '');
-        $timeout = $this->timeout ?? (int) config('ai-chatbox.rag_embedding_timeout', 10);
+        $url     = $this->url ?? '';
+        $model   = $this->model ?? '';
+        $token   = $this->token ?? '';
+        $timeout = $this->timeout ?? 10;
 
         if (empty($url)) {
             Log::warning('AI Chatbox RAG: rag_embedding_url is not configured.');

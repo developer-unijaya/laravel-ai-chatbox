@@ -277,15 +277,15 @@ AI_CHATBOX_LANGUAGE=            # empty — let the model decide
 | Key | Env var | Default | Description |
 |---|---|---|---|
 | `rag_enabled` | `AI_CHATBOX_RAG` | `false` | Master switch — enable RAG context injection |
-| `rag_embedding_url` | `AI_CHATBOX_EMBEDDING_URL` | `http://localhost:11434/v1/embeddings` | Embedding API endpoint (global default; overridable per provider) |
-| `rag_embedding_model` | `AI_CHATBOX_EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model (global default; overridable per provider) |
-| `rag_embedding_timeout` | `AI_CHATBOX_EMBEDDING_TIMEOUT` | `10` | Timeout in seconds for each embedding request |
+| `rag_embedding_timeout` | `AI_CHATBOX_EMBEDDING_TIMEOUT` | `10` | Timeout in seconds for every embedding HTTP request — applies to all providers |
 | `rag_top_k` | `AI_CHATBOX_RAG_TOP_K` | `3` | Number of chunks retrieved per query |
 | `rag_chunk_size` | `AI_CHATBOX_RAG_CHUNK_SIZE` | `500` | Target chunk size in tokens (~4 chars/token) |
 | `rag_chunk_overlap` | `AI_CHATBOX_RAG_CHUNK_OVERLAP` | `50` | Overlap between consecutive chunks in tokens |
 | `rag_similarity_threshold` | `AI_CHATBOX_RAG_THRESHOLD` | `0.2` | Minimum cosine similarity score (`0.0`–`1.0`) |
 | `rag_context_prompt` | `AI_CHATBOX_RAG_CONTEXT_PROMPT` | *(see below)* | Instruction prepended to retrieved chunks — use `{chunks}` as placeholder |
 | `rag_processing_timeout` | `AI_CHATBOX_RAG_PROCESSING_TIMEOUT` | `0` | Max seconds for a single upload or reprocess — `0` = no limit |
+
+> `rag_embedding_url`, `rag_embedding_model`, and `rag_embedding_timeout` are **not** global settings. They are defined per-provider inside the `providers` block and resolved through the active named provider. See [AI Providers](#ai-providers).
 
 ---
 
@@ -301,30 +301,32 @@ Named providers are defined under the `providers` key in `config/ai-chatbox.php`
 // config/ai-chatbox.php
 'providers' => [
     'ollama'   => [
-        'api_url'             => env('OLLAMA_URL',            'http://localhost:11434/v1/chat/completions'),
-        'api_token'           => env('OLLAMA_TOKEN',          'your-ollama-token'),
-        'api_model'           => env('OLLAMA_MODEL',          'gpt-oss:120b'),
-        'rag_embedding_url'   => env('OLLAMA_EMBEDDING_URL',  'http://localhost:11434/v1/embeddings'),
-        'rag_embedding_model' => env('OLLAMA_EMBEDDING_MODEL','nomic-embed-text'),
+        'api_url'             => env('OLLAMA_URL',               'http://localhost:11434/v1/chat/completions'),
+        'api_token'           => env('OLLAMA_TOKEN',             'your-ollama-token'),
+        'api_model'           => env('OLLAMA_MODEL',             'gpt-oss:120b'),
+        'rag_embedding_url'   => env('OLLAMA_EMBEDDING_URL',     'http://localhost:11434/v1/embeddings'),
+        'rag_embedding_model' => env('OLLAMA_EMBEDDING_MODEL',   'nomic-embed-text'),
     ],
     'openai'   => [
-        'api_url'             => env('OPENAI_URL',            'https://api.openai.com/v1/chat/completions'),
-        'api_token'           => env('OPENAI_API_KEY',        ''),
-        'api_model'           => env('OPENAI_MODEL',          ''),
-        'rag_embedding_url'   => env('OPENAI_EMBEDDING_URL',  ''),
-        'rag_embedding_model' => env('OPENAI_EMBEDDING_MODEL',''),
+        'api_url'             => env('OPENAI_URL',               'https://api.openai.com/v1/chat/completions'),
+        'api_token'           => env('OPENAI_API_KEY',           ''),
+        'api_model'           => env('OPENAI_MODEL',             ''),
+        'rag_embedding_url'   => env('OPENAI_EMBEDDING_URL',     ''),
+        'rag_embedding_model' => env('OPENAI_EMBEDDING_MODEL',   ''),
     ],
     'groq'     => [
-        'api_url'   => env('GROQ_URL',     'https://api.groq.com/openai/v1/chat/completions'),
-        'api_token' => env('GROQ_API_KEY', ''),
-        'api_model' => env('GROQ_MODEL',   ''),
+        'api_url'             => env('GROQ_URL',                 'https://api.groq.com/openai/v1/chat/completions'),
+        'api_token'           => env('GROQ_API_KEY',             ''),
+        'api_model'           => env('GROQ_MODEL',               ''),
+        'rag_embedding_url'   => env('GROQ_EMBEDDING_URL',       ''),
+        'rag_embedding_model' => env('GROQ_EMBEDDING_MODEL',     ''),
     ],
     'lmstudio' => [
-        'api_url'             => env('LMSTUDIO_URL',            'http://127.0.0.1:1234/v1/chat/completions'),
-        'api_token'           => env('LMSTUDIO_TOKEN',          'lmstudio'),
-        'api_model'           => env('LMSTUDIO_MODEL',          'phi-3.5-mini-instruct'),
-        'rag_embedding_url'   => env('LMSTUDIO_EMBEDDING_URL',  'http://127.0.0.1:1234/v1/embeddings'),
-        'rag_embedding_model' => env('LMSTUDIO_EMBEDDING_MODEL','text-embedding-nomic-embed-text-v1.5'),
+        'api_url'             => env('LMSTUDIO_URL',             'http://127.0.0.1:1234/v1/chat/completions'),
+        'api_token'           => env('LMSTUDIO_TOKEN',           'lmstudio'),
+        'api_model'           => env('LMSTUDIO_MODEL',           'phi-3.5-mini-instruct'),
+        'rag_embedding_url'   => env('LMSTUDIO_EMBEDDING_URL',   'http://127.0.0.1:1234/v1/embeddings'),
+        'rag_embedding_model' => env('LMSTUDIO_EMBEDDING_MODEL', 'text-embedding-nomic-embed-text-v1.5'),
     ],
 ],
 ```
@@ -337,6 +339,8 @@ Named providers are defined under the `providers` key in `config/ai-chatbox.php`
 | `openai` | `OPENAI_URL` | `OPENAI_API_KEY` | `OPENAI_MODEL` | `OPENAI_EMBEDDING_URL` | `OPENAI_EMBEDDING_MODEL` |
 | `groq` | `GROQ_URL` | `GROQ_API_KEY` | `GROQ_MODEL` | `GROQ_EMBEDDING_URL` | `GROQ_EMBEDDING_MODEL` |
 | `lmstudio` | `LMSTUDIO_URL` | `LMSTUDIO_TOKEN` | `LMSTUDIO_MODEL` | `LMSTUDIO_EMBEDDING_URL` | `LMSTUDIO_EMBEDDING_MODEL` |
+
+> `rag_embedding_timeout` (`AI_CHATBOX_EMBEDDING_TIMEOUT`) is a universal setting — it applies to all providers and is not overridable per provider. Configure it once in the RAG section.
 
 > The chatbox widget and the `AI` facade both resolve through the same named provider. `AI_CHATBOX_ACTIVE_PROVIDER` controls which provider is active for both.
 
@@ -816,12 +820,14 @@ AI answers using your knowledge-base context
 
 ### Quick start
 
-**1. Enable RAG:**
+**1. Enable RAG and set embedding config on your active provider:**
 
 ```env
 AI_CHATBOX_RAG=true
-AI_CHATBOX_EMBEDDING_URL=http://localhost:11434/v1/embeddings
-AI_CHATBOX_EMBEDDING_MODEL=nomic-embed-text
+
+# Set embedding settings for your active provider (example: ollama)
+OLLAMA_EMBEDDING_URL=http://localhost:11434/v1/embeddings
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 ```
 
 **2. Run the migration:**
@@ -840,20 +846,21 @@ Every subsequent chat message will automatically retrieve and inject relevant co
 
 RAG uses a **separate embedding API** — distinct from the chat API. Any provider with an `/embeddings` endpoint works.
 
-| Provider | `AI_CHATBOX_EMBEDDING_URL` | `AI_CHATBOX_EMBEDDING_MODEL` |
+Embedding settings are configured **per named provider** via `rag_embedding_url`, `rag_embedding_model`, and `rag_embedding_timeout`. They are resolved through the active provider — there are no global embedding env vars.
+
+| Provider | Env var | Example value |
 |---|---|---|
-| Ollama | `http://localhost:11434/v1/embeddings` | `nomic-embed-text` |
-| Ollama | `http://localhost:11434/v1/embeddings` | `mxbai-embed-large` |
-| LM Studio | `http://localhost:1234/v1/embeddings` | your loaded embedding model |
-| OpenAI | `https://api.openai.com/v1/embeddings` | `text-embedding-3-small` |
-| OpenAI | `https://api.openai.com/v1/embeddings` | `text-embedding-3-large` |
+| Ollama | `OLLAMA_EMBEDDING_URL` | `http://localhost:11434/v1/embeddings` |
+| Ollama | `OLLAMA_EMBEDDING_MODEL` | `nomic-embed-text` or `mxbai-embed-large` |
+| LM Studio | `LMSTUDIO_EMBEDDING_URL` | `http://127.0.0.1:1234/v1/embeddings` |
+| LM Studio | `LMSTUDIO_EMBEDDING_MODEL` | your loaded embedding model name |
+| OpenAI | `OPENAI_EMBEDDING_URL` | `https://api.openai.com/v1/embeddings` |
+| OpenAI | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` or `text-embedding-3-large` |
 
 > **Ollama:** Pull the embedding model first:
 > ```bash
 > ollama pull nomic-embed-text
 > ```
-
-Named providers support per-provider embedding configuration. Set `rag_embedding_url` and `rag_embedding_model` inside a provider entry to override the global defaults for that provider.
 
 ---
 
@@ -1322,10 +1329,9 @@ AI_CHATBOX_STORAGE=local          # local | session
 AI_CHATBOX_PRUNE_DAYS=30          # retention period for ai-chatbox:prune-conversations
 
 # ── RAG ───────────────────────────────────────────────────────────────────────
+# Embedding URL and model are per-provider — set them in the provider block below.
 AI_CHATBOX_RAG=false
-AI_CHATBOX_EMBEDDING_URL=http://localhost:11434/v1/embeddings
-AI_CHATBOX_EMBEDDING_MODEL=nomic-embed-text
-AI_CHATBOX_EMBEDDING_TIMEOUT=10
+AI_CHATBOX_EMBEDDING_TIMEOUT=10   # universal — applies to all providers
 AI_CHATBOX_RAG_TOP_K=3
 AI_CHATBOX_RAG_CHUNK_SIZE=500
 AI_CHATBOX_RAG_CHUNK_OVERLAP=50

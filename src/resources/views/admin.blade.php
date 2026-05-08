@@ -511,13 +511,13 @@
                     <div class="flex items-center justify-between gap-2">
                         <span class="text-gray-500 dark:text-gray-400">URL</span>
                         <span class="config-val text-xs text-right break-all text-gray-700 dark:text-gray-300">
-                            {{ config('ai-chatbox.rag_embedding_url') ?: '—' }}
+                            {{ $configGroups['RAG']['rag_embedding_url'] ?: '—' }}
                         </span>
                     </div>
                     <div class="flex items-center justify-between gap-2">
                         <span class="text-gray-500 dark:text-gray-400">Model</span>
                         <span class="config-val text-xs text-gray-700 dark:text-gray-300">
-                            {{ config('ai-chatbox.rag_embedding_model') ?: '—' }}
+                            {{ $configGroups['RAG']['rag_embedding_model'] ?: '—' }}
                         </span>
                     </div>
                     @if($ragStats)
