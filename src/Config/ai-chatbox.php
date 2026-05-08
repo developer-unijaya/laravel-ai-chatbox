@@ -122,13 +122,15 @@ return [
 
 /*
 |--------------------------------------------------------------------------
-| Color Scheme (Admin RAG UI)
+| Color Scheme
 |--------------------------------------------------------------------------
-| Controls whether the RAG admin page renders in light or dark mode.
+| Controls the light/dark mode for both the chat widget and all admin pages
 |
 | 'auto'  — follows the user's OS / browser preference (default)
-| 'light' — always light
-| 'dark'  — always dark
+| 'light' — always light, regardless of OS preference
+| 'dark'  — always dark, regardless of OS preference
+|
+| Env: AI_CHATBOX_COLOR_SCHEME
 */
 
     'color_scheme' => env('AI_CHATBOX_COLOR_SCHEME', 'auto'),

@@ -413,6 +413,21 @@ onMounted(() => {
     if (cfg.themeColor) {
         document.documentElement.style.setProperty('--chatbox-color', cfg.themeColor)
     }
+    const scheme = cfg.colorScheme
+    if (scheme === 'light' || scheme === 'dark') {
+        const wrap = document.getElementById('ai-chatbox-wrapper')
+        if (wrap) {
+            const d = scheme === 'dark'
+            wrap.style.setProperty('--chatbox-shadow',    d ? '0 8px 32px rgba(0,0,0,0.5)'  : '0 8px 32px rgba(0,0,0,0.18)')
+            wrap.style.setProperty('--chatbox-bg',        d ? '#1e1e2e' : '#ffffff')
+            wrap.style.setProperty('--chatbox-msg-bg',    d ? '#2a2a3d' : '#f3f4f6')
+            wrap.style.setProperty('--chatbox-text',      d ? '#e2e8f0' : '#111827')
+            wrap.style.setProperty('--chatbox-muted',     d ? '#94a3b8' : '#6b7280')
+            wrap.style.setProperty('--chatbox-border',    d ? '#374151' : '#e5e7eb')
+            wrap.style.setProperty('--chatbox-input-bg',  d ? '#2a2a3d' : '#f9fafb')
+            wrap.style.setProperty('--chatbox-scrollbar', d ? '#4b5563' : '#d1d5db')
+        }
+    }
     threadId.value = loadOrCreateThreadId()
     loadFromStorage()
     scrollToBottom()

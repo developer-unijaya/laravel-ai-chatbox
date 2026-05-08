@@ -37,6 +37,7 @@
         storageKey:     "{{ $storageKey }}",
         storageType:    "{{ $storageType }}",
         offlineMessage: {!! json_encode($offlineMessage, JSON_HEX_TAG) !!},
-        themeColor:     {!! json_encode($themeColor, JSON_HEX_TAG) !!}
+        themeColor:     {!! json_encode($themeColor, JSON_HEX_TAG) !!},
+        colorScheme:    {!! json_encode(config('ai-chatbox.color_scheme', 'auto'), JSON_HEX_TAG) !!}
     };
 </script>

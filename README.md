@@ -235,7 +235,7 @@ AI_CHATBOX_LANGUAGE=            # empty — let the model decide
 | `greeting` | `AI_CHATBOX_GREETING` | `Hi! How can I help you today?` | Opening message — leave empty to disable |
 | `placeholder` | — | `Type your message...` | Input placeholder text |
 | `theme_color` | — | `#4f46e5` | Primary colour (hex) |
-| `color_scheme` | `AI_CHATBOX_COLOR_SCHEME` | `auto` | Admin page colour scheme — `auto`, `light`, or `dark` |
+| `color_scheme` | `AI_CHATBOX_COLOR_SCHEME` | `auto` | Colour scheme for the widget and admin pages — `auto` (OS preference), `light`, or `dark` |
 | `position` | `AI_CHATBOX_POSITION` | `bottom-right` | Widget position — `bottom-right`, `bottom-left`, `top-right`, `top-left` |
 | `markdown` | `AI_CHATBOX_MARKDOWN` | `true` | Render AI replies as Markdown |
 | `sound` | `AI_CHATBOX_SOUND` | `true` | Play a ping when the AI replies |
@@ -1038,19 +1038,15 @@ AI_CHATBOX_STORAGE=session
 
 ## Dark Mode
 
-### Chat widget
+### Chat widget and admin pages
 
-The widget automatically adapts to the OS/browser dark mode preference via `prefers-color-scheme: dark`. No configuration required.
-
-### Admin pages
-
-All admin pages — `/ai-chatbox/admin`, `/ai-chatbox/admin/conversations`, and `/ai-chatbox/rag` — share the `color_scheme` setting:
+The `color_scheme` setting controls both the chat widget and all admin pages (`/ai-chatbox/admin`, `/ai-chatbox/admin/conversations`, `/ai-chatbox/rag`):
 
 | Value | Behaviour |
 |---|---|
-| `auto` *(default)* | Follows OS preference — updates live when changed |
-| `light` | Always light |
-| `dark` | Always dark |
+| `auto` *(default)* | Follows the OS/browser `prefers-color-scheme` preference |
+| `light` | Always light, regardless of OS preference |
+| `dark` | Always dark, regardless of OS preference |
 
 ```env
 AI_CHATBOX_COLOR_SCHEME=auto    # OS preference (default)
@@ -1318,7 +1314,7 @@ AI_CHATBOX_FRONTEND=vue           # vue | blade | livewire | none
 AI_CHATBOX_TITLE="AI Assistant"
 AI_CHATBOX_GREETING="Hi! How can I help you today?"
 AI_CHATBOX_POSITION=bottom-right  # bottom-right | bottom-left | top-right | top-left
-AI_CHATBOX_COLOR_SCHEME=auto      # auto | light | dark  (admin pages)
+AI_CHATBOX_COLOR_SCHEME=auto      # auto | light | dark  (widget + admin pages)
 AI_CHATBOX_MARKDOWN=true
 AI_CHATBOX_SOUND=true
 AI_CHATBOX_SOUND_VOLUME=0.3
