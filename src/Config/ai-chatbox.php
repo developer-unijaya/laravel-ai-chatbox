@@ -283,13 +283,7 @@ return [
 |
 | 'rag_enabled'              — master switch (default: false)
 | 'rag_embedding_timeout'    — timeout in seconds for every embedding HTTP request (default: 10).
-|                              Applies to all providers. Env: AI_CHATBOX_EMBEDDING_TIMEOUT
-| 'rag_embedding_url'        — embedding endpoint. Defined per-provider (see providers section).
-|                              Per-provider env: LMSTUDIO_EMBEDDING_URL, OLLAMA_EMBEDDING_URL,
-|                                               OPENAI_EMBEDDING_URL, GROQ_EMBEDDING_URL
-| 'rag_embedding_model'      — embedding model name. Defined per-provider (see providers section).
-|                              Per-provider env: LMSTUDIO_EMBEDDING_MODEL, OLLAMA_EMBEDDING_MODEL,
-|                                               OPENAI_EMBEDDING_MODEL, GROQ_EMBEDDING_MODEL
+|                              Applies to all providers.
 | 'rag_top_k'                — number of chunks to retrieve per query (default: 3)
 | 'rag_chunk_size'           — target chunk size in tokens (~4 chars/token, default: 500)
 | 'rag_chunk_overlap'        — overlap between chunks in tokens (default: 50)
