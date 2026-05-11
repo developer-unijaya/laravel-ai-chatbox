@@ -22,8 +22,7 @@ class DatabaseConversationRepository implements ConversationRepositoryInterface
             return [];
         }
 
-        return $conversation->messages()
-            ->orderBy('id')
+        return $this->activeMessages($conversation)
             ->get(['role', 'content'])
             ->map(fn($m) => ['role' => $m->role, 'content' => $m->content])
             ->toArray();
@@ -36,10 +35,9 @@ class DatabaseConversationRepository implements ConversationRepositoryInterface
             ['user_id' => auth()->id()]
         );
 
-        // Only insert messages that are not already persisted.
-        // The controller always passes the full history with the new pair appended at the end,
-        // so slicing from the current DB count gives exactly the new messages to insert.
-        $existingCount = $conversation->messages()->count();
+        // Count only "active" messages (after the last clear point) to determine
+        // which entries in $history are already persisted vs. need inserting.
+        $existingCount = $this->activeMessages($conversation)->count();
         $newMessages = array_slice($history, $existingCount);
 
         if (!empty($newMessages)) {
@@ -58,18 +56,16 @@ class DatabaseConversationRepository implements ConversationRepositoryInterface
             return;
         }
 
-        $total = $conversation->messages()->count();
-        $max = $maxPairs * 2;
+        $max   = $maxPairs * 2;
+        $query = $this->activeMessages($conversation);
+        $total = $query->count();
 
         if ($total <= $max) {
             return;
         }
 
         $excess = $total - $max;
-        $ids = $conversation->messages()
-            ->orderBy('id')
-            ->limit($excess)
-            ->pluck('id');
+        $ids = $query->limit($excess)->pluck('id');
 
         Message::whereIn('id', $ids)->delete();
     }
@@ -77,6 +73,28 @@ class DatabaseConversationRepository implements ConversationRepositoryInterface
     public function clear(string $threadId): void
     {
         $conversation = Conversation::where('thread_id', $threadId)->first();
-        $conversation?->messages()->delete();
+
+        if (!$conversation) {
+            return;
+        }
+
+        // Record the ID of the last stored message as the new "cleared" boundary.
+        // Messages up to this point are preserved in the DB for admin review;
+        // getHistory() will return an empty array for the next AI turn.
+        $lastId = $conversation->messages()->max('id');
+        $conversation->update(['cleared_after_id' => $lastId ?? 0]);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private function activeMessages(Conversation $conversation)
+    {
+        $query = $conversation->messages()->orderBy('id');
+
+        if ($conversation->cleared_after_id !== null) {
+            $query->where('id', '>', $conversation->cleared_after_id);
+        }
+
+        return $query;
     }
 }

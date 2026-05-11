@@ -8,7 +8,7 @@ class Conversation extends Model
 {
     protected $table = 'ai_chatbox_conversations';
 
-    protected $fillable = ['thread_id', 'user_id'];
+    protected $fillable = ['thread_id', 'user_id', 'cleared_after_id'];
 
     public function messages(): HasMany
     {

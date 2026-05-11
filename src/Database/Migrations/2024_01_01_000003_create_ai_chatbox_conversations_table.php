@@ -11,6 +11,7 @@ return new class extends Migration
             $table->id();
             $table->string('thread_id', 36)->unique();
             $table->unsignedBigInteger('user_id')->nullable()->index();
+            $table->unsignedBigInteger('cleared_after_id')->nullable();
             $table->timestamps();
         });
     }
