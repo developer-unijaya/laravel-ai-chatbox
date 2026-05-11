@@ -119,19 +119,21 @@ Add to your project's `composer.json`, then run `composer update`:
 
 ### 2. Publish assets
 
+Publish CSS + JS to public/vendor/ai-chatbox/
 ```bash
-# Required — publish CSS + JS to public/vendor/ai-chatbox/
 php artisan vendor:publish --tag=ai-chatbox-assets
+```
 
-# Optional — publish the config file to customise defaults
+Publish the config file to customise defaults
+```bash
 php artisan vendor:publish --tag=ai-chatbox-config
 ```
 
 If you plan to use **RAG** or the **database memory driver**, run the migrations:
 
+Publish the migration files
 ```bash
-# Publish the migration files
-php artisan vendor:publish --tag=ai-chatbox-migrations
+php artisan vendor:publish --tag=ai-chatbox-migrations && 
 php artisan migrate
 ```
 
