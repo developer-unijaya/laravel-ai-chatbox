@@ -43,13 +43,13 @@ class ChatboxController extends Controller
         $threadId = $request->input('thread_id', '');
         $userMsg = $request->input('message');
 
-        // Memory layer: retrieve + context-trim history
-        $history = $this->repository->getHistory($threadId);
+        // Memory layer: retrieve full history, then trim a copy for API context only
+        $fullHistory = $this->repository->getHistory($threadId);
         $system = $this->promptBuilder->systemMessages($cfg);
-        $history = $this->contextManager->trim($history, $system, $userMsg, $cfg);
+        $contextHistory = $this->contextManager->trim($fullHistory, $system, $userMsg, $cfg);
 
         // Engine layer: build prompt and call AI
-        $messages = $this->promptBuilder->build($userMsg, $history, $cfg);
+        $messages = $this->promptBuilder->build($userMsg, $contextHistory, $cfg);
 
         try {
             $reply = $this->engine->complete($messages, $cfg);
@@ -57,11 +57,11 @@ class ChatboxController extends Controller
             return $this->engineError($e);
         }
 
-        // Memory layer: persist trimmed history + new pair
+        // Memory layer: persist full history + new pair (not the trimmed context)
         if ($cfg['history_enabled'] ?? true) {
-            $history[] = ['role' => 'user', 'content' => $userMsg];
-            $history[] = ['role' => 'assistant', 'content' => $reply];
-            $this->repository->saveHistory($threadId, $history);
+            $fullHistory[] = ['role' => 'user', 'content' => $userMsg];
+            $fullHistory[] = ['role' => 'assistant', 'content' => $reply];
+            $this->repository->saveHistory($threadId, $fullHistory);
             $this->repository->trimToLimit($threadId, (int) ($cfg['history_limit'] ?? 50));
         }
 
@@ -79,12 +79,12 @@ class ChatboxController extends Controller
         $threadId = $request->input('thread_id', '');
         $userMsg = $request->input('message');
 
-        // Memory layer: retrieve + context-trim history before streaming starts
-        $history = $this->repository->getHistory($threadId);
+        // Memory layer: retrieve full history, then trim a copy for API context only
+        $fullHistory = $this->repository->getHistory($threadId);
         $system = $this->promptBuilder->systemMessages($cfg);
-        $history = $this->contextManager->trim($history, $system, $userMsg, $cfg);
+        $contextHistory = $this->contextManager->trim($fullHistory, $system, $userMsg, $cfg);
 
-        $messages = $this->promptBuilder->build($userMsg, $history, $cfg);
+        $messages = $this->promptBuilder->build($userMsg, $contextHistory, $cfg);
         $useHistory = $cfg['history_enabled'] ?? true;
         $historyLimit = (int) ($cfg['history_limit'] ?? 50);
 
@@ -97,7 +97,7 @@ class ChatboxController extends Controller
         }
 
         return response()->stream(
-            function () use ($streamReader, $threadId, $userMsg, $history, $useHistory, $historyLimit) {
+            function () use ($streamReader, $threadId, $userMsg, $fullHistory, $useHistory, $historyLimit) {
                 try {
                     $fullReply = $streamReader(function (string $token) {
                         echo 'data: ' . json_encode(['token' => $token]) . "\n\n";
@@ -108,9 +108,9 @@ class ChatboxController extends Controller
                     });
 
                     if ($useHistory && $fullReply !== '') {
-                        $history[] = ['role' => 'user', 'content' => $userMsg];
-                        $history[] = ['role' => 'assistant', 'content' => $fullReply];
-                        $this->repository->saveHistory($threadId, $history);
+                        $fullHistory[] = ['role' => 'user', 'content' => $userMsg];
+                        $fullHistory[] = ['role' => 'assistant', 'content' => $fullReply];
+                        $this->repository->saveHistory($threadId, $fullHistory);
                         $this->repository->trimToLimit($threadId, $historyLimit);
                         session()->save(); // required because the response has already started
                     }

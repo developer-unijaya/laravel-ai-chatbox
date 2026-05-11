@@ -7,6 +7,8 @@
     <title>AI Chatbox — Conversations</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>tailwind.config = { darkMode: 'class' }</script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
     @if($scheme === 'auto')
     <script>
         (function () {
@@ -114,11 +116,48 @@
             border-radius: 1rem 1rem 1rem 0.25rem;
             padding: 0.6rem 0.9rem;
             max-width: 78%;
-            white-space: pre-wrap;
             word-break: break-word;
             font-size: 0.875rem;
         }
         .dark .bubble-assistant { background: #374151; color: #f3f4f6; }
+
+        /* Markdown prose inside assistant bubbles */
+        .bubble-assistant p { margin: 0 0 0.5em; }
+        .bubble-assistant p:last-child { margin-bottom: 0; }
+        .bubble-assistant ul { list-style: disc; margin: 0.25em 0 0.5em 1.25em; }
+        .bubble-assistant ol { list-style: decimal; margin: 0.25em 0 0.5em 1.25em; }
+        .bubble-assistant li { margin-bottom: 0.2em; }
+        .bubble-assistant h1,.bubble-assistant h2,.bubble-assistant h3,
+        .bubble-assistant h4,.bubble-assistant h5,.bubble-assistant h6 {
+            font-weight: 700; margin: 0.6em 0 0.25em; line-height: 1.3;
+        }
+        .bubble-assistant h1 { font-size: 1.1em; }
+        .bubble-assistant h2 { font-size: 1em; }
+        .bubble-assistant h3 { font-size: 0.95em; }
+        .bubble-assistant code {
+            background: rgba(0,0,0,0.1); border-radius: 3px;
+            padding: 0.1em 0.35em; font-size: 0.82em; font-family: monospace;
+        }
+        .dark .bubble-assistant code { background: rgba(255,255,255,0.12); }
+        .bubble-assistant pre {
+            background: rgba(0,0,0,0.08); border-radius: 6px;
+            padding: 0.6em 0.8em; overflow-x: auto; margin: 0.4em 0;
+        }
+        .dark .bubble-assistant pre { background: rgba(0,0,0,0.3); }
+        .bubble-assistant pre code { background: none; padding: 0; }
+        .bubble-assistant blockquote {
+            border-left: 3px solid rgba(0,0,0,0.18);
+            padding-left: 0.75em; margin: 0.4em 0; opacity: 0.85;
+        }
+        .dark .bubble-assistant blockquote { border-left-color: rgba(255,255,255,0.2); }
+        .bubble-assistant a { text-decoration: underline; opacity: 0.85; }
+        .bubble-assistant strong { font-weight: 700; }
+        .bubble-assistant em { font-style: italic; }
+        .bubble-assistant hr { border: none; border-top: 1px solid rgba(0,0,0,0.12); margin: 0.5em 0; }
+        .bubble-assistant table { border-collapse: collapse; font-size: 0.85em; margin: 0.4em 0; width: 100%; }
+        .bubble-assistant th, .bubble-assistant td { border: 1px solid rgba(0,0,0,0.15); padding: 0.25em 0.5em; }
+        .dark .bubble-assistant th, .dark .bubble-assistant td { border-color: rgba(255,255,255,0.15); }
+        .bubble-assistant th { font-weight: 600; background: rgba(0,0,0,0.05); }
 
         /* Spinner */
         .spin { animation: spin 0.7s linear infinite; }
@@ -188,13 +227,30 @@
                 <h2 id="modal-title" class="font-semibold text-base">Conversation</h2>
                 <p id="modal-meta" class="text-xs text-gray-500 dark:text-gray-400 mt-0.5"></p>
             </div>
-            <button id="modal-close-btn"
-                    class="ml-4 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-                    aria-label="Close">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
+            <div class="flex items-center gap-1 ml-4 shrink-0">
+                {{-- Copy button --}}
+                <button id="modal-copy-btn" title="Copy conversation"
+                        class="relative p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                        aria-label="Copy conversation">
+                    {{-- Clipboard icon (default) --}}
+                    <svg id="copy-icon" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <rect x="9" y="2" width="13" height="13" rx="2" ry="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                    {{-- Check icon (shown briefly after copy) --}}
+                    <svg id="copy-check-icon" class="w-5 h-5 hidden text-green-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M20 6L9 17l-5-5"/>
+                    </svg>
+                </button>
+                {{-- Close button --}}
+                <button id="modal-close-btn"
+                        class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                        aria-label="Close">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
         </div>
 
         {{-- Modal body --}}
@@ -210,6 +266,7 @@
 
     let currentPage = 1;
     let totalPages  = 1;
+    let currentConversation = null; // { threadId, userName, messages }
 
     // ── Fetch & render conversations ────────────────────────────────────────
     async function loadPage(page) {
@@ -363,6 +420,7 @@
 
             title.textContent = `Thread: ${json.thread_id ?? '—'}`;
             meta.textContent  = json.user_id ? `User: ${json.user_name || json.user_id}` : 'Guest session';
+            currentConversation = { threadId: json.thread_id ?? '—', userName, messages: json.messages };
 
             if (!json.messages.length) {
                 body.innerHTML = `<p class="text-center text-sm text-gray-400 py-8">No messages in this conversation.</p>`;
@@ -374,10 +432,11 @@
                 const bubble = isUser ? 'bubble-user' : 'bubble-assistant';
                 const label  = isUser ? userName : 'Assistant';
                 const align  = isUser ? 'items-end' : 'items-start';
+                const content = isUser ? escHtml(m.content) : renderMarkdown(m.content);
                 return `
                 <div class="flex flex-col ${align} gap-0.5">
                     <span class="text-[0.65rem] text-gray-400 px-1">${escHtml(label)} · ${escHtml(m.created_at ?? '')}</span>
-                    <div class="${bubble}">${escHtml(m.content)}</div>
+                    <div class="${bubble}">${content}</div>
                 </div>`;
             }).join('');
 
@@ -391,8 +450,53 @@
     function closeModal() {
         document.getElementById('msg-modal-backdrop').style.display = 'none';
         document.body.style.overflow = '';
+        currentConversation = null;
+        resetCopyIcon();
     }
 
+    function resetCopyIcon() {
+        document.getElementById('copy-icon').classList.remove('hidden');
+        document.getElementById('copy-check-icon').classList.add('hidden');
+    }
+
+    function copyConversation() {
+        if (!currentConversation) return;
+        const { threadId, userName, messages } = currentConversation;
+        const lines = [`Thread: ${threadId}`, `User: ${userName}`, ''];
+        messages.forEach(m => {
+            const label = m.role === 'user' ? userName : 'Assistant';
+            lines.push(`[${label}]`);
+            lines.push(m.content ?? '');
+            lines.push('');
+        });
+        const text = lines.join('\n');
+
+        const onSuccess = () => {
+            document.getElementById('copy-icon').classList.add('hidden');
+            document.getElementById('copy-check-icon').classList.remove('hidden');
+            setTimeout(resetCopyIcon, 2000);
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(onSuccess).catch(() => fallbackCopy(text, onSuccess));
+        } else {
+            fallbackCopy(text, onSuccess);
+        }
+    }
+
+    function fallbackCopy(text, onSuccess) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (ok) onSuccess();
+    }
+
+    document.getElementById('modal-copy-btn').addEventListener('click', copyConversation);
     document.getElementById('modal-close-btn').addEventListener('click', closeModal);
     document.getElementById('msg-modal-backdrop').addEventListener('click', function (e) {
         if (e.target === this) closeModal();
@@ -403,6 +507,18 @@
     function escHtml(str) {
         if (str == null) return '';
         return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function renderMarkdown(text) {
+        if (!text) return '';
+        if (typeof marked === 'undefined') return escHtml(text);
+        const raw = marked.parse(String(text), { breaks: true, gfm: true });
+        return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(raw) : raw;
+    }
+
+    // Configure marked once
+    if (typeof marked !== 'undefined') {
+        marked.setOptions({ breaks: true, gfm: true });
     }
 
     // ── Init ─────────────────────────────────────────────────────────────────

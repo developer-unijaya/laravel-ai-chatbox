@@ -36,10 +36,14 @@ class DatabaseConversationRepository implements ConversationRepositoryInterface
             ['user_id' => auth()->id()]
         );
 
-        $conversation->messages()->delete();
+        // Only insert messages that are not already persisted.
+        // The controller always passes the full history with the new pair appended at the end,
+        // so slicing from the current DB count gives exactly the new messages to insert.
+        $existingCount = $conversation->messages()->count();
+        $newMessages = array_slice($history, $existingCount);
 
-        if (!empty($history)) {
-            $conversation->messages()->createMany($history);
+        if (!empty($newMessages)) {
+            $conversation->messages()->createMany($newMessages);
         }
 
         // Keep updated_at current so the prune command can use it as last-activity time
