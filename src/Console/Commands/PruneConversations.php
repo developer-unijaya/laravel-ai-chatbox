@@ -20,41 +20,55 @@ class PruneConversations extends Command
 
         if ($days < 1) {
             $this->error('Days must be 1 or greater.');
-            return self::FAILURE;
+            return 1;
         }
 
         if (!$this->checkMemoryDriver()) {
-            return self::FAILURE;
+            return 1;
         }
 
         if (!$this->checkTablesExist()) {
-            return self::FAILURE;
+            return 1;
         }
 
         $cutoff = now()->subDays($days);
 
-        $query = Conversation::where('updated_at', '<', $cutoff);
+        $staleQuery = Conversation::where('updated_at', '<', $cutoff);
+        $emptyQuery = Conversation::doesntHave('messages');
 
-        $count = $query->count();
+        $staleCount = $staleQuery->count();
+        $emptyCount = $emptyQuery->count();
 
-        if ($count === 0) {
-            $this->info("No conversations found that have been inactive for more than {$days} day(s). Nothing to delete.");
-            return self::SUCCESS;
+        if ($staleCount === 0 && $emptyCount === 0) {
+            $this->info("No conversations found that have been inactive for more than {$days} day(s) or have no messages. Nothing to delete.");
+            return 0;
         }
 
         if ($this->option('dry-run')) {
-            $this->info("[Dry run] {$count} conversation(s) with no activity since {$cutoff->toDateTimeString()} would be deleted.");
-            return self::SUCCESS;
+            if ($staleCount > 0) {
+                $this->info("[Dry run] {$staleCount} conversation(s) with no activity since {$cutoff->toDateTimeString()} would be deleted.");
+            }
+            if ($emptyCount > 0) {
+                $this->info("[Dry run] {$emptyCount} conversation(s) with no messages would be deleted.");
+            }
+            return 0;
         }
 
-        $this->info("Deleting {$count} conversation(s) with no activity since {$cutoff->toDateTimeString()}...");
+        if ($staleCount > 0) {
+            $this->info("Deleting {$staleCount} conversation(s) with no activity since {$cutoff->toDateTimeString()}...");
+            $staleQuery->delete();
+        }
 
-        // Messages are cascade-deleted via the foreign key constraint
-        $deleted = $query->delete();
+        if ($emptyCount > 0) {
+            $this->info("Deleting {$emptyCount} conversation(s) with no messages...");
+            // Re-query in case stale delete already removed some empty ones
+            Conversation::doesntHave('messages')->delete();
+        }
 
-        $this->info("Done. {$deleted} conversation(s) deleted (messages removed via cascade).");
+        $total = $staleCount + $emptyCount;
+        $this->info("Done. Up to {$total} conversation(s) deleted.");
 
-        return self::SUCCESS;
+        return 0;
     }
 
     private function resolveDays(): int
