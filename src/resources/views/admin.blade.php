@@ -291,6 +291,16 @@
                                 <span class="badge badge-green">{{ $val ?: 'default' }}</span>
                             @elseif($key === 'rag_embedding_url')
                                 <span class="break-all">{{ $val ?: '—' }}</span>
+                            @elseif($key === 'toggle_icon')
+                                @php
+                                    $resolvedIcon = preg_match('#^https?://#i', $val) ? $val : asset($val);
+                                @endphp
+                                <span class="flex items-center gap-2 flex-wrap">
+                                    <span class="break-all text-gray-600 dark:text-gray-400">{{ $val }}</span>
+                                    <img src="{{ $resolvedIcon }}" alt="toggle icon preview"
+                                         class="w-6 h-6 rounded object-contain border border-gray-200 dark:border-gray-600 bg-indigo-500 p-0.5 shrink-0"
+                                         onerror="this.style.display='none'">
+                                </span>
                             @else
                                 {{ $val }}
                             @endif
@@ -457,6 +467,76 @@
             }
             </script>
             @endif
+
+            {{-- Widget Preview --}}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+                <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-700">
+                    <span class="section-heading">Widget Preview</span>
+                </div>
+                <div class="px-5 py-4 space-y-4">
+                    {{-- Toggle button preview --}}
+                    <div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Toggle Button</p>
+                        <div class="flex items-center gap-4">
+                            <div class="w-14 h-14 rounded-full flex items-center justify-content-center justify-center shadow-md shrink-0"
+                                 style="background:var(--theme)">
+                                @if($toggleIconUrl)
+                                    <img src="{{ $toggleIconUrl }}" alt="Toggle icon"
+                                         class="w-[26px] h-[26px] object-contain"
+                                         onerror="this.replaceWith(document.getElementById('aicb-admin-default-icon').cloneNode(true))">
+                                @else
+                                    <svg class="w-[26px] h-[26px] text-white" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/>
+                                    </svg>
+                                @endif
+                            </div>
+                            <div class="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                                <p><span class="font-medium text-gray-700 dark:text-gray-300">Icon:</span>
+                                    @if($toggleIconUrl)
+                                        <span class="badge badge-green">custom</span>
+                                    @else
+                                        <span class="badge badge-gray">default SVG</span>
+                                    @endif
+                                </p>
+                                <p><span class="font-medium text-gray-700 dark:text-gray-300">Color:</span>
+                                    <span class="inline-flex items-center gap-1">
+                                        <span class="inline-block w-3 h-3 rounded-full border border-gray-200 dark:border-gray-600"
+                                              style="background:{{ $themeColor }}"></span>
+                                        <code class="config-key">{{ $themeColor }}</code>
+                                    </span>
+                                </p>
+                                <p><span class="font-medium text-gray-700 dark:text-gray-300">Position:</span>
+                                    <code class="config-key">{{ $configGroups['Widget']['position'] ?? 'bottom-right' }}</code>
+                                </p>
+                            </div>
+                        </div>
+                        @if($toggleIconUrl)
+                        <p class="mt-2 text-xs text-gray-400 dark:text-gray-500 break-all font-mono leading-relaxed">
+                            {{ $configGroups['Widget']['toggle_icon'] ?? '' }}
+                        </p>
+                        @endif
+                    </div>
+
+                    {{-- Hidden fallback SVG for onerror --}}
+                    <svg id="aicb-admin-default-icon" class="w-[26px] h-[26px] text-white hidden" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/>
+                    </svg>
+
+                    {{-- Other widget settings at a glance --}}
+                    <div class="space-y-1.5 text-xs border-t border-gray-100 dark:border-gray-700 pt-3">
+                        @foreach([
+                            'Title'   => $configGroups['Widget']['title'] ?? '—',
+                            'Greeting' => $configGroups['Widget']['greeting'] ?? '—',
+                            'Frontend'=> $configGroups['Widget']['frontend'] ?? '—',
+                        ] as $label => $value)
+                        <div class="flex gap-2">
+                            <span class="text-gray-500 dark:text-gray-400 w-16 shrink-0">{{ $label }}</span>
+                            <span class="text-gray-700 dark:text-gray-300 truncate">{{ $value }}</span>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
 
             {{-- Frontend Driver --}}
             @php

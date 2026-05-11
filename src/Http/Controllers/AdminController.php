@@ -95,6 +95,7 @@ class AdminController extends Controller
                 'theme_color' => $cfg['theme_color'] ?? null,
                 'color_scheme' => $cfg['color_scheme'] ?? null,
                 'position' => $cfg['position'] ?? null,
+                'toggle_icon' => $cfg['toggle_icon'] ?? null,
                 'markdown' => $cfg['markdown'] ?? null,
                 'sound' => $cfg['sound'] ?? null,
                 'sound_volume' => $cfg['sound_volume'] ?? null,
@@ -408,6 +409,11 @@ class AdminController extends Controller
             'app_url' => config('app.url'),
         ];
 
+        $rawToggleIcon  = $cfg['toggle_icon'] ?? null;
+        $toggleIconUrl  = $rawToggleIcon
+            ? (preg_match('#^https?://#i', $rawToggleIcon) ? $rawToggleIcon : asset($rawToggleIcon))
+            : null;
+
         return view('ai-chatbox::admin', [
             'ragStats' => $ragStats,
             'memoryStats' => $memoryStats,
@@ -419,6 +425,7 @@ class AdminController extends Controller
             'colorScheme' => $cfg['color_scheme'] ?? 'auto',
             'ragEnabled' => $ragEnabled,
             'frontend' => $frontend,
+            'toggleIconUrl' => $toggleIconUrl,
             'ragUrl' => route('ai-chatbox.rag.index'),
             'conversationsUrl' => config('ai-chatbox.memory_driver') === 'database'
             ? route('ai-chatbox.admin.conversations')
