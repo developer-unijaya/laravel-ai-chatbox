@@ -10,6 +10,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.6] — 2026-05-08
+
+### Added
+- **`color_scheme` now applies to the chat widget** — the `color_scheme` config key (`AI_CHATBOX_COLOR_SCHEME`) previously only controlled admin pages; it now also forces the chat widget into `light` or `dark` mode across all three frontend drivers (`vue`, `blade`, `livewire`); `auto` (default) continues to follow the OS/browser `prefers-color-scheme` preference with no change required
+
+### Changed
+- **`rag_embedding_timeout` promoted to universal global config** — previously a per-provider key that had to be duplicated across every named provider entry; it is now a single top-level `rag_embedding_timeout` key (`AI_CHATBOX_EMBEDDING_TIMEOUT`, default `10` seconds) shared by all providers; if you published the config and have `rag_embedding_timeout` inside a provider block, remove it — the top-level value takes effect automatically
+- **`EmbeddingService` no longer reads config values directly** — all parameters (URL, model, token, timeout) must be injected via the constructor; the service now correctly sources all embedding settings from `AiManager::resolveConfig()` rather than ever falling back to global `config()` calls; two new getters (`resolvedUrl()`, `resolvedModel()`) expose the active values for accurate log output
+- **`RagRetriever` log messages** now report the actual resolved embedding URL and model (via the new `EmbeddingService` getters) rather than the potentially-wrong global config values
+- **`color_scheme` config comment** updated — header changed from `Color Scheme (Admin RAG UI)` to `Color Scheme`; description clarifies it applies to both the widget and all admin pages
+
+---
+
 ## [0.2.5] — 2026-04-04
 
 ### Added
@@ -322,7 +335,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Configurable API URL, token, and model via `.env`
 - Service provider with auto-discovery, asset publishing, and view publishing
 
-[Unreleased]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.5...HEAD
+[Unreleased]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.6...HEAD
+[0.2.6]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.5...0.2.6
 [0.2.5]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.4...0.2.5
 [0.2.4]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.3...0.2.4
 [0.2.3]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.2...0.2.3

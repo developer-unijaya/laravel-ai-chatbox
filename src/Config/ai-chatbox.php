@@ -29,20 +29,27 @@ return [
 | 'Bahasa Malaysia', 'French', 'Arabic').
 |
 | Set to empty string to let the AI reply in whatever language it chooses.
+| Publish the config to change: php artisan vendor:publish --tag=ai-chatbox-config
 */
 
-    'language' => env('AI_CHATBOX_LANGUAGE', 'English'),
+    'language' => 'English',
 
 /*
 |--------------------------------------------------------------------------
 | System Prompt
 |--------------------------------------------------------------------------
 | An optional system message sent to the AI on every request.
-| Leave empty to use the default. The {language} placeholder is
-| automatically replaced with the value of the 'language' config above.
+| The {language} placeholder is automatically replaced with the value
+| of the 'language' config above.
+|
+| Publish the config to customise:
+|   php artisan vendor:publish --tag=ai-chatbox-config
+|
+| Note: avoid setting this via .env — multi-line strings and special
+| characters are error-prone in .env files.
 */
 
-    'system_prompt' => env('AI_CHATBOX_SYSTEM_PROMPT', 'You are a helpful assistant. You must always respond in {language} only, no matter what language the user writes in. Do not switch to any other language under any circumstances.'),
+    'system_prompt' => 'You are a helpful assistant. You must always respond in {language} only, no matter what language the user writes in. Do not switch to any other language under any circumstances.',
 
 /*
 |--------------------------------------------------------------------------
@@ -64,7 +71,7 @@ return [
 */
 
     'health_check' => env('AI_CHATBOX_HEALTH_CHECK', true),
-    'offline_message' => env('AI_CHATBOX_OFFLINE_MESSAGE', 'AI service is currently unreachable.'),
+    'offline_message' => 'AI service is currently unreachable.',
 
 /*
 |--------------------------------------------------------------------------
@@ -113,27 +120,28 @@ return [
 |--------------------------------------------------------------------------
 | Widget Appearance
 |--------------------------------------------------------------------------
+| Publish the config to customise these values:
+|   php artisan vendor:publish --tag=ai-chatbox-config
 */
 
     'title' => env('AI_CHATBOX_TITLE', 'AI Assistant'),
     'placeholder' => 'Type your message...',
     'theme_color' => '#4f46e5',
-    'greeting' => env('AI_CHATBOX_GREETING', 'Hi! How can I help you today?'),
+    'greeting' => 'Hi! How can I help you today?',
 
 /*
 |--------------------------------------------------------------------------
 | Color Scheme
 |--------------------------------------------------------------------------
 | Controls the light/dark mode for both the chat widget and all admin pages
+| (/ai-chatbox/admin, /ai-chatbox/admin/conversations, /ai-chatbox/rag).
 |
 | 'auto'  — follows the user's OS / browser preference (default)
 | 'light' — always light, regardless of OS preference
 | 'dark'  — always dark, regardless of OS preference
-|
-| Env: AI_CHATBOX_COLOR_SCHEME
 */
 
-    'color_scheme' => env('AI_CHATBOX_COLOR_SCHEME', 'auto'),
+    'color_scheme' => 'auto',
 
 /*
 |--------------------------------------------------------------------------
@@ -147,7 +155,7 @@ return [
 | 'none'     — Only outputs window.AiChatboxConfig; bring your own frontend
 */
 
-    'frontend' => env('AI_CHATBOX_FRONTEND', 'vue'),
+    'frontend' => 'vue',
 
 /*
 |--------------------------------------------------------------------------
@@ -159,7 +167,7 @@ return [
 | Set to false to display replies as plain text.
 */
 
-    'markdown' => env('AI_CHATBOX_MARKDOWN', true),
+    'markdown' => true,
 
 /*
 |--------------------------------------------------------------------------
@@ -172,8 +180,8 @@ return [
 | 'sound_volume' — float between 0.0 (silent) and 1.0 (full)
 */
 
-    'sound' => env('AI_CHATBOX_SOUND', true),
-    'sound_volume' => env('AI_CHATBOX_SOUND_VOLUME', 0.3),
+    'sound' => true,
+    'sound_volume' => 0.3,
 
 /*
 |--------------------------------------------------------------------------
@@ -183,7 +191,7 @@ return [
 | Supported: 'bottom-right', 'bottom-left', 'top-right', 'top-left'
 */
 
-    'position' => env('AI_CHATBOX_POSITION', 'bottom-right'),
+    'position' => 'bottom-right',
 
 /*
 |--------------------------------------------------------------------------
@@ -198,7 +206,7 @@ return [
 */
 
     'history_enabled' => env('AI_CHATBOX_HISTORY', true),
-    'history_limit' => env('AI_CHATBOX_HISTORY_LIMIT', 50),
+    'history_limit' => 50,
 
 /*
 |--------------------------------------------------------------------------
@@ -217,7 +225,7 @@ return [
 | Set to 0 to disable token-based trimming (rely on history_limit only).
 */
 
-    'context_token_limit' => env('AI_CHATBOX_CONTEXT_TOKENS', 4000),
+    'context_token_limit' => 4000,
 
 /*
 |--------------------------------------------------------------------------
@@ -249,7 +257,7 @@ return [
 | Use 'session' for apps where users may discuss sensitive information.
 */
 
-    'storage' => env('AI_CHATBOX_STORAGE', 'local'),
+    'storage' => 'local',
 
 /*
 |--------------------------------------------------------------------------
@@ -262,14 +270,15 @@ return [
 |                 0.0 = deterministic, 1.0 = creative. Typical: 0.7.
 */
 
-    'max_tokens' => env('AI_CHATBOX_MAX_TOKENS', null),
-    'temperature' => env('AI_CHATBOX_TEMPERATURE', 0.7),
+    'max_tokens' => null,
+    'temperature' => 0.7,
 
 /*
 |--------------------------------------------------------------------------
 | Request Timeout
 |--------------------------------------------------------------------------
 | Seconds to wait for a response from the AI API before timing out.
+| Increase for slow local models (e.g. Ollama on consumer hardware).
 */
 
     'timeout' => env('AI_CHATBOX_TIMEOUT', 30),
@@ -283,11 +292,11 @@ return [
 |
 | 'rag_enabled'              — master switch (default: false)
 | 'rag_embedding_timeout'    — timeout in seconds for every embedding HTTP request (default: 10).
-|                              Applies to all providers.
+|                              Applies to all providers. Env: AI_CHATBOX_EMBEDDING_TIMEOUT
 | 'rag_top_k'                — number of chunks to retrieve per query (default: 3)
 | 'rag_chunk_size'           — target chunk size in tokens (~4 chars/token, default: 500)
 | 'rag_chunk_overlap'        — overlap between chunks in tokens (default: 50)
-| 'rag_similarity_threshold' — minimum cosine similarity score 0.0–1.0 (default: 0.3)
+| 'rag_similarity_threshold' — minimum cosine similarity score 0.0–1.0 (default: 0.2)
 | 'rag_admin_middleware'     — middleware for the admin document-management UI.
 |                              Default: ['web', 'auth'] — requires an authenticated user.
 |                              Change to ['web'] to make it publicly accessible (not recommended).
@@ -295,10 +304,10 @@ return [
 
     'rag_enabled' => env('AI_CHATBOX_RAG', false),
     'rag_embedding_timeout' => (int) env('AI_CHATBOX_EMBEDDING_TIMEOUT', 10),
-    'rag_top_k' => (int) env('AI_CHATBOX_RAG_TOP_K', 3),
-    'rag_chunk_size' => (int) env('AI_CHATBOX_RAG_CHUNK_SIZE', 500),
-    'rag_chunk_overlap' => (int) env('AI_CHATBOX_RAG_CHUNK_OVERLAP', 50),
-    'rag_similarity_threshold' => (float) env('AI_CHATBOX_RAG_THRESHOLD', 0.2),
+    'rag_top_k' => 3,
+    'rag_chunk_size' => 500,
+    'rag_chunk_overlap' => 50,
+    'rag_similarity_threshold' => 0.2,
     'rag_admin_middleware' => ['web', 'auth'],
 
 /*
@@ -313,14 +322,15 @@ return [
 | If {chunks} is absent, the retrieved text is appended after the prompt.
 |
 | Set to empty string to send the raw chunks with no additional instruction.
+|
+| Publish the config to customise:
+|   php artisan vendor:publish --tag=ai-chatbox-config
 */
-    'rag_context_prompt' => env(
-        'AI_CHATBOX_RAG_CONTEXT_PROMPT',
-        "Use the following knowledge-base excerpts as your PRIMARY source when answering. "
-        . "Prioritize this context over your general knowledge. "
-        . "If the answer is not found in the context, say \"I don't have that information in my knowledge base.\"\n\n"
-        . "Context:\n{chunks}"
-    ),
+
+    'rag_context_prompt' => "Use the following knowledge-base excerpts as your PRIMARY source when answering. "
+    . "Prioritize this context over your general knowledge. "
+    . "If the answer is not found in the context, say \"I don't have that information in my knowledge base.\"\n\n"
+    . "Context:\n{chunks}",
 
 /*
 |--------------------------------------------------------------------------
@@ -350,7 +360,7 @@ return [
 | Only applies when memory_driver=database.
 */
 
-    'conversation_prune_days' => env('AI_CHATBOX_PRUNE_DAYS', 30),
+    'conversation_prune_days' => 30,
 
 /*
 |--------------------------------------------------------------------------
@@ -367,6 +377,7 @@ return [
 | This only affects the RAG admin upload/reprocess request — all other
 | requests use the normal PHP max_execution_time.
 */
+
     'rag_processing_timeout' => (int) env('AI_CHATBOX_RAG_PROCESSING_TIMEOUT', 0),
 
 /*

@@ -199,20 +199,21 @@ Publish and edit `config/ai-chatbox.php` to change any default.
 
 | Key | Env var | Default | Description |
 |---|---|---|---|
-| `language` | `AI_CHATBOX_LANGUAGE` | `English` | Language the AI must reply in — leave empty to let the model decide |
-| `system_prompt` | `AI_CHATBOX_SYSTEM_PROMPT` | `You are a helpful assistant...` | System message sent on every request — use `{language}` as a placeholder |
+| `language` | — | `English` | Language the AI must reply in — leave empty to let the model decide |
+| `system_prompt` | — | `You are a helpful assistant...` | System message sent on every request — use `{language}` as a placeholder |
 
 The `language` value is enforced at two points per request:
 
 1. The `{language}` placeholder in `system_prompt` is substituted at runtime
 2. `[Important: Reply in {language} only.]` is appended to every user message, which improves compliance on smaller models
 
-```env
-AI_CHATBOX_LANGUAGE=English
-AI_CHATBOX_LANGUAGE="Bahasa Malaysia"
-AI_CHATBOX_LANGUAGE=French
-AI_CHATBOX_LANGUAGE=            # empty — let the model decide
+These are project-level settings best changed by publishing the config file:
+
+```bash
+php artisan vendor:publish --tag=ai-chatbox-config
 ```
+
+Then edit `config/ai-chatbox.php` directly.
 
 ---
 
@@ -220,9 +221,9 @@ AI_CHATBOX_LANGUAGE=            # empty — let the model decide
 
 | Key | Env var | Default | Description |
 |---|---|---|---|
-| `temperature` | `AI_CHATBOX_TEMPERATURE` | `0.7` | Creativity — `0.0` deterministic, `1.0` creative |
-| `max_tokens` | `AI_CHATBOX_MAX_TOKENS` | `null` | Max reply length — `null` lets the model decide |
-| `timeout` | `AI_CHATBOX_TIMEOUT` | `30` | Request timeout in seconds |
+| `temperature` | — | `0.7` | Creativity — `0.0` deterministic, `1.0` creative |
+| `max_tokens` | — | `null` | Max reply length — `null` lets the model decide |
+| `timeout` | `AI_CHATBOX_TIMEOUT` | `30` | Request timeout in seconds — increase for slow local models |
 
 ---
 
@@ -230,16 +231,16 @@ AI_CHATBOX_LANGUAGE=            # empty — let the model decide
 
 | Key | Env var | Default | Description |
 |---|---|---|---|
-| `frontend` | `AI_CHATBOX_FRONTEND` | `vue` | UI driver — `vue`, `blade`, `livewire`, or `none` |
+| `frontend` | — | `vue` | UI driver — `vue`, `blade`, `livewire`, or `none` |
 | `title` | `AI_CHATBOX_TITLE` | `AI Assistant` | Widget header title |
-| `greeting` | `AI_CHATBOX_GREETING` | `Hi! How can I help you today?` | Opening message — leave empty to disable |
+| `greeting` | — | `Hi! How can I help you today?` | Opening message — leave empty to disable |
 | `placeholder` | — | `Type your message...` | Input placeholder text |
 | `theme_color` | — | `#4f46e5` | Primary colour (hex) |
-| `color_scheme` | `AI_CHATBOX_COLOR_SCHEME` | `auto` | Colour scheme for the widget and admin pages — `auto` (OS preference), `light`, or `dark` |
-| `position` | `AI_CHATBOX_POSITION` | `bottom-right` | Widget position — `bottom-right`, `bottom-left`, `top-right`, `top-left` |
-| `markdown` | `AI_CHATBOX_MARKDOWN` | `true` | Render AI replies as Markdown |
-| `sound` | `AI_CHATBOX_SOUND` | `true` | Play a ping when the AI replies |
-| `sound_volume` | `AI_CHATBOX_SOUND_VOLUME` | `0.3` | Volume — `0.0` silent, `1.0` full |
+| `color_scheme` | — | `auto` | Colour scheme for the widget and admin pages — `auto` (OS preference), `light`, or `dark` |
+| `position` | — | `bottom-right` | Widget position — `bottom-right`, `bottom-left`, `top-right`, `top-left` |
+| `markdown` | — | `true` | Render AI replies as Markdown |
+| `sound` | — | `true` | Play a ping when the AI replies |
+| `sound_volume` | — | `0.3` | Volume — `0.0` silent, `1.0` full |
 | `stream` | `AI_CHATBOX_STREAM` | `true` | Stream replies token-by-token via SSE |
 
 ---
@@ -249,10 +250,10 @@ AI_CHATBOX_LANGUAGE=            # empty — let the model decide
 | Key | Env var | Default | Description |
 |---|---|---|---|
 | `history_enabled` | `AI_CHATBOX_HISTORY` | `true` | Include previous messages for context |
-| `history_limit` | `AI_CHATBOX_HISTORY_LIMIT` | `50` | Max user+assistant pairs kept per thread |
-| `context_token_limit` | `AI_CHATBOX_CONTEXT_TOKENS` | `4000` | Max estimated tokens of history per request — trims oldest pairs first (`0` = rely on `history_limit` only) |
+| `history_limit` | — | `50` | Max user+assistant pairs kept per thread |
+| `context_token_limit` | — | `4000` | Max estimated tokens of history per request — trims oldest pairs first (`0` = rely on `history_limit` only) |
 | `memory_driver` | `AI_CHATBOX_MEMORY_DRIVER` | `session` | Server-side history driver — `session` or `database` |
-| `storage` | `AI_CHATBOX_STORAGE` | `local` | Browser storage — `local` (persists across sessions) or `session` (clears on tab close) |
+| `storage` | — | `local` | Browser storage — `local` (persists across sessions) or `session` (clears on tab close) |
 
 ---
 
@@ -265,7 +266,7 @@ AI_CHATBOX_LANGUAGE=            # empty — let the model decide
 | `rate_limit` | `AI_CHATBOX_RATE_LIMIT` | `20` | Max requests per window per IP |
 | `rate_window` | `AI_CHATBOX_RATE_WINDOW` | `1` | Rate limit window in minutes |
 | `health_check` | `AI_CHATBOX_HEALTH_CHECK` | `true` | Ping the AI service before opening the widget |
-| `offline_message` | `AI_CHATBOX_OFFLINE_MESSAGE` | `AI service is currently unreachable.` | Toast shown when the service is unreachable |
+| `offline_message` | — | `AI service is currently unreachable.` | Toast shown when the service is unreachable |
 | `ssrf_protection` | `AI_CHATBOX_SSRF_PROTECTION` | `true` | Block requests to private/reserved IP ranges |
 | `allowed_origins` | — | `[env('APP_URL')]` | Origins allowed to call chatbox endpoints (CORS) |
 | `rag_admin_middleware` | — | `['web', 'auth']` | Middleware for all admin and Knowledge Base pages |
@@ -278,14 +279,14 @@ AI_CHATBOX_LANGUAGE=            # empty — let the model decide
 |---|---|---|---|
 | `rag_enabled` | `AI_CHATBOX_RAG` | `false` | Master switch — enable RAG context injection |
 | `rag_embedding_timeout` | `AI_CHATBOX_EMBEDDING_TIMEOUT` | `10` | Timeout in seconds for every embedding HTTP request — applies to all providers |
-| `rag_top_k` | `AI_CHATBOX_RAG_TOP_K` | `3` | Number of chunks retrieved per query |
-| `rag_chunk_size` | `AI_CHATBOX_RAG_CHUNK_SIZE` | `500` | Target chunk size in tokens (~4 chars/token) |
-| `rag_chunk_overlap` | `AI_CHATBOX_RAG_CHUNK_OVERLAP` | `50` | Overlap between consecutive chunks in tokens |
-| `rag_similarity_threshold` | `AI_CHATBOX_RAG_THRESHOLD` | `0.2` | Minimum cosine similarity score (`0.0`–`1.0`) |
-| `rag_context_prompt` | `AI_CHATBOX_RAG_CONTEXT_PROMPT` | *(see below)* | Instruction prepended to retrieved chunks — use `{chunks}` as placeholder |
+| `rag_top_k` | — | `3` | Number of chunks retrieved per query |
+| `rag_chunk_size` | — | `500` | Target chunk size in tokens (~4 chars/token) |
+| `rag_chunk_overlap` | — | `50` | Overlap between consecutive chunks in tokens |
+| `rag_similarity_threshold` | — | `0.2` | Minimum cosine similarity score (`0.0`–`1.0`) |
+| `rag_context_prompt` | — | *(see below)* | Instruction prepended to retrieved chunks — use `{chunks}` as placeholder |
 | `rag_processing_timeout` | `AI_CHATBOX_RAG_PROCESSING_TIMEOUT` | `0` | Max seconds for a single upload or reprocess — `0` = no limit |
 
-> `rag_embedding_url`, `rag_embedding_model`, and `rag_embedding_timeout` are **not** global settings. They are defined per-provider inside the `providers` block and resolved through the active named provider. See [AI Providers](#ai-providers).
+> `rag_embedding_url` and `rag_embedding_model` are per-provider settings defined inside the `providers` block and resolved through the active named provider. See [AI Providers](#ai-providers).
 
 ---
 
@@ -1283,26 +1284,17 @@ All available settings with their default values.
 # api_url, api_token, and api_model are always sourced from the active provider.
 AI_CHATBOX_ACTIVE_PROVIDER=ollama
 
-# ── Response Language & System Prompt ─────────────────────────────────────────
-AI_CHATBOX_LANGUAGE=English
-AI_CHATBOX_SYSTEM_PROMPT="You are a helpful assistant. You must always respond in {language} only, no matter what language the user writes in. Do not switch to any other language under any circumstances."
-
 # ── Response Tuning ────────────────────────────────────────────────────────────
-AI_CHATBOX_TEMPERATURE=0.7
-AI_CHATBOX_MAX_TOKENS=          # leave blank (null) to let the model decide
 AI_CHATBOX_TIMEOUT=30
 
 # ── Conversation History ───────────────────────────────────────────────────────
 AI_CHATBOX_HISTORY=true
-AI_CHATBOX_HISTORY_LIMIT=50
-AI_CHATBOX_CONTEXT_TOKENS=4000  # 0 = rely on HISTORY_LIMIT only
 
 # ── Streaming ─────────────────────────────────────────────────────────────────
 AI_CHATBOX_STREAM=true
 
 # ── Health Check ──────────────────────────────────────────────────────────────
 AI_CHATBOX_HEALTH_CHECK=true
-AI_CHATBOX_OFFLINE_MESSAGE="AI service is currently unreachable."
 
 # ── Security ──────────────────────────────────────────────────────────────────
 AI_CHATBOX_SSRF_PROTECTION=true  # disable for local Ollama / LM Studio
@@ -1310,29 +1302,16 @@ AI_CHATBOX_RATE_LIMIT=20
 AI_CHATBOX_RATE_WINDOW=1
 
 # ── Widget Appearance ─────────────────────────────────────────────────────────
-AI_CHATBOX_FRONTEND=vue           # vue | blade | livewire | none
 AI_CHATBOX_TITLE="AI Assistant"
-AI_CHATBOX_GREETING="Hi! How can I help you today?"
-AI_CHATBOX_POSITION=bottom-right  # bottom-right | bottom-left | top-right | top-left
-AI_CHATBOX_COLOR_SCHEME=auto      # auto | light | dark  (widget + admin pages)
-AI_CHATBOX_MARKDOWN=true
-AI_CHATBOX_SOUND=true
-AI_CHATBOX_SOUND_VOLUME=0.3
 
-# ── Memory & Storage ──────────────────────────────────────────────────────────
+# ── Memory ────────────────────────────────────────────────────────────────────
 AI_CHATBOX_MEMORY_DRIVER=session  # session | database
-AI_CHATBOX_STORAGE=local          # local | session
-AI_CHATBOX_PRUNE_DAYS=30          # retention period for ai-chatbox:prune-conversations
 
 # ── RAG ───────────────────────────────────────────────────────────────────────
 # Embedding URL and model are per-provider — set them in the provider block below.
+# Tuning values (top_k, chunk_size, etc.) are set in the published config file.
 AI_CHATBOX_RAG=false
-AI_CHATBOX_EMBEDDING_TIMEOUT=10   # universal — applies to all providers
-AI_CHATBOX_RAG_TOP_K=3
-AI_CHATBOX_RAG_CHUNK_SIZE=500
-AI_CHATBOX_RAG_CHUNK_OVERLAP=50
-AI_CHATBOX_RAG_THRESHOLD=0.2
-AI_CHATBOX_RAG_CONTEXT_PROMPT="Use the following knowledge-base excerpts as your PRIMARY source when answering. Prioritize this context over your general knowledge. If the answer is not found in the context, say \"I don't have that information in my knowledge base.\"\n\nContext:\n{chunks}"
+AI_CHATBOX_EMBEDDING_TIMEOUT=10      # universal — applies to all providers
 AI_CHATBOX_RAG_PROCESSING_TIMEOUT=0  # 0 = no limit
 
 # ── Named Provider Credentials ────────────────────────────────────────────────
