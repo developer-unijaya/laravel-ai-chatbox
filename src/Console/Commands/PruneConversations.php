@@ -33,13 +33,15 @@ class PruneConversations extends Command
 
         $cutoff = now()->subDays($days);
 
+        // Stale: any conversation inactive beyond the cutoff (with or without messages)
         $staleQuery = Conversation::where('updated_at', '<', $cutoff);
-        $emptyQuery = Conversation::doesntHave('messages');
+        // Fresh-empty: conversations with no messages that are not already covered by stale
+        $freshEmptyQuery = Conversation::doesntHave('messages')->where('updated_at', '>=', $cutoff);
 
-        $staleCount = $staleQuery->count();
-        $emptyCount = $emptyQuery->count();
+        $staleCount      = $staleQuery->count();
+        $freshEmptyCount = $freshEmptyQuery->count();
 
-        if ($staleCount === 0 && $emptyCount === 0) {
+        if ($staleCount === 0 && $freshEmptyCount === 0) {
             $this->info("No conversations found that have been inactive for more than {$days} day(s) or have no messages. Nothing to delete.");
             return 0;
         }
@@ -48,25 +50,25 @@ class PruneConversations extends Command
             if ($staleCount > 0) {
                 $this->info("[Dry run] {$staleCount} conversation(s) with no activity since {$cutoff->toDateTimeString()} would be deleted.");
             }
-            if ($emptyCount > 0) {
-                $this->info("[Dry run] {$emptyCount} conversation(s) with no messages would be deleted.");
+            if ($freshEmptyCount > 0) {
+                $this->info("[Dry run] {$freshEmptyCount} conversation(s) with no messages would be deleted.");
             }
             return 0;
         }
 
         if ($staleCount > 0) {
-            $this->info("Deleting {$staleCount} conversation(s) with no activity since {$cutoff->toDateTimeString()}...");
+            $this->info("Deleting {$staleCount} conversation(s) with no activity since {$cutoff->toDateTimeString()} (messages removed via cascade)...");
             $staleQuery->delete();
         }
 
-        if ($emptyCount > 0) {
-            $this->info("Deleting {$emptyCount} conversation(s) with no messages...");
-            // Re-query in case stale delete already removed some empty ones
-            Conversation::doesntHave('messages')->delete();
+        // Delete any remaining empty conversations (stale ones are already gone)
+        $emptyDeleted = Conversation::doesntHave('messages')->delete();
+        if ($emptyDeleted > 0) {
+            $this->info("Deleted {$emptyDeleted} conversation(s) with no messages.");
         }
 
-        $total = $staleCount + $emptyCount;
-        $this->info("Done. Up to {$total} conversation(s) deleted.");
+        $total = $staleCount + $emptyDeleted;
+        $this->info("Done. {$total} conversation(s) deleted.");
 
         return 0;
     }
