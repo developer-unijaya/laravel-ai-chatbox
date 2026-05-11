@@ -134,7 +134,7 @@ class AdminController extends Controller
         // $cfg is the resolved effective config — api_url/token/model come from
         // the active provider. Validate every required field is properly set.
         $activeProvider = config('ai-chatbox.active_provider', 'default');
-        $allProviders   = config('ai-chatbox.providers', []);
+        $allProviders = config('ai-chatbox.providers', []);
 
         // Mirror AiManager: 'default' and '' both map to the first configured provider
         if ($activeProvider === 'default' || $activeProvider === '') {
@@ -409,10 +409,10 @@ class AdminController extends Controller
             'app_url' => config('app.url'),
         ];
 
-        $rawToggleIcon  = $cfg['toggle_icon'] ?? null;
-        $toggleIconUrl  = $rawToggleIcon
-            ? (preg_match('#^https?://#i', $rawToggleIcon) ? $rawToggleIcon : asset($rawToggleIcon))
-            : null;
+        $rawToggleIcon = $cfg['toggle_icon'] ?? null;
+        $toggleIconUrl = $rawToggleIcon
+        ? (preg_match('#^https?://#i', $rawToggleIcon) ? $rawToggleIcon : asset($rawToggleIcon))
+        : null;
 
         return view('ai-chatbox::admin', [
             'ragStats' => $ragStats,

@@ -39,9 +39,9 @@ class EmbeddingService
 
     public function embed(string $text): ?array
     {
-        $url     = $this->url ?? '';
-        $model   = $this->model ?? '';
-        $token   = $this->token ?? '';
+        $url = $this->url ?? '';
+        $model = $this->model ?? '';
+        $token = $this->token ?? '';
         $timeout = $this->timeout ?? 10;
 
         if (empty($url)) {
