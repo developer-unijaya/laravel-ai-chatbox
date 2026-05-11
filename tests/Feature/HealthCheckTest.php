@@ -157,7 +157,7 @@ class HealthCheckTest extends TestCase
         // testprovider URL is valid but overriding to a different provider to confirm routing
         $this->app['config']->set('ai-chatbox.providers', [
             'myprovider' => [
-                'api_url'   => 'http://active.example.com/v1/chat',
+                'api_url' => 'http://active.example.com/v1/chat',
                 'api_token' => 'active-token',
                 'api_model' => 'active-model',
             ],

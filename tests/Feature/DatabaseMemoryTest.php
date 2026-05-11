@@ -5,7 +5,6 @@ use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use SyafiqUnijaya\AiChatbox\Memory\DatabaseConversationRepository;
 use SyafiqUnijaya\AiChatbox\Memory\Models\Conversation;
-use SyafiqUnijaya\AiChatbox\Memory\Models\Message;
 use SyafiqUnijaya\AiChatbox\Tests\TestCase;
 
 /**
@@ -34,11 +33,11 @@ class DatabaseMemoryTest extends TestCase
 
     public function test_save_history_creates_conversation_and_messages(): void
     {
-        $repo     = new DatabaseConversationRepository();
+        $repo = new DatabaseConversationRepository();
         $threadId = '550e8400-e29b-4d4f-a716-446655440000';
 
         $repo->saveHistory($threadId, [
-            ['role' => 'user',      'content' => 'Hello'],
+            ['role' => 'user', 'content' => 'Hello'],
             ['role' => 'assistant', 'content' => 'Hi there!'],
         ]);
 
@@ -46,64 +45,69 @@ class DatabaseMemoryTest extends TestCase
         $this->assertDatabaseCount('ai_chatbox_messages', 2);
 
         $this->assertDatabaseHas('ai_chatbox_conversations', ['thread_id' => $threadId]);
-        $this->assertDatabaseHas('ai_chatbox_messages', ['role' => 'user',      'content' => 'Hello']);
+        $this->assertDatabaseHas('ai_chatbox_messages', ['role' => 'user', 'content' => 'Hello']);
         $this->assertDatabaseHas('ai_chatbox_messages', ['role' => 'assistant', 'content' => 'Hi there!']);
     }
 
-    public function test_save_history_replaces_existing_messages(): void
+    public function test_save_history_appends_only_new_messages(): void
     {
-        $repo     = new DatabaseConversationRepository();
+        $repo = new DatabaseConversationRepository();
         $threadId = '550e8400-e29b-4d4f-a716-446655440000';
 
+        // First call: 2 messages stored
         $repo->saveHistory($threadId, [
-            ['role' => 'user',      'content' => 'old message'],
+            ['role' => 'user', 'content' => 'old message'],
             ['role' => 'assistant', 'content' => 'old reply'],
         ]);
 
+        // Second call: controller always passes the full history + new pair
         $repo->saveHistory($threadId, [
-            ['role' => 'user',      'content' => 'new message'],
+            ['role' => 'user', 'content' => 'old message'],
+            ['role' => 'assistant', 'content' => 'old reply'],
+            ['role' => 'user', 'content' => 'new message'],
             ['role' => 'assistant', 'content' => 'new reply'],
         ]);
 
         $this->assertDatabaseCount('ai_chatbox_conversations', 1); // same conversation
-        $this->assertDatabaseCount('ai_chatbox_messages', 2);       // replaced, not appended
+        $this->assertDatabaseCount('ai_chatbox_messages', 4);      // appended, not replaced
 
-        $this->assertDatabaseMissing('ai_chatbox_messages', ['content' => 'old message']);
-        $this->assertDatabaseHas('ai_chatbox_messages',    ['content' => 'new message']);
+        // Both old and new messages are preserved in the DB
+        $this->assertDatabaseHas('ai_chatbox_messages', ['content' => 'old message']);
+        $this->assertDatabaseHas('ai_chatbox_messages', ['content' => 'new message']);
     }
 
     public function test_get_history_returns_messages_in_order(): void
     {
-        $repo     = new DatabaseConversationRepository();
+        $repo = new DatabaseConversationRepository();
         $threadId = '550e8400-e29b-4d4f-a716-446655440000';
 
         $repo->saveHistory($threadId, [
-            ['role' => 'user',      'content' => 'first'],
+            ['role' => 'user', 'content' => 'first'],
             ['role' => 'assistant', 'content' => 'second'],
-            ['role' => 'user',      'content' => 'third'],
+            ['role' => 'user', 'content' => 'third'],
             ['role' => 'assistant', 'content' => 'fourth'],
         ]);
 
         $history = $repo->getHistory($threadId);
 
         $this->assertCount(4, $history);
-        $this->assertSame('first',  $history[0]['content']);
+        $this->assertSame('first', $history[0]['content']);
         $this->assertSame('second', $history[1]['content']);
-        $this->assertSame('third',  $history[2]['content']);
+        $this->assertSame('third', $history[2]['content']);
         $this->assertSame('fourth', $history[3]['content']);
     }
 
     public function test_trim_to_limit_drops_oldest_pairs(): void
     {
-        $repo     = new DatabaseConversationRepository();
+        $repo = new DatabaseConversationRepository();
         $threadId = '550e8400-e29b-4d4f-a716-446655440000';
 
         $repo->saveHistory($threadId, [
-            ['role' => 'user',      'content' => 'msg1'],
+            ['role' => 'user', 'content' => 'msg1'],
             ['role' => 'assistant', 'content' => 'rep1'],
-            ['role' => 'user',      'content' => 'msg2'],
+            ['role' => 'user', 'content' => 'msg2'],
             ['role' => 'assistant', 'content' => 'rep2'],
-            ['role' => 'user',      'content' => 'msg3'],
+            ['role' => 'user', 'content' => 'msg3'],
             ['role' => 'assistant', 'content' => 'rep3'],
         ]);
 
@@ -117,11 +121,11 @@ class DatabaseMemoryTest extends TestCase
 
     public function test_trim_to_limit_does_nothing_when_under_limit(): void
     {
-        $repo     = new DatabaseConversationRepository();
+        $repo = new DatabaseConversationRepository();
         $threadId = '550e8400-e29b-4d4f-a716-446655440000';
 
         $repo->saveHistory($threadId, [
-            ['role' => 'user',      'content' => 'only'],
+            ['role' => 'user', 'content' => 'only'],
             ['role' => 'assistant', 'content' => 'one pair'],
         ]);
 
@@ -132,24 +136,26 @@ class DatabaseMemoryTest extends TestCase
 
     public function test_clear_removes_all_messages(): void
     {
-        $repo     = new DatabaseConversationRepository();
+        $repo = new DatabaseConversationRepository();
         $threadId = '550e8400-e29b-4d4f-a716-446655440000';
 
         $repo->saveHistory($threadId, [
-            ['role' => 'user',      'content' => 'Hello'],
+            ['role' => 'user', 'content' => 'Hello'],
             ['role' => 'assistant', 'content' => 'Hi!'],
         ]);
 
         $repo->clear($threadId);
 
+        // AI context returns empty — cleared_after_id acts as a soft-clear boundary
         $this->assertSame([], $repo->getHistory($threadId));
-        $this->assertDatabaseCount('ai_chatbox_messages', 0);
+        // Messages are preserved in the DB so admins can still review them
+        $this->assertDatabaseCount('ai_chatbox_messages', 2);
         $this->assertDatabaseCount('ai_chatbox_conversations', 1); // conversation row kept
     }
 
     public function test_clear_is_scoped_to_thread(): void
     {
-        $repo    = new DatabaseConversationRepository();
+        $repo = new DatabaseConversationRepository();
         $threadA = '550e8400-e29b-4d4f-a716-446655440000';
         $threadB = '6ba7b810-9dad-4d4f-80b4-00c04fd430c8';
 
@@ -175,11 +181,11 @@ class DatabaseMemoryTest extends TestCase
         ]);
 
         $this->postJson('/ai-chatbox/message', [
-            'message'   => 'DB message',
+            'message' => 'DB message',
             'thread_id' => $threadId,
         ])->assertOk()->assertJsonFragment(['reply' => 'DB reply']);
 
-        $this->assertDatabaseHas('ai_chatbox_messages', ['role' => 'user',      'content' => 'DB message']);
+        $this->assertDatabaseHas('ai_chatbox_messages', ['role' => 'user', 'content' => 'DB message']);
         $this->assertDatabaseHas('ai_chatbox_messages', ['role' => 'assistant', 'content' => 'DB reply']);
     }
 
@@ -201,9 +207,9 @@ class DatabaseMemoryTest extends TestCase
         $history = (new DatabaseConversationRepository())->getHistory($threadId);
 
         $this->assertCount(4, $history); // 2 pairs
-        $this->assertSame('Msg 1',   $history[0]['content']);
+        $this->assertSame('Msg 1', $history[0]['content']);
         $this->assertSame('Reply 1', $history[1]['content']);
-        $this->assertSame('Msg 2',   $history[2]['content']);
+        $this->assertSame('Msg 2', $history[2]['content']);
         $this->assertSame('Reply 2', $history[3]['content']);
     }
 
@@ -220,9 +226,9 @@ class DatabaseMemoryTest extends TestCase
         $this->postJson('/ai-chatbox/message', ['message' => 'Thread A', 'thread_id' => $threadA]);
         $this->postJson('/ai-chatbox/message', ['message' => 'Thread B', 'thread_id' => $threadB]);
 
-        $repo    = new DatabaseConversationRepository();
-        $histA   = $repo->getHistory($threadA);
-        $histB   = $repo->getHistory($threadB);
+        $repo = new DatabaseConversationRepository();
+        $histA = $repo->getHistory($threadA);
+        $histB = $repo->getHistory($threadB);
 
         $this->assertSame('Thread A', $histA[0]['content']);
         $this->assertSame('Thread B', $histB[0]['content']);
@@ -231,16 +237,16 @@ class DatabaseMemoryTest extends TestCase
     public function test_clear_history_endpoint_removes_db_messages(): void
     {
         $threadId = '550e8400-e29b-4d4f-a716-446655440000';
-        $repo     = new DatabaseConversationRepository();
+        $repo = new DatabaseConversationRepository();
 
         $repo->saveHistory($threadId, [
-            ['role' => 'user',      'content' => 'Hello'],
+            ['role' => 'user', 'content' => 'Hello'],
             ['role' => 'assistant', 'content' => 'Hi'],
         ]);
 
         $this->postJson('/ai-chatbox/clear', ['thread_id' => $threadId])
-             ->assertOk()
-             ->assertJsonFragment(['status' => 'ok']);
+            ->assertOk()
+            ->assertJsonFragment(['status' => 'ok']);
 
         $this->assertSame([], $repo->getHistory($threadId));
     }
@@ -254,7 +260,7 @@ class DatabaseMemoryTest extends TestCase
         ]);
 
         $this->postJson('/ai-chatbox/message', [
-            'message'   => 'Hello',
+            'message' => 'Hello',
             'thread_id' => '550e8400-e29b-4d4f-a716-446655440000',
         ])->assertOk();
 

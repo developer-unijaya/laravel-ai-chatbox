@@ -43,9 +43,9 @@ class RagDocumentTest extends TestCase
         // Testbench has no real auth guard wired up, so we just assert the route
         // exists and is accessible when middleware is bypassed.
         $this->withoutMiddleware()
-             ->get('/ai-chatbox/rag')
-             ->assertStatus(200)
-             ->assertSee('Knowledge Base');
+            ->get('/ai-chatbox/rag')
+            ->assertStatus(200)
+            ->assertSee('Knowledge Base');
     }
 
     // ── Upload validation ─────────────────────────────────────────────────────
@@ -53,17 +53,17 @@ class RagDocumentTest extends TestCase
     public function test_upload_requires_a_file(): void
     {
         $this->withoutMiddleware()
-             ->post('/ai-chatbox/rag', [])
-             ->assertSessionHasErrors(['file']);
+            ->post('/ai-chatbox/rag', [])
+            ->assertSessionHasErrors(['file']);
     }
 
     public function test_upload_rejects_disallowed_file_types(): void
     {
         $this->withoutMiddleware()
-             ->post('/ai-chatbox/rag', [
-                 'file' => $this->fakeFile('<html></html>', 'html'),
-             ])
-             ->assertSessionHasErrors(['file']);
+            ->post('/ai-chatbox/rag', [
+                'file' => $this->fakeFile('<html></html>', 'html'),
+            ])
+            ->assertSessionHasErrors(['file']);
     }
 
     // ── Successful upload ─────────────────────────────────────────────────────
@@ -78,12 +78,12 @@ class RagDocumentTest extends TestCase
         ]);
 
         $this->withoutMiddleware()
-             ->post('/ai-chatbox/rag', [
-                 'file'  => $this->fakeFile($content, 'txt'),
-                 'title' => 'My Test Doc',
-             ])
-             ->assertRedirect('/ai-chatbox/rag')
-             ->assertSessionHas('success');
+            ->post('/ai-chatbox/rag', [
+                'file' => $this->fakeFile($content, 'txt'),
+                'title' => 'My Test Doc',
+            ])
+            ->assertRedirect('/ai-chatbox/rag')
+            ->assertSessionHas('success');
 
         $doc = RagDocument::first();
         $this->assertNotNull($doc);
@@ -100,11 +100,11 @@ class RagDocumentTest extends TestCase
         $this->mockGuzzle([$this->mockEmbedding()]);
 
         $this->withoutMiddleware()
-             ->post('/ai-chatbox/rag', [
-                 'file' => $this->fakeFile($content, 'md'),
-             ])
-             ->assertRedirect('/ai-chatbox/rag')
-             ->assertSessionHas('success');
+            ->post('/ai-chatbox/rag', [
+                'file' => $this->fakeFile($content, 'md'),
+            ])
+            ->assertRedirect('/ai-chatbox/rag')
+            ->assertSessionHas('success');
 
         $this->assertSame('ready', RagDocument::first()->status);
     }
@@ -114,9 +114,9 @@ class RagDocumentTest extends TestCase
         $this->mockGuzzle([$this->mockEmbedding()]);
 
         $this->withoutMiddleware()
-             ->post('/ai-chatbox/rag', [
-                 'file' => $this->fakeFile('content', 'txt'),
-             ]);
+            ->post('/ai-chatbox/rag', [
+                'file' => $this->fakeFile('content', 'txt'),
+            ]);
 
         // UploadedFile fake name is 'test.txt', stem is 'test'
         $this->assertSame('test', RagDocument::first()?->title);
@@ -129,9 +129,9 @@ class RagDocumentTest extends TestCase
         $this->mockGuzzle([$this->mockEmbedding()]);
 
         $this->withoutMiddleware()
-             ->post('/ai-chatbox/rag', [
-                 'file' => $this->fakeFile('Hello world.', 'txt'),
-             ]);
+            ->post('/ai-chatbox/rag', [
+                'file' => $this->fakeFile('Hello world.', 'txt'),
+            ]);
 
         $chunk = RagChunk::first();
         $this->assertIsArray($chunk->embedding);
@@ -146,17 +146,17 @@ class RagDocumentTest extends TestCase
         $this->mockGuzzle([$this->mockEmbedding()]);
 
         $this->withoutMiddleware()
-             ->post('/ai-chatbox/rag', [
-                 'file' => $this->fakeFile('Hello', 'txt'),
-             ]);
+            ->post('/ai-chatbox/rag', [
+                'file' => $this->fakeFile('Hello', 'txt'),
+            ]);
 
         $doc = RagDocument::first();
         $this->assertNotNull($doc);
 
         $this->withoutMiddleware()
-             ->delete('/ai-chatbox/rag/' . $doc->id)
-             ->assertRedirect('/ai-chatbox/rag')
-             ->assertSessionHas('success');
+            ->delete('/ai-chatbox/rag/' . $doc->id)
+            ->assertRedirect('/ai-chatbox/rag')
+            ->assertSessionHas('success');
 
         $this->assertDatabaseMissing('ai_chatbox_rag_documents', ['id' => $doc->id]);
         $this->assertDatabaseMissing('ai_chatbox_rag_chunks', ['document_id' => $doc->id]);
@@ -170,9 +170,9 @@ class RagDocumentTest extends TestCase
         $this->mockGuzzle([$this->mockEmbedding()]);
 
         $this->withoutMiddleware()
-             ->post('/ai-chatbox/rag', [
-                 'file' => $this->fakeFile('Single paragraph.', 'txt'),
-             ]);
+            ->post('/ai-chatbox/rag', [
+                'file' => $this->fakeFile('Single paragraph.', 'txt'),
+            ]);
 
         $doc = RagDocument::first();
         $originalCount = $doc->chunk_count;
@@ -181,9 +181,9 @@ class RagDocumentTest extends TestCase
         $this->mockGuzzle([$this->mockEmbedding()]);
 
         $this->withoutMiddleware()
-             ->post('/ai-chatbox/rag/' . $doc->id . '/reprocess')
-             ->assertRedirect('/ai-chatbox/rag')
-             ->assertSessionHas('success');
+            ->post('/ai-chatbox/rag/' . $doc->id . '/reprocess')
+            ->assertRedirect('/ai-chatbox/rag')
+            ->assertSessionHas('success');
 
         $doc->refresh();
         $this->assertSame('ready', $doc->status);
@@ -197,21 +197,21 @@ class RagDocumentTest extends TestCase
         $this->app['config']->set('ai-chatbox.rag_embedding_url', 'http://global.example.com/v1/embeddings');
         $this->app['config']->set('ai-chatbox.providers', [
             'lmstudio' => [
-                'api_url'             => 'http://lmstudio.example.com/v1/chat',
-                'api_token'           => 'lm-token',
-                'api_model'           => 'lm-model',
-                'rag_embedding_url'   => 'http://lmstudio.example.com/v1/embeddings',
+                'api_url' => 'http://lmstudio.example.com/v1/chat',
+                'api_token' => 'lm-token',
+                'api_model' => 'lm-model',
+                'rag_embedding_url' => 'http://lmstudio.example.com/v1/embeddings',
                 'rag_embedding_model' => 'my-embed-model',
             ],
         ]);
         $this->app['config']->set('ai-chatbox.active_provider', 'lmstudio');
 
         $this->withoutMiddleware()
-             ->get('/ai-chatbox/rag')
-             ->assertOk()
-             ->assertSee('http://lmstudio.example.com/v1/embeddings')
-             ->assertSee('my-embed-model')
-             ->assertDontSee('http://global.example.com/v1/embeddings');
+            ->get('/ai-chatbox/rag')
+            ->assertOk()
+            ->assertSee('http://lmstudio.example.com/v1/embeddings')
+            ->assertSee('my-embed-model')
+            ->assertDontSee('http://global.example.com/v1/embeddings');
     }
 
     public function test_rag_upload_uses_active_provider_embedding_config(): void
@@ -220,10 +220,10 @@ class RagDocumentTest extends TestCase
         $this->app['config']->set('ai-chatbox.rag_embedding_url', '');
         $this->app['config']->set('ai-chatbox.providers', [
             'lmstudio' => [
-                'api_url'             => 'http://lmstudio.example.com/v1/chat',
-                'api_token'           => 'lm-token',
-                'api_model'           => 'lm-model',
-                'rag_embedding_url'   => 'http://lmstudio.example.com/v1/embeddings',
+                'api_url' => 'http://lmstudio.example.com/v1/chat',
+                'api_token' => 'lm-token',
+                'api_model' => 'lm-model',
+                'rag_embedding_url' => 'http://lmstudio.example.com/v1/embeddings',
                 'rag_embedding_model' => 'lm-embed',
             ],
         ]);
@@ -232,11 +232,11 @@ class RagDocumentTest extends TestCase
         $this->mockGuzzle([$this->mockEmbedding()]);
 
         $this->withoutMiddleware()
-             ->post('/ai-chatbox/rag', [
-                 'file' => $this->fakeFile('Hello from LM Studio.', 'txt'),
-             ])
-             ->assertRedirect('/ai-chatbox/rag')
-             ->assertSessionHas('success');
+            ->post('/ai-chatbox/rag', [
+                'file' => $this->fakeFile('Hello from LM Studio.', 'txt'),
+            ])
+            ->assertRedirect('/ai-chatbox/rag')
+            ->assertSessionHas('success');
 
         $this->assertSame('ready', RagDocument::first()->status);
     }
@@ -247,18 +247,18 @@ class RagDocumentTest extends TestCase
     {
         // Seed a ready document with a known chunk + embedding
         $doc = RagDocument::create([
-            'title'             => 'FAQ',
+            'title' => 'FAQ',
             'original_filename' => 'faq.txt',
-            'file_type'         => 'txt',
-            'status'            => 'ready',
-            'chunk_count'       => 1,
+            'file_type' => 'txt',
+            'status' => 'ready',
+            'chunk_count' => 1,
         ]);
 
         RagChunk::create([
             'document_id' => $doc->id,
             'chunk_index' => 0,
-            'content'     => 'Laravel is a PHP framework.',
-            'embedding'   => [1.0, 0.0, 0.0], // unit vector
+            'content' => 'Laravel is a PHP framework.',
+            'embedding' => [1.0, 0.0, 0.0], // unit vector
         ]);
 
         // Enable RAG
@@ -278,6 +278,6 @@ class RagDocumentTest extends TestCase
         $response = $this->postJson('/ai-chatbox/message', ['message' => 'What is Laravel?']);
 
         $response->assertStatus(200)
-                 ->assertJson(['reply' => 'Laravel is great!']);
+            ->assertJson(['reply' => 'Laravel is great!']);
     }
 }

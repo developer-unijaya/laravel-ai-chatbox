@@ -41,7 +41,7 @@ class AiFacadeTest extends TestCase
     public function test_ai_provider_default_resolves_to_active_named_provider(): void
     {
         $this->app['config']->set('ai-chatbox.providers.testprovider', [
-            'api_url'   => 'http://test.provider.com',
+            'api_url' => 'http://test.provider.com',
             'api_token' => 'test-token',
             'api_model' => 'test-model-x',
         ]);
@@ -49,7 +49,7 @@ class AiFacadeTest extends TestCase
         $provider = AI::provider('default');
 
         $this->assertSame('http://test.provider.com', $provider->getConfig()['api_url']);
-        $this->assertSame('test-model-x',             $provider->getConfig()['api_model']);
+        $this->assertSame('test-model-x', $provider->getConfig()['api_model']);
     }
 
     // ── Named providers ───────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ class AiFacadeTest extends TestCase
     public function test_ai_provider_named_resolves_correct_url(): void
     {
         $this->app['config']->set('ai-chatbox.providers.ollama', [
-            'api_url'   => 'http://localhost:11434/v1/chat/completions',
+            'api_url' => 'http://localhost:11434/v1/chat/completions',
             'api_token' => 'ollama',
             'api_model' => 'phi3:mini',
         ]);
@@ -65,7 +65,7 @@ class AiFacadeTest extends TestCase
         $provider = AI::provider('ollama');
 
         $this->assertSame('http://localhost:11434/v1/chat/completions', $provider->getConfig()['api_url']);
-        $this->assertSame('ollama',    $provider->getConfig()['api_token']);
+        $this->assertSame('ollama', $provider->getConfig()['api_token']);
         $this->assertSame('phi3:mini', $provider->getConfig()['api_model']);
     }
 
@@ -73,7 +73,7 @@ class AiFacadeTest extends TestCase
     {
         $this->app['config']->set('ai-chatbox.temperature', 0.3);
         $this->app['config']->set('ai-chatbox.providers.openai', [
-            'api_url'   => 'https://api.openai.com/v1/chat/completions',
+            'api_url' => 'https://api.openai.com/v1/chat/completions',
             'api_token' => 'sk-test',
             'api_model' => 'gpt-4o',
         ]);
@@ -147,7 +147,7 @@ class AiFacadeTest extends TestCase
         ]);
 
         $history = [
-            ['role' => 'user',      'content' => 'Previous question'],
+            ['role' => 'user', 'content' => 'Previous question'],
             ['role' => 'assistant', 'content' => 'Previous answer'],
         ];
 

@@ -98,7 +98,7 @@ class AdminDiagnosticsTest extends TestCase
         $this->app['config']->set('ai-chatbox.active_provider', 'myprovider');
         $this->app['config']->set('ai-chatbox.providers', [
             'myprovider' => [
-                'api_url'   => 'http://myprovider.example.com/v1/chat',
+                'api_url' => 'http://myprovider.example.com/v1/chat',
                 'api_token' => 'myprovider-token',
                 'api_model' => 'myprovider-model',
             ],

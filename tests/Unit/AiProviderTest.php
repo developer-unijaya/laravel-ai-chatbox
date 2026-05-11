@@ -13,13 +13,13 @@ class AiProviderTest extends TestCase
     private function cfg(array $overrides = []): array
     {
         return array_merge([
-            'api_url'       => 'http://ai.test/v1/chat/completions',
-            'api_token'     => 'test-token',
-            'api_model'     => 'test-model',
+            'api_url' => 'http://ai.test/v1/chat/completions',
+            'api_token' => 'test-token',
+            'api_model' => 'test-model',
             'system_prompt' => 'You are helpful.',
-            'language'      => 'English',
-            'temperature'   => 0.7,
-            'rag_enabled'   => false,
+            'language' => 'English',
+            'temperature' => 0.7,
+            'rag_enabled' => false,
         ], $overrides);
     }
 
@@ -68,8 +68,8 @@ class AiProviderTest extends TestCase
             });
 
         $provider = new AiProvider($engine, new PromptBuilder(), $this->cfg());
-        $history  = [
-            ['role' => 'user',      'content' => 'previous message'],
+        $history = [
+            ['role' => 'user', 'content' => 'previous message'],
             ['role' => 'assistant', 'content' => 'previous reply'],
         ];
 
@@ -110,8 +110,8 @@ class AiProviderTest extends TestCase
     public function test_stream_closure_calls_on_token_when_invoked(): void
     {
         $received = '';
-        $reader   = $this->provider(reply: 'token')->stream('Hello');
-        $reader(function (string $t) use (&$received) { $received .= $t; });
+        $reader = $this->provider(reply: 'token')->stream('Hello');
+        $reader(function (string $t) use (&$received) {$received .= $t;});
 
         $this->assertSame('token', $received);
     }
@@ -205,12 +205,12 @@ class AiProviderTest extends TestCase
 
         $cfg = $provider->getConfig();
 
-        $this->assertSame('gpt-4o',       $cfg['api_model']);
-        $this->assertSame(0.3,            $cfg['temperature']);
-        $this->assertSame('Be concise.',  $cfg['system_prompt']);
-        $this->assertSame('Malay',        $cfg['language']);
-        $this->assertSame(200,            $cfg['max_tokens']);
-        $this->assertSame(45,             $cfg['timeout']);
+        $this->assertSame('gpt-4o', $cfg['api_model']);
+        $this->assertSame(0.3, $cfg['temperature']);
+        $this->assertSame('Be concise.', $cfg['system_prompt']);
+        $this->assertSame('Malay', $cfg['language']);
+        $this->assertSame(200, $cfg['max_tokens']);
+        $this->assertSame(45, $cfg['timeout']);
     }
 
     // ── getConfig() ───────────────────────────────────────────────────────────

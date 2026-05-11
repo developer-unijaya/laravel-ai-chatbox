@@ -31,7 +31,7 @@ class StreamMessageTest extends TestCase
     {
         $body = '';
         foreach ($tokens as $i => $token) {
-            $done  = ($i === count($tokens) - 1);
+            $done = ($i === count($tokens) - 1);
             $body .= json_encode(['message' => ['content' => $token], 'done' => $done]) . "\n";
         }
 
@@ -133,7 +133,7 @@ class StreamMessageTest extends TestCase
 
     public function test_scopes_streamed_history_to_thread_id(): void
     {
-        $threadId   = '550e8400-e29b-4d4f-a716-446655440000';
+        $threadId = '550e8400-e29b-4d4f-a716-446655440000';
         $sessionKey = 'ai_chatbox_history_' . str_replace('-', '', $threadId);
 
         $this->mockGuzzle([$this->streamResponse(['Streamed reply'])]);
@@ -167,7 +167,7 @@ class StreamMessageTest extends TestCase
         $this->app['config']->set('ai-chatbox.api_token', '');
         $this->app['config']->set('ai-chatbox.providers', [
             'streamprovider' => [
-                'api_url'   => 'http://stream.example.com/v1/chat/completions',
+                'api_url' => 'http://stream.example.com/v1/chat/completions',
                 'api_token' => 'stream-token',
                 'api_model' => 'stream-model',
             ],

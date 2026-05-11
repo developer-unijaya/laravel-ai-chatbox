@@ -4,7 +4,6 @@ namespace SyafiqUnijaya\AiChatbox\Tests\Feature;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use SyafiqUnijaya\AiChatbox\Tests\TestCase;
 
 class SendMessageTest extends TestCase
@@ -223,9 +222,9 @@ class SendMessageTest extends TestCase
 
         // Seed session with 2 existing pairs (4 entries = at the limit)
         session(['ai_chatbox_history' => [
-            ['role' => 'user',      'content' => 'msg1'],
+            ['role' => 'user', 'content' => 'msg1'],
             ['role' => 'assistant', 'content' => 'reply1'],
-            ['role' => 'user',      'content' => 'msg2'],
+            ['role' => 'user', 'content' => 'msg2'],
             ['role' => 'assistant', 'content' => 'reply2'],
         ]]);
 
@@ -256,8 +255,8 @@ class SendMessageTest extends TestCase
     {
         $threadA = '550e8400-e29b-4d4f-a716-446655440000';
         $threadB = '6ba7b810-9dad-4d4f-80b4-00c04fd430c8';
-        $keyA    = 'ai_chatbox_history_' . str_replace('-', '', $threadA);
-        $keyB    = 'ai_chatbox_history_' . str_replace('-', '', $threadB);
+        $keyA = 'ai_chatbox_history_' . str_replace('-', '', $threadA);
+        $keyB = 'ai_chatbox_history_' . str_replace('-', '', $threadB);
 
         $this->mockGuzzle([
             $this->openAiResponse('Reply A'),
@@ -289,21 +288,22 @@ class SendMessageTest extends TestCase
 
         // Seed with a large history that would exceed 20 tokens (80+ chars)
         session(['ai_chatbox_history' => [
-            ['role' => 'user',      'content' => 'this is a long first message that pushes over the limit'],
+            ['role' => 'user', 'content' => 'this is a long first message that pushes over the limit'],
             ['role' => 'assistant', 'content' => 'this is a long first assistant reply that also adds tokens'],
-            ['role' => 'user',      'content' => 'short'],
+            ['role' => 'user', 'content' => 'short'],
             ['role' => 'assistant', 'content' => 'short'],
         ]]);
 
         $this->mockGuzzle([$this->openAiResponse('OK')]);
         $this->postJson('/ai-chatbox/message', ['message' => 'hi']);
 
-        // The full history + current message exceeds 20 tokens, so old pairs are dropped
-        // The stored history after the response should not have all 4 original entries + new pair
+        // Context trimming only affects what is sent to the AI — full history is always persisted.
+        // The stored session history should contain all 4 original messages + the new user/AI pair.
         $history = session('ai_chatbox_history');
         $this->assertNotEmpty($history);
-        // Verify the oldest long pair was pruned (first two entries should NOT be the very long ones)
-        $this->assertNotSame('this is a long first message that pushes over the limit', $history[0]['content']);
+        $this->assertCount(6, $history);
+        // The oldest long message is preserved in storage even though it was trimmed from the AI context
+        $this->assertSame('this is a long first message that pushes over the limit', $history[0]['content']);
     }
 
     public function test_token_trimming_disabled_when_limit_is_zero(): void
@@ -312,7 +312,7 @@ class SendMessageTest extends TestCase
         $this->app['config']->set('ai-chatbox.history_limit', 10);
 
         session(['ai_chatbox_history' => [
-            ['role' => 'user',      'content' => str_repeat('a', 1000)],
+            ['role' => 'user', 'content' => str_repeat('a', 1000)],
             ['role' => 'assistant', 'content' => str_repeat('b', 1000)],
         ]]);
 
@@ -334,7 +334,7 @@ class SendMessageTest extends TestCase
             $this->openAiResponse('Reply 2'),
         ]);
 
-        $this->postJson('/ai-chatbox/message', ['message' => 'First',  'thread_id' => $threadId]);
+        $this->postJson('/ai-chatbox/message', ['message' => 'First', 'thread_id' => $threadId]);
         $this->postJson('/ai-chatbox/message', ['message' => 'Second', 'thread_id' => $threadId]);
 
         // History lives in DB, not session
@@ -351,7 +351,7 @@ class SendMessageTest extends TestCase
         $this->app['config']->set('ai-chatbox.api_token', '');
         $this->app['config']->set('ai-chatbox.providers', [
             'myprovider' => [
-                'api_url'   => 'http://active.example.com/v1/chat/completions',
+                'api_url' => 'http://active.example.com/v1/chat/completions',
                 'api_token' => 'active-token',
                 'api_model' => 'active-model',
             ],
@@ -383,7 +383,7 @@ class SendMessageTest extends TestCase
             $this->openAiResponse('Reply 2'),
         ]);
 
-        $this->postJson('/ai-chatbox/message', ['message' => 'First',  'thread_id' => $threadId]);
+        $this->postJson('/ai-chatbox/message', ['message' => 'First', 'thread_id' => $threadId]);
         $this->postJson('/ai-chatbox/message', ['message' => 'Second', 'thread_id' => $threadId]);
 
         // Only the newest 1 pair = 2 messages should remain

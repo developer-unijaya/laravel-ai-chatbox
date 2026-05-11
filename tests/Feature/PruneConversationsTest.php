@@ -1,5 +1,4 @@
 <?php
-
 namespace SyafiqUnijaya\AiChatbox\Tests\Feature;
 
 use Illuminate\Console\Command;
@@ -79,7 +78,7 @@ class PruneConversationsTest extends TestCase
 
         // Use Artisan::call() directly; PendingCommand has known issues with boolean flag propagation
         $exitCode = Artisan::call('ai-chatbox:prune-conversations', ['--force' => true]);
-        $output   = Artisan::output();
+        $output = Artisan::output();
 
         $this->assertStringContainsString("memory_driver is set to 'session'", $output);
         $this->assertStringContainsString('Running anyway because --force was passed', $output);
@@ -105,15 +104,15 @@ class PruneConversationsTest extends TestCase
     {
         $this->useDatabase();
 
-        $old   = $this->createConversation('old-thread',    daysAgo: 31);
-        $fresh = $this->createConversation('fresh-thread',  daysAgo: 10);
+        $old = $this->createConversation('old-thread', daysAgo: 31);
+        $fresh = $this->createConversation('fresh-thread', daysAgo: 10, withMessage: true);
 
         $this->artisan('ai-chatbox:prune-conversations')
             ->expectsOutputToContain('1 conversation(s) deleted')
             ->assertExitCode(Command::SUCCESS);
 
         $this->assertDatabaseMissing('ai_chatbox_conversations', ['thread_id' => 'old-thread']);
-        $this->assertDatabaseHas('ai_chatbox_conversations',    ['thread_id' => 'fresh-thread']);
+        $this->assertDatabaseHas('ai_chatbox_conversations', ['thread_id' => 'fresh-thread']);
     }
 
     public function test_deletes_conversations_older_than_custom_days(): void
@@ -121,16 +120,16 @@ class PruneConversationsTest extends TestCase
         $this->useDatabase();
 
         $this->createConversation('very-old', daysAgo: 90);
-        $this->createConversation('medium',   daysAgo: 45);
-        $this->createConversation('recent',   daysAgo: 5);
+        $this->createConversation('medium', daysAgo: 45, withMessage: true);
+        $this->createConversation('recent', daysAgo: 5, withMessage: true);
 
         $this->artisan('ai-chatbox:prune-conversations', ['--days' => '60'])
             ->expectsOutputToContain('1 conversation(s) deleted')
             ->assertExitCode(Command::SUCCESS);
 
         $this->assertDatabaseMissing('ai_chatbox_conversations', ['thread_id' => 'very-old']);
-        $this->assertDatabaseHas('ai_chatbox_conversations',    ['thread_id' => 'medium']);
-        $this->assertDatabaseHas('ai_chatbox_conversations',    ['thread_id' => 'recent']);
+        $this->assertDatabaseHas('ai_chatbox_conversations', ['thread_id' => 'medium']);
+        $this->assertDatabaseHas('ai_chatbox_conversations', ['thread_id' => 'recent']);
     }
 
     public function test_deletes_multiple_old_conversations(): void
@@ -140,7 +139,7 @@ class PruneConversationsTest extends TestCase
         $this->createConversation('old-1', daysAgo: 60);
         $this->createConversation('old-2', daysAgo: 90);
         $this->createConversation('old-3', daysAgo: 120);
-        $this->createConversation('fresh', daysAgo: 5);
+        $this->createConversation('fresh', daysAgo: 5, withMessage: true);
 
         $this->artisan('ai-chatbox:prune-conversations')
             ->expectsOutputToContain('3 conversation(s) deleted')
@@ -157,7 +156,7 @@ class PruneConversationsTest extends TestCase
         $this->useDatabase();
 
         // exactly 30 days ago — should NOT be pruned (cutoff is strictly less than)
-        $this->createConversation('boundary', daysAgo: 30);
+        $this->createConversation('boundary', daysAgo: 30, withMessage: true);
 
         $this->artisan('ai-chatbox:prune-conversations')
             ->expectsOutputToContain('Nothing to delete')
@@ -174,7 +173,7 @@ class PruneConversationsTest extends TestCase
 
         $repo = new DatabaseConversationRepository();
         $repo->saveHistory('old-thread', [
-            ['role' => 'user',      'content' => 'Hello'],
+            ['role' => 'user', 'content' => 'Hello'],
             ['role' => 'assistant', 'content' => 'Hi there!'],
         ]);
 
@@ -213,7 +212,7 @@ class PruneConversationsTest extends TestCase
         $this->artisan('ai-chatbox:prune-conversations')->assertExitCode(Command::SUCCESS);
 
         $this->assertDatabaseMissing('ai_chatbox_messages', ['content' => 'Old message']);
-        $this->assertDatabaseHas('ai_chatbox_messages',    ['content' => 'Fresh message']);
+        $this->assertDatabaseHas('ai_chatbox_messages', ['content' => 'Fresh message']);
     }
 
     // ── --dry-run flag ────────────────────────────────────────────────────────
@@ -227,7 +226,7 @@ class PruneConversationsTest extends TestCase
 
         // Use Artisan::call() directly; PendingCommand has known issues with boolean flag propagation
         $exitCode = Artisan::call('ai-chatbox:prune-conversations', ['--dry-run' => true]);
-        $output   = Artisan::output();
+        $output = Artisan::output();
 
         $this->assertStringContainsString('[Dry run]', $output);
         $this->assertStringContainsString('would be deleted', $output);
@@ -241,7 +240,7 @@ class PruneConversationsTest extends TestCase
     {
         $this->useDatabase();
 
-        $this->createConversation('fresh', daysAgo: 5);
+        $this->createConversation('fresh', daysAgo: 5, withMessage: true);
 
         $exitCode = Artisan::call('ai-chatbox:prune-conversations', ['--dry-run' => true]);
 
@@ -257,15 +256,15 @@ class PruneConversationsTest extends TestCase
 
         $this->app['config']->set('ai-chatbox.conversation_prune_days', 60);
 
-        $this->createConversation('old-enough', daysAgo: 61); // older than 60 days → pruned
-        $this->createConversation('too-fresh',  daysAgo: 31); // older than 30 but not 60 → kept
+        $this->createConversation('old-enough', daysAgo: 61);                   // older than 60 days → pruned
+        $this->createConversation('too-fresh', daysAgo: 31, withMessage: true); // older than 30 but not 60 → kept
 
         $this->artisan('ai-chatbox:prune-conversations')
             ->expectsOutputToContain('1 conversation(s) deleted')
             ->assertExitCode(Command::SUCCESS);
 
         $this->assertDatabaseMissing('ai_chatbox_conversations', ['thread_id' => 'old-enough']);
-        $this->assertDatabaseHas('ai_chatbox_conversations',    ['thread_id' => 'too-fresh']);
+        $this->assertDatabaseHas('ai_chatbox_conversations', ['thread_id' => 'too-fresh']);
     }
 
     public function test_days_option_overrides_config_value(): void
@@ -288,7 +287,7 @@ class PruneConversationsTest extends TestCase
     {
         $this->useDatabase();
 
-        $this->createConversation('recent', daysAgo: 5);
+        $this->createConversation('recent', daysAgo: 5, withMessage: true);
 
         $this->artisan('ai-chatbox:prune-conversations')
             ->expectsOutputToContain('Nothing to delete')
@@ -312,7 +311,7 @@ class PruneConversationsTest extends TestCase
     {
         $this->useDatabase();
 
-        $repo     = new DatabaseConversationRepository();
+        $repo = new DatabaseConversationRepository();
         $threadId = 'touch-test-thread';
 
         $repo->saveHistory($threadId, [
@@ -328,7 +327,7 @@ class PruneConversationsTest extends TestCase
 
         // Saving again must refresh updated_at
         $repo->saveHistory($threadId, [
-            ['role' => 'user',      'content' => 'First message'],
+            ['role' => 'user', 'content' => 'First message'],
             ['role' => 'assistant', 'content' => 'Reply'],
         ]);
 
@@ -345,13 +344,23 @@ class PruneConversationsTest extends TestCase
      * Uses the raw query builder for the timestamp update so Eloquent cannot
      * silently override the value with NOW() via its automatic timestamp handling.
      */
-    private function createConversation(string $threadId, int $daysAgo): Conversation
+    private function createConversation(string $threadId, int $daysAgo, bool $withMessage = false): Conversation
     {
         $conversation = Conversation::create(['thread_id' => $threadId]);
 
         DB::table('ai_chatbox_conversations')
             ->where('thread_id', $threadId)
             ->update(['updated_at' => now()->subDays($daysAgo)->toDateTimeString()]);
+
+        if ($withMessage) {
+            DB::table('ai_chatbox_messages')->insert([
+                'conversation_id' => $conversation->id,
+                'role' => 'user',
+                'content' => 'Hello',
+                'created_at' => now()->toDateTimeString(),
+                'updated_at' => now()->toDateTimeString(),
+            ]);
+        }
 
         return $conversation->fresh();
     }

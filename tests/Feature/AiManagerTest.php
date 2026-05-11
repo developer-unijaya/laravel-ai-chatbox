@@ -27,7 +27,7 @@ class AiManagerTest extends TestCase
         $this->app['config']->set('ai-chatbox.active_provider', 'myprovider');
         $this->app['config']->set('ai-chatbox.providers', [
             'myprovider' => [
-                'api_url'   => 'http://test-default.example.com',
+                'api_url' => 'http://test-default.example.com',
                 'api_token' => 'my-token',
                 'api_model' => 'default-model',
             ],
@@ -36,7 +36,7 @@ class AiManagerTest extends TestCase
         $provider = $this->app->make(AiManager::class)->provider('default');
 
         $this->assertSame('http://test-default.example.com', $provider->getConfig()['api_url']);
-        $this->assertSame('default-model',                   $provider->getConfig()['api_model']);
+        $this->assertSame('default-model', $provider->getConfig()['api_model']);
     }
 
     // ── provider() — named ────────────────────────────────────────────────────
@@ -45,7 +45,7 @@ class AiManagerTest extends TestCase
     {
         $this->setProviders([
             'openai' => [
-                'api_url'   => 'https://api.openai.com/v1/chat/completions',
+                'api_url' => 'https://api.openai.com/v1/chat/completions',
                 'api_token' => 'sk-test',
                 'api_model' => 'gpt-4o',
             ],
@@ -55,7 +55,7 @@ class AiManagerTest extends TestCase
 
         $this->assertSame('https://api.openai.com/v1/chat/completions', $provider->getConfig()['api_url']);
         $this->assertSame('sk-test', $provider->getConfig()['api_token']);
-        $this->assertSame('gpt-4o',  $provider->getConfig()['api_model']);
+        $this->assertSame('gpt-4o', $provider->getConfig()['api_model']);
     }
 
     public function test_named_provider_inherits_global_settings(): void
@@ -63,7 +63,7 @@ class AiManagerTest extends TestCase
         $this->app['config']->set('ai-chatbox.temperature', 0.42);
         $this->setProviders([
             'groq' => [
-                'api_url'   => 'https://api.groq.com/openai/v1/chat/completions',
+                'api_url' => 'https://api.groq.com/openai/v1/chat/completions',
                 'api_token' => 'groq-key',
                 'api_model' => 'llama3-70b',
             ],
@@ -79,9 +79,9 @@ class AiManagerTest extends TestCase
         $this->app['config']->set('ai-chatbox.temperature', 0.7);
         $this->setProviders([
             'cold' => [
-                'api_url'     => 'http://cold.example.com',
-                'api_token'   => 'token',
-                'api_model'   => 'model',
+                'api_url' => 'http://cold.example.com',
+                'api_token' => 'token',
+                'api_model' => 'model',
                 'temperature' => 0.0,
             ],
         ]);
@@ -117,11 +117,11 @@ class AiManagerTest extends TestCase
 
     public function test_resolve_config_named_overrides_api_keys_and_inherits_rest(): void
     {
-        $this->app['config']->set('ai-chatbox.api_url',     'http://base.example.com');
+        $this->app['config']->set('ai-chatbox.api_url', 'http://base.example.com');
         $this->app['config']->set('ai-chatbox.temperature', 0.42);
         $this->app['config']->set('ai-chatbox.providers', [
             'fast' => [
-                'api_url'   => 'http://fast.example.com',
+                'api_url' => 'http://fast.example.com',
                 'api_token' => 'fast-token',
                 'api_model' => 'fast-model',
             ],
@@ -129,9 +129,9 @@ class AiManagerTest extends TestCase
 
         $config = $this->app->make(AiManager::class)->resolveConfig('fast');
 
-        $this->assertSame('http://fast.example.com', $config['api_url']);  // overridden
-        $this->assertSame('fast-token',              $config['api_token']); // overridden
-        $this->assertSame(0.42,                      $config['temperature']); // inherited
+        $this->assertSame('http://fast.example.com', $config['api_url']); // overridden
+        $this->assertSame('fast-token', $config['api_token']);            // overridden
+        $this->assertSame(0.42, $config['temperature']);                  // inherited
     }
 
     // ── resolveConfig — per-provider RAG embedding ────────────────────────────
@@ -141,10 +141,10 @@ class AiManagerTest extends TestCase
         $this->app['config']->set('ai-chatbox.rag_embedding_url', 'http://global.example.com/v1/embeddings');
         $this->app['config']->set('ai-chatbox.providers', [
             'lmstudio' => [
-                'api_url'             => 'http://lmstudio.example.com/v1/chat/completions',
-                'api_token'           => 'lm-token',
-                'api_model'           => 'lm-model',
-                'rag_embedding_url'   => 'http://lmstudio.example.com/v1/embeddings',
+                'api_url' => 'http://lmstudio.example.com/v1/chat/completions',
+                'api_token' => 'lm-token',
+                'api_model' => 'lm-model',
+                'rag_embedding_url' => 'http://lmstudio.example.com/v1/embeddings',
                 'rag_embedding_model' => 'lm-embed-model',
             ],
         ]);
@@ -161,7 +161,7 @@ class AiManagerTest extends TestCase
         $this->app['config']->set('ai-chatbox.rag_embedding_model', 'global-embed');
         $this->app['config']->set('ai-chatbox.providers', [
             'myprovider' => [
-                'api_url'   => 'http://myprovider.example.com/v1/chat',
+                'api_url' => 'http://myprovider.example.com/v1/chat',
                 'api_token' => 'my-token',
                 'api_model' => 'my-model',
                 // no rag_embedding_url or rag_embedding_model

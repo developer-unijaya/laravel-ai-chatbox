@@ -2,8 +2,8 @@
 namespace SyafiqUnijaya\AiChatbox\Tests;
 
 use GuzzleHttp\Client;
-use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Handler\MockHandler;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Orchestra\Testbench\TestCase as Orchestra;
 use SyafiqUnijaya\AiChatbox\AiChatboxServiceProvider;
@@ -25,9 +25,9 @@ abstract class TestCase extends Orchestra
         // SQLite in-memory for RAG model tests
         $app['config']->set('database.default', 'testingdb');
         $app['config']->set('database.connections.testingdb', [
-            'driver'                  => 'sqlite',
-            'database'                => ':memory:',
-            'prefix'                  => '',
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+            'prefix' => '',
             'foreign_key_constraints' => true,
         ]);
 
@@ -44,7 +44,7 @@ abstract class TestCase extends Orchestra
         $app['config']->set('ai-chatbox.active_provider', 'testprovider');
         $app['config']->set('ai-chatbox.providers', [
             'testprovider' => [
-                'api_url'   => 'http://ai.example.com/v1/chat/completions',
+                'api_url' => 'http://ai.example.com/v1/chat/completions',
                 'api_token' => 'test-token',
                 'api_model' => 'test-model',
             ],
@@ -79,7 +79,7 @@ abstract class TestCase extends Orchestra
      */
     protected function mockGuzzle(array $responses): void
     {
-        $mock    = new MockHandler($responses);
+        $mock = new MockHandler($responses);
         $handler = HandlerStack::create($mock);
 
         $this->app->bind('ai-chatbox.guzzle', function () use ($handler) {

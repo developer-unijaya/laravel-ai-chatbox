@@ -19,9 +19,9 @@ class PromptBuilderTest extends TestCase
     private function cfg(array $overrides = []): array
     {
         return array_merge([
-            'language'       => 'English',
-            'system_prompt'  => 'You are helpful. Reply in {language}.',
-            'rag_enabled'    => false,
+            'language' => 'English',
+            'system_prompt' => 'You are helpful. Reply in {language}.',
+            'rag_enabled' => false,
         ], $overrides);
     }
 
@@ -66,17 +66,17 @@ class PromptBuilderTest extends TestCase
     public function test_build_places_history_after_system_and_before_user(): void
     {
         $history = [
-            ['role' => 'user',      'content' => 'prev question'],
+            ['role' => 'user', 'content' => 'prev question'],
             ['role' => 'assistant', 'content' => 'prev answer'],
         ];
 
         $messages = $this->builder->build('new question', $history, $this->cfg());
 
         // [system, user-prev, assistant-prev, user-new]
-        $this->assertSame('system',    $messages[0]['role']);
-        $this->assertSame('user',      $messages[1]['role']);
+        $this->assertSame('system', $messages[0]['role']);
+        $this->assertSame('user', $messages[1]['role']);
         $this->assertSame('assistant', $messages[2]['role']);
-        $this->assertSame('user',      $messages[3]['role']);
+        $this->assertSame('user', $messages[3]['role']);
     }
 
     public function test_build_last_message_is_always_user(): void
@@ -88,7 +88,7 @@ class PromptBuilderTest extends TestCase
 
     public function test_build_user_message_is_last_even_with_history(): void
     {
-        $history  = [['role' => 'user', 'content' => 'a'], ['role' => 'assistant', 'content' => 'b']];
+        $history = [['role' => 'user', 'content' => 'a'], ['role' => 'assistant', 'content' => 'b']];
         $messages = $this->builder->build('final', $history, $this->cfg());
 
         // The last message starts with the user's text (language reminder may be appended)
@@ -100,7 +100,7 @@ class PromptBuilderTest extends TestCase
     public function test_build_appends_language_reminder_to_user_message(): void
     {
         $messages = $this->builder->build('Hello', [], $this->cfg(['language' => 'Malay']));
-        $userMsg  = end($messages)['content'];
+        $userMsg = end($messages)['content'];
 
         $this->assertStringContainsString('Hello', $userMsg);
         $this->assertStringContainsString('Malay', $userMsg);
@@ -110,7 +110,7 @@ class PromptBuilderTest extends TestCase
     public function test_build_does_not_add_reminder_when_system_prompt_is_empty(): void
     {
         $messages = $this->builder->build('Hello', [], $this->cfg(['system_prompt' => '']));
-        $userMsg  = end($messages)['content'];
+        $userMsg = end($messages)['content'];
 
         $this->assertSame('Hello', $userMsg);
     }
@@ -118,7 +118,7 @@ class PromptBuilderTest extends TestCase
     public function test_build_does_not_add_reminder_when_language_is_empty(): void
     {
         $messages = $this->builder->build('Hello', [], $this->cfg(['language' => '']));
-        $userMsg  = end($messages)['content'];
+        $userMsg = end($messages)['content'];
 
         $this->assertSame('Hello', $userMsg);
     }
@@ -128,9 +128,9 @@ class PromptBuilderTest extends TestCase
     public function test_build_includes_all_history_entries(): void
     {
         $history = [
-            ['role' => 'user',      'content' => 'msg1'],
+            ['role' => 'user', 'content' => 'msg1'],
             ['role' => 'assistant', 'content' => 'rep1'],
-            ['role' => 'user',      'content' => 'msg2'],
+            ['role' => 'user', 'content' => 'msg2'],
             ['role' => 'assistant', 'content' => 'rep2'],
         ];
 
@@ -146,7 +146,7 @@ class PromptBuilderTest extends TestCase
 
         $this->assertCount(2, $messages);
         $this->assertSame('system', $messages[0]['role']);
-        $this->assertSame('user',   $messages[1]['role']);
+        $this->assertSame('user', $messages[1]['role']);
     }
 
     // ── RAG disabled ──────────────────────────────────────────────────────────
@@ -158,7 +158,7 @@ class PromptBuilderTest extends TestCase
         // With RAG off: system prompt + user message only
         $this->assertCount(2, $messages);
         $this->assertSame('system', $messages[0]['role']);
-        $this->assertSame('user',   $messages[1]['role']);
+        $this->assertSame('user', $messages[1]['role']);
     }
 
     // ── {language} placeholder in system prompt ───────────────────────────────
@@ -166,7 +166,7 @@ class PromptBuilderTest extends TestCase
     public function test_build_resolves_language_placeholder_in_system_prompt(): void
     {
         $messages = $this->builder->build('hi', [], $this->cfg([
-            'language'      => 'Japanese',
+            'language' => 'Japanese',
             'system_prompt' => 'Reply only in {language}.',
         ]));
 
@@ -177,7 +177,7 @@ class PromptBuilderTest extends TestCase
     public function test_system_messages_resolves_language_placeholder(): void
     {
         $result = $this->builder->systemMessages($this->cfg([
-            'language'      => 'Arabic',
+            'language' => 'Arabic',
             'system_prompt' => 'Answer in {language} only.',
         ]));
 

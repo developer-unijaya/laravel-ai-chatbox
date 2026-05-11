@@ -1,7 +1,6 @@
 <?php
 namespace SyafiqUnijaya\AiChatbox\Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use SyafiqUnijaya\AiChatbox\Memory\DatabaseConversationRepository;
 use SyafiqUnijaya\AiChatbox\Tests\TestCase;
 
@@ -17,7 +16,7 @@ class ClearHistoryTest extends TestCase
     public function test_clears_session_history(): void
     {
         session(['ai_chatbox_history' => [
-            ['role' => 'user',      'content' => 'Hello'],
+            ['role' => 'user', 'content' => 'Hello'],
             ['role' => 'assistant', 'content' => 'Hi!'],
         ]]);
 
@@ -36,11 +35,11 @@ class ClearHistoryTest extends TestCase
 
     public function test_clears_specific_thread_history(): void
     {
-        $threadId   = '550e8400-e29b-4d4f-a716-446655440000';
+        $threadId = '550e8400-e29b-4d4f-a716-446655440000';
         $sessionKey = 'ai_chatbox_history_' . str_replace('-', '', $threadId);
 
         session([$sessionKey => [
-            ['role' => 'user',      'content' => 'Hello'],
+            ['role' => 'user', 'content' => 'Hello'],
             ['role' => 'assistant', 'content' => 'Hi!'],
         ]]);
 
@@ -53,8 +52,8 @@ class ClearHistoryTest extends TestCase
     {
         $threadA = '550e8400-e29b-4d4f-a716-446655440000';
         $threadB = '6ba7b810-9dad-4d4f-80b4-00c04fd430c8';
-        $keyA    = 'ai_chatbox_history_' . str_replace('-', '', $threadA);
-        $keyB    = 'ai_chatbox_history_' . str_replace('-', '', $threadB);
+        $keyA = 'ai_chatbox_history_' . str_replace('-', '', $threadA);
+        $keyB = 'ai_chatbox_history_' . str_replace('-', '', $threadB);
 
         session([
             $keyA => [['role' => 'user', 'content' => 'A']],
@@ -74,19 +73,21 @@ class ClearHistoryTest extends TestCase
         $this->useDatabase();
 
         $threadId = '550e8400-e29b-4d4f-a716-446655440000';
-        $repo     = new DatabaseConversationRepository();
+        $repo = new DatabaseConversationRepository();
 
         $repo->saveHistory($threadId, [
-            ['role' => 'user',      'content' => 'Hello'],
+            ['role' => 'user', 'content' => 'Hello'],
             ['role' => 'assistant', 'content' => 'Hi!'],
         ]);
 
         $this->postJson('/ai-chatbox/clear', ['thread_id' => $threadId])
-             ->assertOk()
-             ->assertJsonFragment(['status' => 'ok']);
+            ->assertOk()
+            ->assertJsonFragment(['status' => 'ok']);
 
+        // getHistory() returns [] because cleared_after_id acts as a soft-clear boundary
         $this->assertSame([], $repo->getHistory($threadId));
-        $this->assertDatabaseCount('ai_chatbox_messages', 0);
+        // Messages remain in the DB so admins can still review them
+        $this->assertDatabaseCount('ai_chatbox_messages', 2);
     }
 
     public function test_clear_db_does_not_affect_other_threads(): void
@@ -95,7 +96,7 @@ class ClearHistoryTest extends TestCase
 
         $threadA = '550e8400-e29b-4d4f-a716-446655440000';
         $threadB = '6ba7b810-9dad-4d4f-80b4-00c04fd430c8';
-        $repo    = new DatabaseConversationRepository();
+        $repo = new DatabaseConversationRepository();
 
         $repo->saveHistory($threadA, [['role' => 'user', 'content' => 'A']]);
         $repo->saveHistory($threadB, [['role' => 'user', 'content' => 'B']]);
@@ -103,6 +104,6 @@ class ClearHistoryTest extends TestCase
         $this->postJson('/ai-chatbox/clear', ['thread_id' => $threadA]);
 
         $this->assertSame([], $repo->getHistory($threadA));
-        $this->assertCount(1,  $repo->getHistory($threadB));
+        $this->assertCount(1, $repo->getHistory($threadB));
     }
 }
