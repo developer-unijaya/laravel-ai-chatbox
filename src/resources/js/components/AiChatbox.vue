@@ -728,6 +728,9 @@ onMounted(() => {
   display: block;
 }
 #ai-chatbox-input:focus { border-color: var(--chatbox-color); background: var(--chatbox-bg); }
+#ai-chatbox-input { scrollbar-width: thin; scrollbar-color: var(--chatbox-scrollbar) transparent; }
+#ai-chatbox-input::-webkit-scrollbar { width: 3px; }
+#ai-chatbox-input::-webkit-scrollbar-thumb { background: var(--chatbox-scrollbar); border-radius: 4px; }
 #ai-chatbox-send {
   width: 38px;
   height: 38px;
