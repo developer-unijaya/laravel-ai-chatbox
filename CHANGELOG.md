@@ -10,6 +10,27 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.7] — 2026-05-11
+
+### Added
+- **Admin conversations modal — Markdown rendering** — AI messages in the admin conversation preview modal now render as formatted Markdown (headings, bold, lists, code blocks, tables, blockquotes) using `marked.js` + `DOMPurify` loaded from CDN; user messages continue to display as plain escaped text
+- **Admin conversations modal — copy conversation button** — clipboard icon added to the modal header; clicking it copies the full conversation (user and AI turns) to the clipboard; falls back to `document.execCommand('copy')` on HTTP (non-secure) contexts where `navigator.clipboard` is unavailable; icon switches to a checkmark for 2 seconds to confirm success
+- **Textarea auto-grow input** — the message input field across all three frontend drivers (Vue, Blade, Livewire) is now a `<textarea>` that auto-expands up to 3 visible rows as the user types; text wraps naturally with no horizontal overflow; the field shrinks back to one row after the message is sent
+
+### Changed
+- **Soft-clear — messages preserved on "Clear conversation"** — clearing a conversation no longer deletes messages from the database; instead, a `cleared_after_id` cursor is recorded on the conversation row; messages before the cursor remain stored and visible to admins in the conversations modal, while the AI context starts fresh from the next message
+- **`ai-chatbox:prune-conversations` now deletes empty conversations** — the prune command runs a second pass using `doesntHave('messages')` to remove conversations that were created but never received any messages; both stale and empty counts are reported separately in `--dry-run` output
+- **Textarea scrollbar styling** — the textarea scrollbar is now 3 px wide on WebKit browsers and `scrollbar-width: thin` on Firefox, using the `--chatbox-scrollbar` CSS variable to match the messages-area scrollbar; pre-built `chatbox.css` updated accordingly
+
+### Fixed
+- **Missing messages from database** — `ChatboxController::sendMessage()` and `streamMessage()` were saving the context-trimmed history subset back to the database instead of the full history, causing older messages to be permanently lost on each turn; the controller now keeps `$fullHistory` (for persistence) separate from `$contextHistory` (passed to the AI prompt only)
+- **`ai-chatbox:prune-conversations` compatibility** — replaced `self::SUCCESS` / `self::FAILURE` class constants (introduced in Laravel 9 / Symfony Console 5.1) with integer literals `0` and `1` so the command works on Laravel 8 and earlier
+
+### Database
+- New migration `2024_01_01_000005_add_cleared_after_id_to_ai_chatbox_conversations_table` — adds a nullable `cleared_after_id` (unsigned big integer) column to `ai_chatbox_conversations`; run `php artisan migrate` after updating
+
+---
+
 ## [0.2.6] — 2026-05-08
 
 ### Added
@@ -335,7 +356,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Configurable API URL, token, and model via `.env`
 - Service provider with auto-discovery, asset publishing, and view publishing
 
-[Unreleased]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.6...HEAD
+[Unreleased]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.7...HEAD
+[0.2.7]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.6...0.2.7
 [0.2.6]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.5...0.2.6
 [0.2.5]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.4...0.2.5
 [0.2.4]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.3...0.2.4
