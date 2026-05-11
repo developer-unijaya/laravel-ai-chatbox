@@ -8,7 +8,8 @@
 
         <!-- Floating toggle button -->
         <button id="ai-chatbox-toggle" :disabled="isChecking" aria-label="Toggle chat" :title="title" @click="toggleChat">
-            <svg v-if="!isOpen && !isChecking" id="ai-chatbox-icon-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <img v-if="!isOpen && !isChecking && toggleIcon" id="ai-chatbox-icon-open" :src="toggleIcon" alt="Chat">
+            <svg v-if="!isOpen && !isChecking && !toggleIcon" id="ai-chatbox-icon-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/>
             </svg>
             <svg v-if="isOpen && !isChecking" id="ai-chatbox-icon-close" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -98,6 +99,7 @@ const soundVolume    = typeof cfg.soundVolume === 'number' ? cfg.soundVolume : 0
 const healthCheck    = cfg.healthCheck !== false
 const offlineMessage = cfg.offlineMessage || 'AI service is currently unreachable.'
 const position       = cfg.position || 'bottom-right'
+const toggleIcon     = cfg.toggleIcon || null
 const STORAGE_KEY    = cfg.storageKey || 'ai_chatbox_ui'
 const THREAD_KEY     = STORAGE_KEY + '_tid'
 const storageDriver  = cfg.storageType === 'session' ? sessionStorage : localStorage
@@ -532,6 +534,7 @@ onMounted(() => {
 .ai-chatbox--top-left    #ai-chatbox-toggle { margin-left: 0; margin-right: auto; }
 #ai-chatbox-toggle:hover { transform: scale(1.08); box-shadow: 0 12px 36px rgba(0,0,0,.24); }
 #ai-chatbox-toggle svg { width: 26px; height: 26px; pointer-events: none; }
+#ai-chatbox-toggle img { width: 26px; height: 26px; pointer-events: none; object-fit: contain; }
 
 /* ── Chat window ── */
 #ai-chatbox-window {

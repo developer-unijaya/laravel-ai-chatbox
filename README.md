@@ -201,8 +201,8 @@ Publish and edit `config/ai-chatbox.php` to change any default.
 
 | Key | Env var | Default | Description |
 |---|---|---|---|
-| `language` | — | `English` | Language the AI must reply in — leave empty to let the model decide |
-| `system_prompt` | — | `You are a helpful assistant...` | System message sent on every request — use `{language}` as a placeholder |
+| `language` | - | `English` | Language the AI must reply in — leave empty to let the model decide |
+| `system_prompt` | - | `You are a helpful assistant...` | System message sent on every request — use `{language}` as a placeholder |
 
 The `language` value is enforced at two points per request:
 
@@ -223,8 +223,8 @@ Then edit `config/ai-chatbox.php` directly.
 
 | Key | Env var | Default | Description |
 |---|---|---|---|
-| `temperature` | — | `0.7` | Creativity — `0.0` deterministic, `1.0` creative |
-| `max_tokens` | — | `null` | Max reply length — `null` lets the model decide |
+| `temperature` | - | `0.7` | Creativity — `0.0` deterministic, `1.0` creative |
+| `max_tokens` | - | `null` | Max reply length — `null` lets the model decide |
 | `timeout` | `AI_CHATBOX_TIMEOUT` | `30` | Request timeout in seconds — increase for slow local models |
 
 ---
@@ -233,16 +233,17 @@ Then edit `config/ai-chatbox.php` directly.
 
 | Key | Env var | Default | Description |
 |---|---|---|---|
-| `frontend` | — | `vue` | UI driver — `vue`, `blade`, `livewire`, or `none` |
+| `frontend` | - | `vue` | UI driver — `vue`, `blade`, `livewire`, or `none` |
 | `title` | `AI_CHATBOX_TITLE` | `AI Assistant` | Widget header title |
-| `greeting` | — | `Hi! How can I help you today?` | Opening message — leave empty to disable |
-| `placeholder` | — | `Type your message...` | Input placeholder text |
-| `theme_color` | — | `#4f46e5` | Primary colour (hex) |
-| `color_scheme` | — | `auto` | Colour scheme for the widget and admin pages — `auto` (OS preference), `light`, or `dark` |
-| `position` | — | `bottom-right` | Widget position — `bottom-right`, `bottom-left`, `top-right`, `top-left` |
-| `markdown` | — | `true` | Render AI replies as Markdown |
-| `sound` | — | `true` | Play a ping when the AI replies |
-| `sound_volume` | — | `0.3` | Volume — `0.0` silent, `1.0` full |
+| `greeting` | - | `Hi! How can I help you today?` | Opening message — leave empty to disable |
+| `placeholder` | - | `Type your message...` | Input placeholder text |
+| `theme_color` | - | `#4f46e5` | Primary colour (hex) |
+| `color_scheme` | - | `auto` | Colour scheme for the widget and admin pages — `auto` (OS preference), `light`, or `dark` |
+| `position` | - | `bottom-right` | Widget position — `bottom-right`, `bottom-left`, `top-right`, `top-left` |
+| `toggle_icon` | - | `null` | Custom image for the floating toggle button — URL or asset path; `null` uses the built-in chat bubble SVG |
+| `markdown` | - | `true` | Render AI replies as Markdown |
+| `sound` | - | `true` | Play a ping when the AI replies |
+| `sound_volume` | - | `0.3` | Volume — `0.0` silent, `1.0` full |
 | `stream` | `AI_CHATBOX_STREAM` | `true` | Stream replies token-by-token via SSE |
 
 ---
@@ -252,10 +253,10 @@ Then edit `config/ai-chatbox.php` directly.
 | Key | Env var | Default | Description |
 |---|---|---|---|
 | `history_enabled` | `AI_CHATBOX_HISTORY` | `true` | Include previous messages for context |
-| `history_limit` | — | `50` | Max user+assistant pairs kept per thread |
-| `context_token_limit` | — | `4000` | Max estimated tokens of history per request — trims oldest pairs first (`0` = rely on `history_limit` only) |
+| `history_limit` | - | `50` | Max user+assistant pairs kept per thread |
+| `context_token_limit` | - | `4000` | Max estimated tokens of history per request — trims oldest pairs first (`0` = rely on `history_limit` only) |
 | `memory_driver` | `AI_CHATBOX_MEMORY_DRIVER` | `session` | Server-side history driver — `session` or `database` |
-| `storage` | — | `local` | Browser storage — `local` (persists across sessions) or `session` (clears on tab close) |
+| `storage` | - | `local` | Browser storage — `local` (persists across sessions) or `session` (clears on tab close) |
 
 ---
 
@@ -263,15 +264,15 @@ Then edit `config/ai-chatbox.php` directly.
 
 | Key | Env var | Default | Description |
 |---|---|---|---|
-| `route_prefix` | — | `ai-chatbox` | URL prefix for all chatbox routes |
-| `middleware` | — | `['web', 'throttle:20,1', 'ai-chatbox.cors']` | Middleware stack for chatbox API routes |
+| `route_prefix` | - | `ai-chatbox` | URL prefix for all chatbox routes |
+| `middleware` | - | `['web', 'throttle:20,1', 'ai-chatbox.cors']` | Middleware stack for chatbox API routes |
 | `rate_limit` | `AI_CHATBOX_RATE_LIMIT` | `20` | Max requests per window per IP |
 | `rate_window` | `AI_CHATBOX_RATE_WINDOW` | `1` | Rate limit window in minutes |
 | `health_check` | `AI_CHATBOX_HEALTH_CHECK` | `true` | Ping the AI service before opening the widget |
-| `offline_message` | — | `AI service is currently unreachable.` | Toast shown when the service is unreachable |
+| `offline_message` | - | `AI service is currently unreachable.` | Toast shown when the service is unreachable |
 | `ssrf_protection` | `AI_CHATBOX_SSRF_PROTECTION` | `true` | Block requests to private/reserved IP ranges |
-| `allowed_origins` | — | `[env('APP_URL')]` | Origins allowed to call chatbox endpoints (CORS) |
-| `rag_admin_middleware` | — | `['web', 'auth']` | Middleware for all admin and Knowledge Base pages |
+| `allowed_origins` | - | `[env('APP_URL')]` | Origins allowed to call chatbox endpoints (CORS) |
+| `rag_admin_middleware` | - | `['web', 'auth']` | Middleware for all admin and Knowledge Base pages |
 
 ---
 
@@ -281,11 +282,11 @@ Then edit `config/ai-chatbox.php` directly.
 |---|---|---|---|
 | `rag_enabled` | `AI_CHATBOX_RAG` | `false` | Master switch — enable RAG context injection |
 | `rag_embedding_timeout` | `AI_CHATBOX_EMBEDDING_TIMEOUT` | `10` | Timeout in seconds for every embedding HTTP request — applies to all providers |
-| `rag_top_k` | — | `3` | Number of chunks retrieved per query |
-| `rag_chunk_size` | — | `500` | Target chunk size in tokens (~4 chars/token) |
-| `rag_chunk_overlap` | — | `50` | Overlap between consecutive chunks in tokens |
-| `rag_similarity_threshold` | — | `0.2` | Minimum cosine similarity score (`0.0`–`1.0`) |
-| `rag_context_prompt` | — | *(see below)* | Instruction prepended to retrieved chunks — use `{chunks}` as placeholder |
+| `rag_top_k` | - | `3` | Number of chunks retrieved per query |
+| `rag_chunk_size` | - | `500` | Target chunk size in tokens (~4 chars/token) |
+| `rag_chunk_overlap` | - | `50` | Overlap between consecutive chunks in tokens |
+| `rag_similarity_threshold` | - | `0.2` | Minimum cosine similarity score (`0.0`–`1.0`) |
+| `rag_context_prompt` | - | *(see below)* | Instruction prepended to retrieved chunks — use `{chunks}` as placeholder |
 | `rag_processing_timeout` | `AI_CHATBOX_RAG_PROCESSING_TIMEOUT` | `0` | Max seconds for a single upload or reprocess — `0` = no limit |
 
 > `rag_embedding_url` and `rag_embedding_model` are per-provider settings defined inside the `providers` block and resolved through the active named provider. See [AI Providers](#ai-providers).
@@ -433,7 +434,7 @@ Set `AI_CHATBOX_FRONTEND` to choose how `@aichatbox` renders. All drivers share 
 | `vue` | Vue 3 SFC | SSE | Bundled `chatbox.js` | `vendor:publish --tag=ai-chatbox-assets` |
 | `blade` | Vanilla JS | SSE | None (marked.js from CDN if Markdown on) | Same |
 | `livewire` | Alpine.js | SSE | Alpine.js (bundled with Livewire 3) | Same |
-| `none` | — | Your choice | None | Not required |
+| `none` | - | Your choice | None | Not required |
 
 ```env
 AI_CHATBOX_FRONTEND=vue       # Vue 3 widget (default)

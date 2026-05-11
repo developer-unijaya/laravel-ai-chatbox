@@ -131,6 +131,25 @@ return [
 
 /*
 |--------------------------------------------------------------------------
+| Toggle Button Icon
+|--------------------------------------------------------------------------
+| The icon displayed on the floating toggle button when the chat is closed.
+|
+| null                        — use the default built-in SVG chat bubble icon
+| 'images/chatbot.png'        — path relative to your public folder (asset())
+| 'https://example.com/b.svg' — any absolute URL, used as-is
+|
+| Do NOT call asset() here — config files load before the app is booted.
+| The package resolves relative paths through asset() automatically.
+|
+| The image is displayed at 26×26 px inside the 56×56 px circular button.
+| The close (✕) and loading spinner icons are never replaced.
+*/
+
+    'toggle_icon' => null,
+
+/*
+|--------------------------------------------------------------------------
 | Color Scheme
 |--------------------------------------------------------------------------
 | Controls the light/dark mode for both the chat widget and all admin pages

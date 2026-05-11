@@ -12,9 +12,19 @@
     <div id="ai-chatbox-offline-toast" role="alert" aria-live="assertive"></div>
 
     <button id="ai-chatbox-toggle" aria-label="Toggle chat">
+        @php
+            $aicbRawIcon = config('ai-chatbox.toggle_icon');
+            $aicbIconUrl = $aicbRawIcon
+                ? (preg_match('#^https?://#i', $aicbRawIcon) ? $aicbRawIcon : asset($aicbRawIcon))
+                : null;
+        @endphp
+        @if($aicbIconUrl)
+        <img id="aicb-icon-open" src="{{ $aicbIconUrl }}" alt="Chat">
+        @else
         <svg id="aicb-icon-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
             <path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/>
         </svg>
+        @endif
         <svg id="aicb-icon-close" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="display:none">
             <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
         </svg>

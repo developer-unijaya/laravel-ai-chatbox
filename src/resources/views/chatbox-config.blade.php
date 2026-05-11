@@ -17,6 +17,10 @@
     $storageKey  = 'ai_chatbox_' . $aiChatboxAppHash . '_' . $userSegment;
     $storageType    = config('ai-chatbox.storage', 'local') === 'session' ? 'session' : 'local';
     $offlineMessage = config('ai-chatbox.offline_message', 'AI service is currently unreachable.');
+    $rawToggleIcon  = config('ai-chatbox.toggle_icon');
+    $toggleIcon     = $rawToggleIcon
+        ? (preg_match('#^https?://#i', $rawToggleIcon) ? $rawToggleIcon : asset($rawToggleIcon))
+        : null;
 @endphp
 <script>
     window.AiChatboxConfig = {
@@ -38,6 +42,7 @@
         storageType:    "{{ $storageType }}",
         offlineMessage: {!! json_encode($offlineMessage, JSON_HEX_TAG) !!},
         themeColor:     {!! json_encode($themeColor, JSON_HEX_TAG) !!},
-        colorScheme:    {!! json_encode(config('ai-chatbox.color_scheme', 'auto'), JSON_HEX_TAG) !!}
+        colorScheme:    {!! json_encode(config('ai-chatbox.color_scheme', 'auto'), JSON_HEX_TAG) !!},
+        toggleIcon:     {!! json_encode($toggleIcon, JSON_HEX_TAG) !!}
     };
 </script>
