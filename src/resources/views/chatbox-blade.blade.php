@@ -56,7 +56,7 @@
         <div id="ai-chatbox-messages"></div>
 
         <form id="ai-chatbox-form" autocomplete="off">
-            <input type="text" id="ai-chatbox-input" maxlength="2000" required>
+            <textarea id="ai-chatbox-input" maxlength="2000" required rows="1"></textarea>
             <button type="submit" id="ai-chatbox-send" aria-label="Send">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
@@ -482,15 +482,36 @@
         });
     }
 
+    // ── Textarea auto-resize ──
+    function autoResize() {
+        input.style.height = 'auto';
+        var lineH = parseFloat(getComputedStyle(input).lineHeight) || 20;
+        var maxH  = lineH * 3 + 18;
+        input.style.height = Math.min(input.scrollHeight, maxH) + 'px';
+        input.style.overflowY = input.scrollHeight > maxH ? 'auto' : 'hidden';
+    }
+    function resetInputHeight() {
+        input.style.height = 'auto';
+        input.style.overflowY = 'hidden';
+    }
+
     // ── Event listeners ──
     toggleBtn.addEventListener('click', toggleChat);
     newBtn.addEventListener('click', newConversation);
     clearBtn.addEventListener('click', clearConversation);
+    input.addEventListener('input', autoResize);
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            form.dispatchEvent(new Event('submit', { cancelable: true }));
+        }
+    });
     form.addEventListener('submit', function (e) {
         e.preventDefault();
         var text = input.value.trim();
         if (!text || isLoading) return;
         input.value = '';
+        resetInputHeight();
         sendMessage(text);
     });
 

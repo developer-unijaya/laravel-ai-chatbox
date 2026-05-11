@@ -56,16 +56,18 @@
             </div>
 
             <form id="ai-chatbox-form" autocomplete="off" @submit.prevent="sendMessage">
-                <input
-                    type="text"
+                <textarea
                     id="ai-chatbox-input"
                     ref="inputRef"
                     v-model="inputText"
                     :placeholder="placeholder"
                     maxlength="2000"
                     :disabled="isLoading"
+                    rows="1"
                     required
-                >
+                    @input="autoResize"
+                    @keydown.enter.exact.prevent="sendMessage"
+                ></textarea>
                 <button type="submit" id="ai-chatbox-send" aria-label="Send" :disabled="isLoading">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
@@ -173,6 +175,24 @@ function loadFromStorage() {
 // ── Markdown ──
 function renderMarkdown(text) {
     return DOMPurify.sanitize(marked.parse(text))
+}
+
+// ── Input auto-resize ──
+function autoResize(e) {
+    const ta = e.target
+    ta.style.height = 'auto'
+    const lineH   = parseFloat(getComputedStyle(ta).lineHeight) || 20
+    const maxH    = lineH * 3 + 18  // 3 rows + top/bottom padding
+    const newH    = Math.min(ta.scrollHeight, maxH)
+    ta.style.height = newH + 'px'
+    ta.style.overflowY = ta.scrollHeight > maxH ? 'auto' : 'hidden'
+}
+
+function resetInputHeight() {
+    if (inputRef.value) {
+        inputRef.value.style.height = 'auto'
+        inputRef.value.style.overflowY = 'hidden'
+    }
 }
 
 // ── Scroll ──
@@ -299,6 +319,7 @@ async function sendMessage() {
     messages.value.push({ role: 'user', text })
     saveToStorage()
     inputText.value = ''
+    resetInputHeight()
     isLoading.value = true
     isTyping.value  = true
     scrollToBottom()
@@ -684,7 +705,7 @@ onMounted(() => {
 /* ── Form ── */
 #ai-chatbox-form {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   padding: 12px 14px;
   border-top: 1px solid var(--chatbox-border);
@@ -697,10 +718,14 @@ onMounted(() => {
   padding: 9px 13px;
   font-size: 14px;
   font-family: var(--chatbox-font);
+  line-height: 1.43;
   outline: none;
   transition: border-color 0.15s, background 0.15s;
   background: var(--chatbox-input-bg);
   color: var(--chatbox-text);
+  resize: none;
+  overflow-y: hidden;
+  display: block;
 }
 #ai-chatbox-input:focus { border-color: var(--chatbox-color); background: var(--chatbox-bg); }
 #ai-chatbox-send {

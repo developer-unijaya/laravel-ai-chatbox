@@ -75,13 +75,16 @@
         </div>
 
         <form id="ai-chatbox-form" autocomplete="off" @submit.prevent="sendMessage()">
-            <input type="text" id="ai-chatbox-input"
+            <textarea id="ai-chatbox-input"
                    x-ref="inputEl"
                    x-model="inputText"
                    :placeholder="placeholder"
                    maxlength="2000"
                    :disabled="isLoading"
-                   required>
+                   rows="1"
+                   required
+                   @input="autoResize($el)"
+                   @keydown.enter.exact.prevent="sendMessage()"></textarea>
             <button type="submit" id="ai-chatbox-send" aria-label="Send" :disabled="isLoading">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
@@ -308,6 +311,19 @@ function aiChatboxWidget() {
             }
         },
 
+        // ── Textarea auto-resize ──
+        autoResize(el) {
+            el.style.height = 'auto';
+            var lineH = parseFloat(getComputedStyle(el).lineHeight) || 20;
+            var maxH  = lineH * 3 + 18;
+            el.style.height = Math.min(el.scrollHeight, maxH) + 'px';
+            el.style.overflowY = el.scrollHeight > maxH ? 'auto' : 'hidden';
+        },
+        resetInputHeight() {
+            var el = this.$refs.inputEl;
+            if (el) { el.style.height = 'auto'; el.style.overflowY = 'hidden'; }
+        },
+
         // ── Send ──
         async sendMessage() {
             var text = this.inputText.trim();
@@ -315,6 +331,7 @@ function aiChatboxWidget() {
             this.messages.push({ role: 'user', text });
             this.saveToStorage();
             this.inputText = '';
+            this.resetInputHeight();
             this.isLoading = true;
             this.isTyping  = true;
             this.$nextTick(() => this.scrollToBottom());
