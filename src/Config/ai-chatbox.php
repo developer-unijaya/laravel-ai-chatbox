@@ -289,7 +289,7 @@ return [
 |                 0.0 = deterministic, 1.0 = creative. Typical: 0.7.
 */
 
-    'max_tokens' => null,
+    'max_tokens' => 300,
     'temperature' => 0.7,
 
 /*
