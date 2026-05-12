@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Chatbox — Conversations</title>
+    <title>AI Chatbox - Conversations</title>
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <script>tailwind.config = { darkMode: 'class' }</script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -184,6 +184,22 @@
         <span id="total-badge" class="badge badge-blue text-sm px-3 py-1"></span>
     </div>
 
+    {{-- ── Search bar ───────────────────────────────────────────────────────── --}}
+    <div class="mb-4">
+        <div class="relative max-w-sm">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35"/>
+            </svg>
+            <input id="search-input" type="text" placeholder="Search messages…"
+                   class="w-full pl-9 pr-9 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--theme)] focus:border-transparent transition">
+            <button id="search-clear" class="absolute right-2.5 top-1/2 -translate-y-1/2 hidden text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" aria-label="Clear search">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
     {{-- ── Table card ───────────────────────────────────────────────────────── --}}
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
 
@@ -264,20 +280,26 @@
     const DATA_URL     = @json($dataUrl);
     const MESSAGES_URL = @json($messagesUrl); // contains __id__ placeholder
 
-    let currentPage = 1;
-    let totalPages  = 1;
+    let currentPage   = 1;
+    let totalPages    = 1;
+    let currentSearch = '';
+    let searchTimer   = null;
     let currentConversation = null; // { threadId, userName, messages }
 
     // ── Fetch & render conversations ────────────────────────────────────────
-    async function loadPage(page) {
+    async function loadPage(page, search) {
+        search = search ?? currentSearch;
         setLoading(true);
         try {
-            const res  = await fetch(`${DATA_URL}?page=${page}`);
+            const params = new URLSearchParams({ page });
+            if (search) params.set('search', search);
+            const res  = await fetch(`${DATA_URL}?${params}`);
             const json = await res.json();
-            renderRows(json.data);
+            renderRows(json.data, search);
             renderPagination(json);
-            currentPage = json.current_page;
-            totalPages  = json.last_page;
+            currentPage   = json.current_page;
+            totalPages    = json.last_page;
+            currentSearch = search;
 
             const totalEl = document.getElementById('total-badge');
             totalEl.textContent = `${json.total} conversation${json.total !== 1 ? 's' : ''}`;
@@ -307,10 +329,13 @@
             </tr>`).join('');
     }
 
-    function renderRows(rows) {
+    function renderRows(rows, search) {
         const tbody = document.getElementById('conv-tbody');
         if (!rows.length) {
-            tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-10 text-center text-sm text-gray-400 dark:text-gray-500">No conversations yet.</td></tr>`;
+            const msg = search
+                ? `No conversations found matching <strong class="font-semibold">"${escHtml(search)}"</strong>.`
+                : 'No conversations yet.';
+            tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-10 text-center text-sm text-gray-400 dark:text-gray-500">${msg}</td></tr>`;
             return;
         }
         tbody.innerHTML = rows.map(row => {
@@ -353,7 +378,7 @@
 
         // Prev
         const prev = pageBtn('‹', json.current_page <= 1);
-        prev.addEventListener('click', () => loadPage(json.current_page - 1));
+        prev.addEventListener('click', () => loadPage(json.current_page - 1, currentSearch));
         wrap.appendChild(prev);
 
         // Page numbers (show up to 7 around current)
@@ -367,14 +392,14 @@
                 wrap.appendChild(dots);
             }
             const btn = pageBtn(p, false, p === json.current_page);
-            btn.addEventListener('click', () => { if (p !== json.current_page) loadPage(p); });
+            btn.addEventListener('click', () => { if (p !== json.current_page) loadPage(p, currentSearch); });
             wrap.appendChild(btn);
             lastP = p;
         });
 
         // Next
         const next = pageBtn('›', json.current_page >= json.last_page);
-        next.addEventListener('click', () => loadPage(json.current_page + 1));
+        next.addEventListener('click', () => loadPage(json.current_page + 1, currentSearch));
         wrap.appendChild(next);
     }
 
@@ -397,13 +422,32 @@
     let modalLastPage = 1;
     let modalCurPage  = 1;
 
+    // Highlight keyword in already-escaped plain text
+    function highlightText(escaped, kw) {
+        if (!kw || kw.length < 3) return escaped;
+        const safe = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return escaped.replace(new RegExp(`(${safe})`, 'gi'),
+            '<mark class="bg-yellow-200 dark:bg-yellow-600/60 rounded-sm px-0.5 text-inherit">$1</mark>');
+    }
+
+    // Highlight keyword only inside text nodes of rendered HTML (not inside tag attributes)
+    function highlightHtml(html, kw) {
+        if (!kw || kw.length < 3) return html;
+        const safe = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp(`(${safe})`, 'gi');
+        return html.replace(/>([^<]+)</g, (_, text) =>
+            '>' + text.replace(re, '<mark class="bg-yellow-200 dark:bg-yellow-600/60 rounded-sm px-0.5 text-inherit">$1</mark>') + '<');
+    }
+
     function renderMessageBubbles(messages, userName) {
         return messages.map(m => {
             const isUser  = m.role === 'user';
             const bubble  = isUser ? 'bubble-user' : 'bubble-assistant';
             const label   = isUser ? userName : 'Assistant';
             const align   = isUser ? 'items-end' : 'items-start';
-            const content = isUser ? escHtml(m.content) : renderMarkdown(m.content);
+            const content = isUser
+                ? highlightText(escHtml(m.content), currentSearch)
+                : highlightHtml(renderMarkdown(m.content), currentSearch);
             return `
             <div class="flex flex-col ${align} gap-0.5">
                 <span class="text-[0.65rem] text-gray-400 px-1">${escHtml(label)} · ${escHtml(m.created_at ?? '')}</span>
@@ -579,6 +623,26 @@
     if (typeof marked !== 'undefined') {
         marked.setOptions({ breaks: true, gfm: true });
     }
+
+    // ── Search input wiring ──────────────────────────────────────────────────
+    const searchInput = document.getElementById('search-input');
+    const searchClear = document.getElementById('search-clear');
+
+    searchInput.addEventListener('input', () => {
+        const val = searchInput.value;
+        searchClear.classList.toggle('hidden', !val);
+        clearTimeout(searchTimer);
+        const trimmed = val.trim();
+        if (trimmed.length > 0 && trimmed.length < 3) return; // wait for ≥3 chars
+        searchTimer = setTimeout(() => loadPage(1, trimmed), 350);
+    });
+
+    searchClear.addEventListener('click', () => {
+        searchInput.value = '';
+        searchClear.classList.add('hidden');
+        searchInput.focus();
+        loadPage(1, '');
+    });
 
     // ── Init ─────────────────────────────────────────────────────────────────
     loadPage(1);

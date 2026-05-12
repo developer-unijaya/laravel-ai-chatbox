@@ -474,11 +474,17 @@ class AdminController extends Controller
     {
         $perPage = 20;
         $page = max(1, (int) $request->query('page', 1));
+        $search = trim((string) $request->query('search', ''));
 
-        $paginator = Conversation::withCount('messages')
+        $query = Conversation::withCount('messages')
             ->with('latestMessage')
-            ->orderByDesc('updated_at')
-            ->paginate($perPage, ['*'], 'page', $page);
+            ->orderByDesc('updated_at');
+
+        if ($search !== '') {
+            $query->whereHas('messages', fn($q) => $q->where('content', 'like', '%' . $search . '%'));
+        }
+
+        $paginator = $query->paginate($perPage, ['*'], 'page', $page);
 
         // Resolve user names in one query to avoid N+1
         $userNames = [];
