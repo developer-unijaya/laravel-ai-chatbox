@@ -10,7 +10,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [0.2.8] — 2026-05-12
+## [0.2.9] — 2026-05-12
 
 ### Added
 - **`admin_middleware` config key** — new `admin_middleware` key (`null` by default) lets you set separate middleware for the admin dashboard (diagnostics, config viewer, conversations) independently of `rag_admin_middleware` which guards the Knowledge Base; when `null`, the dashboard inherits `rag_admin_middleware` so existing deployments are unaffected
