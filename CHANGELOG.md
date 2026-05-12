@@ -10,6 +10,35 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.8] — 2026-05-12
+
+### Added
+- **`admin_middleware` config key** — new `admin_middleware` key (`null` by default) lets you set separate middleware for the admin dashboard (diagnostics, config viewer, conversations) independently of `rag_admin_middleware` which guards the Knowledge Base; when `null`, the dashboard inherits `rag_admin_middleware` so existing deployments are unaffected
+- **Admin security diagnostics split** — the diagnostics panel now emits separate warnings for the admin dashboard and the Knowledge Base (RAG) pages instead of a single combined warning, giving clearer guidance on which middleware to configure
+- **`Conversation::latestMessage()` relation** — new `HasOne` relation on the `Conversation` model using `latestOfMany('id')`; used in the admin conversations list to eager-load the last message and avoid N+1 queries
+- **Paginated conversation messages** — `AdminController::conversationMessages()` now returns messages in pages of 50 (with `current_page`, `last_page`, `total`, `per_page` metadata) instead of fetching all messages in one query
+- **RAG token budget reservation in `ContextManager`** — `ContextManager::trim()` accepts a new `$ragBudget` parameter; when RAG is enabled the controller estimates the token cost of the top-K chunks (`rag_top_k × rag_chunk_size`) and passes it as headroom so history is trimmed to leave room for injected RAG context
+- **CORS preflight (`OPTIONS`) support** — `CorsMiddleware` now short-circuits `OPTIONS` requests with a `204` response including `Access-Control-Max-Age: 86400` before the request reaches any controller, fixing browsers that require a successful preflight before sending the actual request
+- **`thread_id` validation on clear-history** — `ChatboxController::clearHistory()` now validates that `thread_id` is a nullable string with a maximum length of 36 characters
+
+### Changed
+- **`DatabaseConversationRepository` scopes reads and writes to the authenticated user** — `getHistory()`, `saveHistory()`, `trimToLimit()`, and `clear()` all use a new private `findConversation()` helper that adds a `user_id` constraint when a user is authenticated; this prevents one authenticated user from reading or writing into another user's thread while preserving guest (unauthenticated) behaviour unchanged
+- **`SessionConversationRepository::key()` hashes non-UUID thread IDs** — previously any non-UUID `thread_id` fell back to the shared base session key; now every distinct non-empty `thread_id` gets its own slot via `md5` truncated to 16 hex chars, preventing thread collisions for custom thread identifiers
+- **`ContextManager::estimateTokens()` uses `mb_strlen`** — token estimation now uses `mb_strlen(..., 'UTF-8')` instead of `strlen` so multi-byte characters (CJK, Arabic, emoji) are counted by character rather than by byte, producing more accurate token estimates
+- **`PruneConversations` empty-conversation query scoped correctly** — the fresh-empty query (`doesntHave('messages')->where('updated_at', '>=', $cutoff)`) now excludes conversations already covered by the stale pass, preventing double-counting and reporting the real deleted count from the Eloquent return value
+- **`AiChatboxServiceProvider::boot()` uses `AiManager::resolveConfig()`** — the debug-mode API token check now resolves via `AiManager` (matching all other provider resolution paths) and catches `InvalidArgumentException` when no providers are configured, instead of reading raw config keys directly
+- **`adminRouteConfiguration()` reads `admin_middleware` first** — the admin route group now uses `admin_middleware ?? rag_admin_middleware` so the new key takes effect without requiring changes to existing configs
+- **`AdminController` conversations list eager-loads `latestMessage`** — replaced the per-row `messages()->orderByDesc('id')->first()` sub-query with a `with('latestMessage')` eager load, eliminating N+1 queries on the conversations list endpoint
+- **`classifyConnectException()` and `classifyHttpStatus()` changed to `protected`** — these methods in `OpenAiCompatibleEngine` were `public` but are internal helpers; visibility narrowed to `protected` to clarify the intended API surface
+- **Default `theme_color` updated** — config default changed from `#4f46e5` (indigo) to `#0dad35` (green)
+- **`groq` provider removed from default config** — the sample `groq` provider block has been removed from `src/Config/ai-chatbox.php`; Groq can still be configured as a custom OpenAI-compatible provider using any provider name
+
+### Fixed
+- **`healthCheck` returns `400` for unknown provider names** — previously an `InvalidArgumentException` from `AiManager::resolveConfig()` would bubble up as a 500; the controller now catches it and returns a JSON `400` with a clear error message
+- **Admin diagnostics no longer expose raw token values** — the placeholder-token diagnostic message now redacts the actual token string from the error message
+
+---
+
 ## [0.2.7] — 2026-05-11
 
 ### Added
