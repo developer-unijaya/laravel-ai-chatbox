@@ -99,22 +99,6 @@ Connect to any **OpenAI-compatible API** including Ollama, OpenAI, Groq, LM Stud
 composer require syafiq-unijaya/laravel-ai-chatbox
 ```
 
-**Local development (path repository):**
-
-Add to your project's `composer.json`, then run `composer update`:
-
-```json
-"repositories": [
-    {
-        "type": "path",
-        "url": "../packages/syafiq-unijaya/laravel-ai-chatbox"
-    }
-],
-"require": {
-    "syafiq-unijaya/laravel-ai-chatbox": "*"
-}
-```
-
 ---
 
 ### 2. Publish assets
@@ -237,7 +221,7 @@ Then edit `config/ai-chatbox.php` directly.
 | `title` | `AI_CHATBOX_TITLE` | `AI Assistant` | Widget header title |
 | `greeting` | - | `Hi! How can I help you today?` | Opening message — leave empty to disable |
 | `placeholder` | - | `Type your message...` | Input placeholder text |
-| `theme_color` | - | `#4f46e5` | Primary colour (hex) |
+| `theme_color` | - | `#0dad35` | Primary colour (hex) |
 | `color_scheme` | - | `auto` | Colour scheme for the widget and admin pages — `auto` (OS preference), `light`, or `dark` |
 | `position` | - | `bottom-right` | Widget position — `bottom-right`, `bottom-left`, `top-right`, `top-left` |
 | `toggle_icon` | - | `null` | Custom image for the floating toggle button — URL or asset path; `null` uses the built-in chat bubble SVG |
@@ -272,7 +256,8 @@ Then edit `config/ai-chatbox.php` directly.
 | `offline_message` | - | `AI service is currently unreachable.` | Toast shown when the service is unreachable |
 | `ssrf_protection` | `AI_CHATBOX_SSRF_PROTECTION` | `true` | Block requests to private/reserved IP ranges |
 | `allowed_origins` | - | `[env('APP_URL')]` | Origins allowed to call chatbox endpoints (CORS) |
-| `rag_admin_middleware` | - | `['web', 'auth']` | Middleware for all admin and Knowledge Base pages |
+| `rag_admin_middleware` | - | `['web', 'auth']` | Middleware for the Knowledge Base (`/ai-chatbox/rag`) pages |
+| `admin_middleware` | - | `null` | Middleware for the Admin dashboard — inherits `rag_admin_middleware` when `null` |
 
 ---
 
@@ -312,18 +297,11 @@ Named providers are defined under the `providers` key in `config/ai-chatbox.php`
         'rag_embedding_model' => env('OLLAMA_EMBEDDING_MODEL',   'nomic-embed-text'),
     ],
     'openai'   => [
-        'api_url'             => env('OPENAI_URL',               'https://api.openai.com/v1/chat/completions'),
+        'api_url'             => env('OPENAI_URL',               ''),
         'api_token'           => env('OPENAI_API_KEY',           ''),
         'api_model'           => env('OPENAI_MODEL',             ''),
         'rag_embedding_url'   => env('OPENAI_EMBEDDING_URL',     ''),
         'rag_embedding_model' => env('OPENAI_EMBEDDING_MODEL',   ''),
-    ],
-    'groq'     => [
-        'api_url'             => env('GROQ_URL',                 'https://api.groq.com/openai/v1/chat/completions'),
-        'api_token'           => env('GROQ_API_KEY',             ''),
-        'api_model'           => env('GROQ_MODEL',               ''),
-        'rag_embedding_url'   => env('GROQ_EMBEDDING_URL',       ''),
-        'rag_embedding_model' => env('GROQ_EMBEDDING_MODEL',     ''),
     ],
     'lmstudio' => [
         'api_url'             => env('LMSTUDIO_URL',             'http://127.0.0.1:1234/v1/chat/completions'),
@@ -335,13 +313,14 @@ Named providers are defined under the `providers` key in `config/ai-chatbox.php`
 ],
 ```
 
+> `groq` and other providers are not in the default config — add them as custom entries after publishing (see [OpenRouter example](#openrouter-custom-provider) below for the pattern).
+
 **Env var reference per provider:**
 
 | Provider | URL | Token | Model | Embedding URL | Embedding model |
 |---|---|---|---|---|---|
 | `ollama` | `OLLAMA_URL` | `OLLAMA_TOKEN` | `OLLAMA_MODEL` | `OLLAMA_EMBEDDING_URL` | `OLLAMA_EMBEDDING_MODEL` |
 | `openai` | `OPENAI_URL` | `OPENAI_API_KEY` | `OPENAI_MODEL` | `OPENAI_EMBEDDING_URL` | `OPENAI_EMBEDDING_MODEL` |
-| `groq` | `GROQ_URL` | `GROQ_API_KEY` | `GROQ_MODEL` | `GROQ_EMBEDDING_URL` | `GROQ_EMBEDDING_MODEL` |
 | `lmstudio` | `LMSTUDIO_URL` | `LMSTUDIO_TOKEN` | `LMSTUDIO_MODEL` | `LMSTUDIO_EMBEDDING_URL` | `LMSTUDIO_EMBEDDING_MODEL` |
 
 > `rag_embedding_timeout` (`AI_CHATBOX_EMBEDDING_TIMEOUT`) is a universal setting — it applies to all providers and is not overridable per provider. Configure it once in the RAG section.
@@ -380,7 +359,20 @@ OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o
 ```
 
-#### Groq
+#### Groq (custom provider)
+
+Groq is not in the default config — add it after publishing `config/ai-chatbox.php`:
+
+```php
+'providers' => [
+    'groq' => [
+        'api_url'   => env('GROQ_URL',     'https://api.groq.com/openai/v1/chat/completions'),
+        'api_token' => env('GROQ_API_KEY', ''),
+        'api_model' => env('GROQ_MODEL',   ''),
+    ],
+    // ... other providers
+],
+```
 
 ```env
 AI_CHATBOX_ACTIVE_PROVIDER=groq
@@ -427,7 +419,7 @@ OPENROUTER_MODEL=mistralai/mistral-7b-instruct
 
 ## Frontend Drivers
 
-Set `AI_CHATBOX_FRONTEND` to choose how `@aichatbox` renders. All drivers share the same backend API routes and `window.AiChatboxConfig` — only the widget layer differs.
+The `frontend` setting controls how `@aichatbox` renders. All drivers share the same backend API routes and `window.AiChatboxConfig` — only the widget layer differs.
 
 | Driver | Widget | Streaming | JS dependency | Assets required |
 |---|---|---|---|---|
@@ -436,11 +428,14 @@ Set `AI_CHATBOX_FRONTEND` to choose how `@aichatbox` renders. All drivers share 
 | `livewire` | Alpine.js | SSE | Alpine.js (bundled with Livewire 3) | Same |
 | `none` | - | Your choice | None | Not required |
 
-```env
-AI_CHATBOX_FRONTEND=vue       # Vue 3 widget (default)
-AI_CHATBOX_FRONTEND=blade     # Vanilla JS, no framework
-AI_CHATBOX_FRONTEND=livewire  # Alpine.js via Livewire
-AI_CHATBOX_FRONTEND=none      # API + config only
+> **No env var.** Publish the config and set `frontend` directly in `config/ai-chatbox.php`:
+
+```php
+// config/ai-chatbox.php
+'frontend' => 'vue',      // Vue 3 widget (default)
+'frontend' => 'blade',    // Vanilla JS, no framework
+'frontend' => 'livewire', // Alpine.js via Livewire
+'frontend' => 'none',     // API + config only
 ```
 
 ---
@@ -541,7 +536,7 @@ $reply = AI::chat('Summarise this document: ...');
 
 // Use a specific named provider
 $reply = AI::provider('openai')->chat('Translate to French: ...');
-$reply = AI::provider('groq')->chat('Write a test for this function...');
+$reply = AI::provider('lmstudio')->chat('Write a test for this function...');
 $reply = AI::provider('ollama')->chat('What is the capital of France?');
 ```
 
@@ -749,35 +744,43 @@ The command performs the following checks before deleting anything:
 
 Two independent limits control how much is sent to the AI per request.
 
+> **These settings have no env var.** Publish the config file and edit `config/ai-chatbox.php` directly:
+> ```bash
+> php artisan vendor:publish --tag=ai-chatbox-config
+> ```
+
 ### Context token limit
 
 Limits the amount of conversation history included per request. History is trimmed oldest-pair-first using a ~4 chars/token heuristic.
 
-```env
-AI_CHATBOX_CONTEXT_TOKENS=4000     # phi3:mini, llama3 8B (default)
-AI_CHATBOX_CONTEXT_TOKENS=8000     # llama3 70B, Mixtral
-AI_CHATBOX_CONTEXT_TOKENS=32000    # GPT-4o, Claude
-AI_CHATBOX_CONTEXT_TOKENS=0        # disabled — rely on history_limit only
+```php
+// config/ai-chatbox.php
+'context_token_limit' => 4000,   // phi3:mini, llama3 8B (default)
+'context_token_limit' => 8000,   // llama3 70B, Mixtral
+'context_token_limit' => 32000,  // GPT-4o, Claude
+'context_token_limit' => 0,      // disabled — rely on history_limit only
 ```
 
 ### Max reply tokens
 
-Limits how long the AI's reply can be. Leave unset to let the model decide.
+Limits how long the AI's reply can be. Leave `null` to let the model decide.
 
-```env
-AI_CHATBOX_MAX_TOKENS=512     # short replies
-AI_CHATBOX_MAX_TOKENS=2048    # longer replies
-AI_CHATBOX_MAX_TOKENS=        # model default (unset)
+```php
+// config/ai-chatbox.php
+'max_tokens' => 512,   // short replies
+'max_tokens' => 2048,  // longer replies
+'max_tokens' => null,  // model default (default)
 ```
 
 Both limits work together: `history_limit` caps by message count, `context_token_limit` caps by estimated tokens. Whichever is reached first applies.
 
 ### Temperature
 
-```env
-AI_CHATBOX_TEMPERATURE=0.2    # focused, deterministic
-AI_CHATBOX_TEMPERATURE=0.7    # balanced (default)
-AI_CHATBOX_TEMPERATURE=1.0    # creative, unpredictable
+```php
+// config/ai-chatbox.php
+'temperature' => 0.2,  // focused, deterministic
+'temperature' => 0.7,  // balanced (default)
+'temperature' => 1.0,  // creative, unpredictable
 ```
 
 ---
@@ -959,13 +962,31 @@ Visit **`/ai-chatbox/admin/conversations`** (requires `memory_driver=database`).
 
 ### Protecting the admin UI
 
-By default, `rag_admin_middleware` is `['web', 'auth']` — any authenticated user can access admin pages. For production, publish the config and add a role or permission middleware:
+Two separate middleware keys control access:
+
+| Key | Controls | Default |
+|---|---|---|
+| `rag_admin_middleware` | Knowledge Base — `/ai-chatbox/rag` (document upload/delete) | `['web', 'auth']` |
+| `admin_middleware` | Admin dashboard — `/ai-chatbox/admin` and conversations viewer | inherits `rag_admin_middleware` when `null` |
+
+By default both require an authenticated user. For production, publish the config and tighten each independently:
 
 ```php
 // config/ai-chatbox.php
+
+// Restrict document management to admins only
+'rag_admin_middleware' => ['web', 'auth', 'role:admin'],
+
+// Allow all authenticated users to view the dashboard (read-only diagnostics)
+'admin_middleware' => ['web', 'auth'],
+```
+
+Common middleware examples:
+
+```php
 'rag_admin_middleware' => ['web', 'auth', 'role:admin'],          // Spatie roles
 'rag_admin_middleware' => ['web', 'auth', 'can:manage-chatbox'],  // Laravel Gates
-'rag_admin_middleware' => ['web', 'auth:sanctum'],                // Sanctum
+'admin_middleware'     => ['web', 'auth:sanctum'],                // Sanctum
 ```
 
 ---
@@ -1052,13 +1073,16 @@ The `color_scheme` setting controls both the chat widget and all admin pages (`/
 | `light` | Always light, regardless of OS preference |
 | `dark` | Always dark, regardless of OS preference |
 
-```env
-AI_CHATBOX_COLOR_SCHEME=auto    # OS preference (default)
-AI_CHATBOX_COLOR_SCHEME=light
-AI_CHATBOX_COLOR_SCHEME=dark
+> **No env var.** Publish the config and set `color_scheme` directly in `config/ai-chatbox.php`:
+
+```php
+// config/ai-chatbox.php
+'color_scheme' => 'auto',  // OS preference (default)
+'color_scheme' => 'light',
+'color_scheme' => 'dark',
 ```
 
-> Run `php artisan config:clear` after changing `.env` values.
+> Run `php artisan config:clear` after changing config values.
 
 ---
 
@@ -1136,10 +1160,13 @@ src/
 │   ├── Contracts/ConversationRepositoryInterface.php
 │   ├── SessionConversationRepository.php
 │   ├── DatabaseConversationRepository.php
-│   └── ContextManager.php
+│   ├── ContextManager.php
+│   └── Models/
+│       ├── Conversation.php
+│       └── Message.php
 ├── Models/
-│   ├── Conversation.php · Message.php
-│   ├── RagDocument.php · RagChunk.php
+│   ├── RagDocument.php
+│   └── RagChunk.php
 ├── Services/
 │   ├── RagRetriever.php
 │   ├── EmbeddingService.php
@@ -1156,7 +1183,7 @@ src/
 │       └── livewire/chatbox.blade.php
 ├── AI.php                         # Facade
 ├── AiManager.php                  # Provider registry + singleton
-└── Providers/AiChatboxServiceProvider.php
+└── AiChatboxServiceProvider.php
 ```
 
 ---
@@ -1176,7 +1203,7 @@ class AnthropicEngine implements AiEngineInterface
     public function validateConfig(array $options): void
     {
         if (empty($options['api_token'])) {
-            throw new AiEngineException('API token missing', 'E03');
+            throw new AiEngineException('E03', 'API token missing', 500);
         }
     }
 
@@ -1342,10 +1369,6 @@ OPENAI_MODEL=gpt-4o
 OPENAI_EMBEDDING_URL=https://api.openai.com/v1/embeddings
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 
-# Groq
-GROQ_URL=https://api.groq.com/openai/v1/chat/completions
-GROQ_API_KEY=
-GROQ_MODEL=llama-3.3-70b-versatile
-GROQ_EMBEDDING_URL=
-GROQ_EMBEDDING_MODEL=
+# Groq / OpenRouter / custom providers — add a 'providers' entry in config/ai-chatbox.php
+# (see Provider examples in the docs above)
 ```
