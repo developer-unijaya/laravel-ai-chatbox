@@ -16,7 +16,7 @@ class DatabaseConversationRepository implements ConversationRepositoryInterface
 {
     public function getHistory(string $threadId): array
     {
-        $conversation = Conversation::where('thread_id', $threadId)->first();
+        $conversation = $this->findConversation($threadId);
 
         if (!$conversation) {
             return [];
@@ -30,10 +30,15 @@ class DatabaseConversationRepository implements ConversationRepositoryInterface
 
     public function saveHistory(string $threadId, array $history): void
     {
-        $conversation = Conversation::firstOrCreate(
-            ['thread_id' => $threadId],
-            ['user_id' => auth()->id()]
-        );
+        $userId = auth()->id();
+        $lookup = ['thread_id' => $threadId];
+
+        // Scope to user when authenticated so one user cannot write into another's thread
+        if ($userId !== null) {
+            $lookup['user_id'] = $userId;
+        }
+
+        $conversation = Conversation::firstOrCreate($lookup, ['user_id' => $userId]);
 
         // Count only "active" messages (after the last clear point) to determine
         // which entries in $history are already persisted vs. need inserting.
@@ -50,13 +55,13 @@ class DatabaseConversationRepository implements ConversationRepositoryInterface
 
     public function trimToLimit(string $threadId, int $maxPairs): void
     {
-        $conversation = Conversation::where('thread_id', $threadId)->first();
+        $conversation = $this->findConversation($threadId);
 
         if (!$conversation) {
             return;
         }
 
-        $max   = $maxPairs * 2;
+        $max = $maxPairs * 2;
         $query = $this->activeMessages($conversation);
         $total = $query->count();
 
@@ -72,7 +77,7 @@ class DatabaseConversationRepository implements ConversationRepositoryInterface
 
     public function clear(string $threadId): void
     {
-        $conversation = Conversation::where('thread_id', $threadId)->first();
+        $conversation = $this->findConversation($threadId);
 
         if (!$conversation) {
             return;
@@ -86,6 +91,22 @@ class DatabaseConversationRepository implements ConversationRepositoryInterface
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Find a conversation scoped to the current user when authenticated.
+     * Falls back to thread_id-only lookup for unauthenticated (guest) users.
+     */
+    private function findConversation(string $threadId): ?Conversation
+    {
+        $userId = auth()->id();
+        $query = Conversation::where('thread_id', $threadId);
+
+        if ($userId !== null) {
+            $query->where('user_id', $userId);
+        }
+
+        return $query->first();
+    }
 
     private function activeMessages(Conversation $conversation)
     {

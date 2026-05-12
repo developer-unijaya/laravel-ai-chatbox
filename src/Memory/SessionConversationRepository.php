@@ -41,8 +41,8 @@ class SessionConversationRepository implements ConversationRepositoryInterface
 
     /**
      * Return the session key scoped to the given thread ID.
-     * Falls back to the base key when no valid UUID v4 is provided,
-     * preserving backward compatibility with clients that omit thread_id.
+     * UUID v4 values are normalised directly; all other values (including empty
+     * string) are hashed so every distinct thread_id gets its own session slot.
      */
     private function key(string $threadId): string
     {
@@ -50,6 +50,6 @@ class SessionConversationRepository implements ConversationRepositoryInterface
             return self::BASE_KEY . '_' . str_replace('-', '', strtolower($threadId));
         }
 
-        return self::BASE_KEY;
+        return self::BASE_KEY . '_' . substr(md5($threadId), 0, 16);
     }
 }

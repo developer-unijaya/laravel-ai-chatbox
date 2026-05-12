@@ -126,7 +126,7 @@ return [
 
     'title' => env('AI_CHATBOX_TITLE', 'AI Assistant'),
     'placeholder' => 'Type your message...',
-    'theme_color' => '#4f46e5',
+    'theme_color' => '#0dad35',
     'greeting' => 'Hi! How can I help you today?',
 
 /*
@@ -316,9 +316,14 @@ return [
 | 'rag_chunk_size'           — target chunk size in tokens (~4 chars/token, default: 500)
 | 'rag_chunk_overlap'        — overlap between chunks in tokens (default: 50)
 | 'rag_similarity_threshold' — minimum cosine similarity score 0.0–1.0 (default: 0.2)
-| 'rag_admin_middleware'     — middleware for the admin document-management UI.
+| 'rag_admin_middleware'     — middleware for the Knowledge Base (RAG) document-management UI.
 |                              Default: ['web', 'auth'] — requires an authenticated user.
 |                              Change to ['web'] to make it publicly accessible (not recommended).
+| 'admin_middleware'         — middleware for the Admin dashboard (diagnostics, config viewer,
+|                              conversations). Defaults to the same value as rag_admin_middleware
+|                              when not set, so existing deployments are unaffected. Set this to a
+|                              stricter middleware (e.g. 'role:superadmin') to give read-only
+|                              operators dashboard access without granting document upload/delete.
 */
 
     'rag_enabled' => env('AI_CHATBOX_RAG', false),
@@ -328,6 +333,7 @@ return [
     'rag_chunk_overlap' => 50,
     'rag_similarity_threshold' => 0.2,
     'rag_admin_middleware' => ['web', 'auth'],
+    'admin_middleware' => null, // null = inherit rag_admin_middleware
 
 /*
 |--------------------------------------------------------------------------
@@ -441,14 +447,6 @@ return [
             'api_model' => env('OPENAI_MODEL', ''),
             'rag_embedding_url' => env('OPENAI_EMBEDDING_URL', ''),
             'rag_embedding_model' => env('OPENAI_EMBEDDING_MODEL', ''),
-        ],
-
-        'groq' => [
-            'api_url' => env('GROQ_URL', ''),
-            'api_token' => env('GROQ_API_KEY', ''),
-            'api_model' => env('GROQ_MODEL', ''),
-            'rag_embedding_url' => env('GROQ_EMBEDDING_URL', ''),
-            'rag_embedding_model' => env('GROQ_EMBEDDING_MODEL', ''),
         ],
     ],
 

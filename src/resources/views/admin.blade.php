@@ -8,7 +8,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Chatbox — Admin</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <script>tailwind.config = { darkMode: 'class' }</script>
     @if($scheme === 'auto')
     <script>
@@ -283,8 +283,8 @@
                             @elseif(is_array($val))
                                 {{ implode(', ', $val) }}
                             @elseif($key === 'api_token')
-                                {{-- Mask token — show first 6 chars only --}}
-                                {{ substr($val, 0, 6) }}{{ strlen($val) > 6 ? str_repeat('•', min(12, strlen($val) - 6)) : '' }}
+                                {{-- Mask token — show only last 4 chars to avoid leaking guessable prefixes --}}
+                                {{ str_repeat('•', min(12, max(0, strlen($val) - 4))) }}{{ strlen($val) > 4 ? substr($val, -4) : $val }}
                             @elseif($key === 'system_prompt' || $key === 'rag_context_prompt')
                                 <span class="line-clamp-2 text-gray-600 dark:text-gray-400">{{ $val }}</span>
                             @elseif($key === 'active_provider')
@@ -328,10 +328,6 @@
                         Knowledge Base (RAG)
                     </a>
                     @endif
-                    <a href="{{ url(config('ai-chatbox.route_prefix') . '/health') }}" target="_blank" class="flex items-center gap-2 text-sm hover:underline" style="color:var(--theme)">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
-                        Health Check
-                    </a>
                     <a href="/" class="flex items-center gap-2 text-sm hover:underline" style="color:var(--theme)">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>
                         App Home
@@ -388,7 +384,7 @@
                             <span class="config-key text-gray-400 whitespace-nowrap">{{ $k }}</span>
                             <span class="config-val {{ $isActive ? 'text-gray-700 dark:text-gray-200' : 'text-gray-600 dark:text-gray-300' }} break-all">
                                 @if($k === 'api_token')
-                                    {{ substr($v, 0, 6) }}{{ strlen($v) > 6 ? '••••••' : '' }}
+                                    {{ str_repeat('•', min(12, max(0, strlen($v) - 4))) }}{{ strlen($v) > 4 ? substr($v, -4) : $v }}
                                 @else
                                     {{ $v ?: '—' }}
                                 @endif

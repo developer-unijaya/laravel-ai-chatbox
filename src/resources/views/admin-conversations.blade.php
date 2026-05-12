@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Chatbox — Conversations</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <script>tailwind.config = { darkMode: 'class' }</script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
@@ -393,11 +393,33 @@
     }
 
     // ── Modal ────────────────────────────────────────────────────────────────
+    let modalConvId   = null;
+    let modalLastPage = 1;
+    let modalCurPage  = 1;
+
+    function renderMessageBubbles(messages, userName) {
+        return messages.map(m => {
+            const isUser  = m.role === 'user';
+            const bubble  = isUser ? 'bubble-user' : 'bubble-assistant';
+            const label   = isUser ? userName : 'Assistant';
+            const align   = isUser ? 'items-end' : 'items-start';
+            const content = isUser ? escHtml(m.content) : renderMarkdown(m.content);
+            return `
+            <div class="flex flex-col ${align} gap-0.5">
+                <span class="text-[0.65rem] text-gray-400 px-1">${escHtml(label)} · ${escHtml(m.created_at ?? '')}</span>
+                <div class="${bubble}">${content}</div>
+            </div>`;
+        }).join('');
+    }
+
     async function openModal(id) {
         const backdrop = document.getElementById('msg-modal-backdrop');
         const body     = document.getElementById('modal-body');
         const meta     = document.getElementById('modal-meta');
         const title    = document.getElementById('modal-title');
+
+        modalConvId  = id;
+        modalCurPage = 1;
 
         title.textContent = 'Loading…';
         meta.textContent  = '';
@@ -411,39 +433,75 @@
         document.body.style.overflow = 'hidden';
 
         try {
-            const url = MESSAGES_URL.replace('__id__', id);
-            const res = await fetch(url);
+            const url  = MESSAGES_URL.replace('__id__', id) + '?page=1';
+            const res  = await fetch(url);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const json = await res.json();
 
-            const userName = json.user_name || (json.user_id ? String(json.user_id) : 'User');
+            modalLastPage = json.last_page ?? 1;
 
+            const userName = json.user_name || (json.user_id ? String(json.user_id) : 'User');
             title.textContent = `Thread: ${json.thread_id ?? '—'}`;
             meta.textContent  = json.user_id ? `User: ${json.user_name || json.user_id}` : 'Guest session';
-            currentConversation = { threadId: json.thread_id ?? '—', userName, messages: json.messages };
+            currentConversation = { threadId: json.thread_id ?? '—', userName, messages: Array.from(json.messages) };
 
             if (!json.messages.length) {
                 body.innerHTML = `<p class="text-center text-sm text-gray-400 py-8">No messages in this conversation.</p>`;
                 return;
             }
 
-            body.innerHTML = json.messages.map(m => {
-                const isUser = m.role === 'user';
-                const bubble = isUser ? 'bubble-user' : 'bubble-assistant';
-                const label  = isUser ? userName : 'Assistant';
-                const align  = isUser ? 'items-end' : 'items-start';
-                const content = isUser ? escHtml(m.content) : renderMarkdown(m.content);
-                return `
-                <div class="flex flex-col ${align} gap-0.5">
-                    <span class="text-[0.65rem] text-gray-400 px-1">${escHtml(label)} · ${escHtml(m.created_at ?? '')}</span>
-                    <div class="${bubble}">${content}</div>
-                </div>`;
-            }).join('');
+            const loadMoreBtn = modalLastPage > 1
+                ? `<div id="load-more-wrap" class="flex justify-center py-3">
+                    <button onclick="loadMoreMessages()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                        Load earlier messages (page 1 of ${modalLastPage})
+                    </button>
+                   </div>`
+                : '';
 
-            // Scroll to bottom
+            body.innerHTML = loadMoreBtn + renderMessageBubbles(json.messages, userName);
             body.scrollTop = body.scrollHeight;
         } catch (e) {
             body.innerHTML = `<p class="text-center text-sm text-red-500 py-8">Failed to load messages: ${e.message}</p>`;
+        }
+    }
+
+    async function loadMoreMessages() {
+        if (!modalConvId || modalCurPage >= modalLastPage) return;
+        modalCurPage++;
+
+        const btn = document.getElementById('load-more-wrap');
+        if (btn) btn.innerHTML = `<p class="text-xs text-gray-400 py-2">Loading…</p>`;
+
+        try {
+            const url  = MESSAGES_URL.replace('__id__', modalConvId) + `?page=${modalCurPage}`;
+            const res  = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+
+            const body     = document.getElementById('modal-body');
+            const userName = currentConversation?.userName ?? 'User';
+            const newHtml  = renderMessageBubbles(json.messages, userName);
+
+            // Prepend new (older) messages before existing content
+            const wrap = document.getElementById('load-more-wrap');
+            if (wrap) {
+                if (modalCurPage < modalLastPage) {
+                    wrap.outerHTML = `<div id="load-more-wrap" class="flex justify-center py-3">
+                        <button onclick="loadMoreMessages()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                            Load earlier messages (page ${modalCurPage} of ${modalLastPage})
+                        </button>
+                       </div>` + newHtml;
+                } else {
+                    wrap.outerHTML = newHtml;
+                }
+            }
+
+            if (currentConversation) {
+                currentConversation.messages = Array.from(json.messages).concat(currentConversation.messages);
+            }
+        } catch (e) {
+            const wrap = document.getElementById('load-more-wrap');
+            if (wrap) wrap.innerHTML = `<p class="text-xs text-red-500 py-2">Failed to load: ${e.message}</p>`;
         }
     }
 
@@ -465,7 +523,8 @@
         const lines = [`Thread: ${threadId}`, `User: ${userName}`, ''];
         messages.forEach(m => {
             const label = m.role === 'user' ? userName : 'Assistant';
-            lines.push(`[${label}]`);
+            const ts    = m.created_at ? ` ${m.created_at}` : '';
+            lines.push(`[${label}]${ts}`);
             lines.push(m.content ?? '');
             lines.push('');
         });

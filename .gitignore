@@ -13,3 +13,5 @@ package-lock.json
 .vscode/
 .DS_Store
 Thumbs.db
+
+temp/

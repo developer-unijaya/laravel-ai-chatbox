@@ -46,7 +46,7 @@ class ChatboxController extends Controller
         // Memory layer: retrieve full history, then trim a copy for API context only
         $fullHistory = $this->repository->getHistory($threadId);
         $system = $this->promptBuilder->systemMessages($cfg);
-        $contextHistory = $this->contextManager->trim($fullHistory, $system, $userMsg, $cfg);
+        $contextHistory = $this->contextManager->trim($fullHistory, $system, $userMsg, $cfg, $this->ragBudget($cfg));
 
         // Engine layer: build prompt and call AI
         $messages = $this->promptBuilder->build($userMsg, $contextHistory, $cfg);
@@ -82,7 +82,7 @@ class ChatboxController extends Controller
         // Memory layer: retrieve full history, then trim a copy for API context only
         $fullHistory = $this->repository->getHistory($threadId);
         $system = $this->promptBuilder->systemMessages($cfg);
-        $contextHistory = $this->contextManager->trim($fullHistory, $system, $userMsg, $cfg);
+        $contextHistory = $this->contextManager->trim($fullHistory, $system, $userMsg, $cfg, $this->ragBudget($cfg));
 
         $messages = $this->promptBuilder->build($userMsg, $contextHistory, $cfg);
         $useHistory = $cfg['history_enabled'] ?? true;
@@ -140,6 +140,10 @@ class ChatboxController extends Controller
 
     public function clearHistory(Request $request): JsonResponse
     {
+        $request->validate([
+            'thread_id' => ['nullable', 'string', 'max:36'],
+        ]);
+
         $this->repository->clear($request->input('thread_id', ''));
 
         return response()->json(['status' => 'ok']);
@@ -148,9 +152,13 @@ class ChatboxController extends Controller
     public function healthCheck(Request $request): JsonResponse
     {
         $providerName = $request->query('provider');
-        $cfg = $providerName
-        ? app(AiManager::class)->resolveConfig((string) $providerName)
-        : $this->effectiveConfig();
+        try {
+            $cfg = $providerName
+            ? app(AiManager::class)->resolveConfig((string) $providerName)
+            : $this->effectiveConfig();
+        } catch (\InvalidArgumentException) {
+            return response()->json(['error' => 'Unknown provider.'], 400);
+        }
 
         $result = $this->healthChecker->check($cfg);
         $status = $result['status'] === 'online' ? 200 : 503;
@@ -170,6 +178,22 @@ class ChatboxController extends Controller
         return app(AiManager::class)->resolveConfig(
             config('ai-chatbox.active_provider', 'default')
         );
+    }
+
+    /**
+     * Estimate the token budget that RAG context will consume so ContextManager
+     * can reserve headroom before trimming history.
+     */
+    private function ragBudget(array $cfg): int
+    {
+        if (!($cfg['rag_enabled'] ?? false)) {
+            return 0;
+        }
+
+        $topK = max(1, (int) ($cfg['rag_top_k'] ?? 3));
+        $chunkSize = max(1, (int) ($cfg['rag_chunk_size'] ?? 500));
+
+        return $topK * $chunkSize;
     }
 
     private function engineError(AiEngineException $e): JsonResponse

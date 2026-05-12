@@ -213,7 +213,7 @@ class OpenAiCompatibleEngine implements AiEngineInterface
         return app('ai-chatbox.guzzle')($config);
     }
 
-    public function classifyConnectException(ConnectException $e): string
+    protected function classifyConnectException(ConnectException $e): string
     {
         $msg = strtolower($e->getMessage());
 
@@ -233,7 +233,7 @@ class OpenAiCompatibleEngine implements AiEngineInterface
         return self::E11;
     }
 
-    public function classifyHttpStatus(int $status): string
+    protected function classifyHttpStatus(int $status): string
     {
         return match ($status) {
             401 => self::E12,

@@ -16,9 +16,10 @@ class ContextManager
      * @param  array<int, array{role: string, content: string}>  $history
      * @param  array<int, array{role: string, content: string}>  $systemMessages  Already-built system message(s)
      * @param  array<string, mixed>  $cfg
+     * @param  int  $ragBudget  Estimated tokens that RAG context will consume (reserved before trimming history)
      * @return array<int, array{role: string, content: string}>
      */
-    public function trim(array $history, array $systemMessages, string $userMessage, array $cfg): array
+    public function trim(array $history, array $systemMessages, string $userMessage, array $cfg, int $ragBudget = 0): array
     {
         $historyLimit = (int) ($cfg['history_limit'] ?? 50);
         $contextTokenLimit = (int) ($cfg['context_token_limit'] ?? 4000);
@@ -35,6 +36,9 @@ class ContextManager
             return $history;
         }
 
+        // Reserve headroom for RAG chunks injected after trimming by PromptBuilder
+        $effectiveLimit = max(0, $contextTokenLimit - $ragBudget);
+
         // 2. Trim by estimated token count (~4 chars per token)
         //    The language reminder is part of the API payload but not stored in history.
         $apiMessage = (!empty($systemPrompt) && !empty($language))
@@ -44,7 +48,7 @@ class ContextManager
         while (count($history) >= 2) {
             $all = array_merge($systemMessages, $history, [['role' => 'user', 'content' => $apiMessage]]);
 
-            if ($this->estimateTokens($all) <= $contextTokenLimit) {
+            if ($this->estimateTokens($all) <= $effectiveLimit) {
                 break;
             }
 
@@ -58,7 +62,7 @@ class ContextManager
 
     private function estimateTokens(array $messages): int
     {
-        $chars = array_sum(array_map(fn($m) => strlen($m['content'] ?? ''), $messages));
+        $chars = array_sum(array_map(fn($m) => mb_strlen($m['content'] ?? '', 'UTF-8'), $messages));
 
         return (int) ceil($chars / 4);
     }

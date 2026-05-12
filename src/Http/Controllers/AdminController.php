@@ -186,7 +186,7 @@ class AdminController extends Controller
                     "Provider \"{$activeProvider}\" has no api_token set. Configure its token env var (e.g. OLLAMA_TOKEN, OPENAI_API_KEY)."];
             } elseif (in_array(strtolower($apiToken), $tokenPlaceholders)) {
                 $diagnostics[] = ['level' => 'error', 'group' => 'Active Provider', 'message' =>
-                    "Provider \"{$activeProvider}\" api_token \"{$apiToken}\" looks like a placeholder. Set a real token via its env var (e.g. OLLAMA_TOKEN, OPENAI_API_KEY)."];
+                    "Provider \"{$activeProvider}\" api_token looks like a placeholder value. Set a real token via its env var (e.g. OLLAMA_TOKEN, OPENAI_API_KEY)."];
             }
 
             // — api_model —
@@ -372,27 +372,50 @@ class AdminController extends Controller
         }
 
         // — Admin / RAG page protection —
-        $adminMiddleware = (array) ($cfg['rag_admin_middleware'] ?? ['web', 'auth']);
+        // admin_middleware controls the dashboard; rag_admin_middleware controls the Knowledge Base.
+        // Both fall back to ['web', 'auth'] when not explicitly configured.
+        $adminMiddleware = (array) ($cfg['admin_middleware'] ?? $cfg['rag_admin_middleware'] ?? ['web', 'auth']);
+        $ragMiddleware = (array) ($cfg['rag_admin_middleware'] ?? ['web', 'auth']);
         $defaultMiddleware = ['web', 'auth'];
-        sort($adminMiddleware);
-        sort($defaultMiddleware);
-        if ($adminMiddleware === $defaultMiddleware) {
+
+        $adminSorted = $adminMiddleware;
+        sort($adminSorted);
+        $ragSorted = $ragMiddleware;
+        sort($ragSorted);
+        $defaultSorted = $defaultMiddleware;
+        sort($defaultSorted);
+
+        if ($adminSorted === $defaultSorted) {
             $diagnostics[] = ['level' => 'warning', 'group' => 'Security', 'message' =>
-                'The admin and Knowledge Base pages are only protected by the default middleware [web, auth] — any authenticated user can access them. ' .
-                'Add a role or permission middleware to rag_admin_middleware in your config, e.g. "role:admin" (Spatie), "can:manage-chatbox" (Laravel Gates), or a custom middleware.',
+                'The admin dashboard is only protected by the default middleware [web, auth] — any authenticated user can access it. ' .
+                'Add a role or permission middleware to admin_middleware in your config, e.g. "role:admin" (Spatie), "can:manage-chatbox" (Laravel Gates), or a custom middleware.',
             ];
-        } else {
-            // Check if any role/permission-style middleware is present
-            $hasRoleCheck = collect($adminMiddleware)->contains(function ($m) {
-                return preg_match('/^(role|permission|can|ability|authorize)[.:\-]/i', $m)
-                || in_array(strtolower($m), ['admin', 'superadmin', 'is-admin', 'isadmin']);
-            });
-            if (!$hasRoleCheck) {
-                $diagnostics[] = ['level' => 'info', 'group' => 'Security', 'message' =>
-                    'Admin middleware has been customised but no role/permission middleware was detected. ' .
-                    'Ensure access is restricted to trusted users only.',
-                ];
-            }
+        }
+
+        if ($ragSorted === $defaultSorted) {
+            $diagnostics[] = ['level' => 'warning', 'group' => 'Security', 'message' =>
+                'The Knowledge Base (RAG) pages are only protected by the default middleware [web, auth] — any authenticated user can upload or delete documents. ' .
+                'Add a role or permission middleware to rag_admin_middleware in your config.',
+            ];
+        }
+
+        $hasRoleCheck = fn(array $mw) => collect($mw)->contains(
+            fn($m) => preg_match('/^(role|permission|can|ability|authorize)[.:\-]/i', $m)
+            || in_array(strtolower($m), ['admin', 'superadmin', 'is-admin', 'isadmin'])
+        );
+
+        if ($adminSorted !== $defaultSorted && !$hasRoleCheck($adminMiddleware)) {
+            $diagnostics[] = ['level' => 'info', 'group' => 'Security', 'message' =>
+                'admin_middleware has been customised but no role/permission middleware was detected. ' .
+                'Ensure dashboard access is restricted to trusted users only.',
+            ];
+        }
+
+        if ($ragSorted !== $defaultSorted && !$hasRoleCheck($ragMiddleware)) {
+            $diagnostics[] = ['level' => 'info', 'group' => 'Security', 'message' =>
+                'rag_admin_middleware has been customised but no role/permission middleware was detected. ' .
+                'Ensure Knowledge Base access is restricted to trusted users only.',
+            ];
         }
 
         // — Streaming —
@@ -453,6 +476,7 @@ class AdminController extends Controller
         $page = max(1, (int) $request->query('page', 1));
 
         $paginator = Conversation::withCount('messages')
+            ->with('latestMessage')
             ->orderByDesc('updated_at')
             ->paginate($perPage, ['*'], 'page', $page);
 
@@ -473,7 +497,7 @@ class AdminController extends Controller
         }
 
         $items = $paginator->getCollection()->map(function (Conversation $c) use ($userNames) {
-            $last = $c->messages()->orderByDesc('id')->first(['role', 'content']);
+            $last = $c->latestMessage;
             return [
                 'id' => $c->id,
                 'thread_id' => $c->thread_id,
@@ -498,19 +522,23 @@ class AdminController extends Controller
 
     // ── Messages for one conversation (JSON) ──────────────────────────────────
 
-    public function conversationMessages(int $id): JsonResponse
+    public function conversationMessages(Request $request, int $id): JsonResponse
     {
         $conversation = Conversation::findOrFail($id);
 
-        $messages = Message::where('conversation_id', $id)
+        $perPage = 50;
+        $page = max(1, (int) $request->query('page', 1));
+
+        $paginator = Message::where('conversation_id', $id)
             ->orderBy('id')
-            ->get(['id', 'role', 'content', 'created_at'])
-            ->map(fn(Message $m) => [
-                'id' => $m->id,
-                'role' => $m->role,
-                'content' => $m->content,
-                'created_at' => $m->created_at?->format('H:i · d M Y'),
-            ]);
+            ->paginate($perPage, ['id', 'role', 'content', 'created_at'], 'page', $page);
+
+        $messages = $paginator->getCollection()->map(fn(Message $m) => [
+            'id' => $m->id,
+            'role' => $m->role,
+            'content' => $m->content,
+            'created_at' => $m->created_at?->format('H:i · d M Y'),
+        ]);
 
         // Try to resolve a display name from the host app's User model
         $userName = null;
@@ -529,6 +557,10 @@ class AdminController extends Controller
             'user_id' => $conversation->user_id,
             'user_name' => $userName,
             'messages' => $messages,
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+            'total' => $paginator->total(),
+            'per_page' => $paginator->perPage(),
         ]);
     }
 }

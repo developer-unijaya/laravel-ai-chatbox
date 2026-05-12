@@ -38,7 +38,7 @@ class PruneConversations extends Command
         // Fresh-empty: conversations with no messages that are not already covered by stale
         $freshEmptyQuery = Conversation::doesntHave('messages')->where('updated_at', '>=', $cutoff);
 
-        $staleCount      = $staleQuery->count();
+        $staleCount = $staleQuery->count();
         $freshEmptyCount = $freshEmptyQuery->count();
 
         if ($staleCount === 0 && $freshEmptyCount === 0) {
@@ -61,8 +61,8 @@ class PruneConversations extends Command
             $staleQuery->delete();
         }
 
-        // Delete any remaining empty conversations (stale ones are already gone)
-        $emptyDeleted = Conversation::doesntHave('messages')->delete();
+        // Delete fresh-empty conversations using the same scoped query as the dry-run count
+        $emptyDeleted = $freshEmptyQuery->delete();
         if ($emptyDeleted > 0) {
             $this->info("Deleted {$emptyDeleted} conversation(s) with no messages.");
         }

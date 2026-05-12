@@ -51,8 +51,11 @@ class AiChatboxServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $activeProvider = config('ai-chatbox.active_provider', 'ollama');
-        $providerToken = config("ai-chatbox.providers.{$activeProvider}.api_token", '');
+        try {
+            $providerToken = app(AiManager::class)->resolveConfig('default')['api_token'] ?? '';
+        } catch (\InvalidArgumentException) {
+            $providerToken = '';
+        }
         $localTokens = ['ollama', 'lmstudio', ''];
         if (config('app.debug') && !in_array(strtolower($providerToken), $localTokens, true)) {
             Log::warning('AI Chatbox: APP_DEBUG is enabled while a real API token is configured. Disable debug mode in production.');
@@ -119,9 +122,11 @@ class AiChatboxServiceProvider extends ServiceProvider
 
     protected function adminRouteConfiguration(): array
     {
+        $middleware = config('ai-chatbox.admin_middleware') ?? config('ai-chatbox.rag_admin_middleware', ['web', 'auth']);
+
         return [
             'prefix' => config('ai-chatbox.route_prefix') . '/admin',
-            'middleware' => config('ai-chatbox.rag_admin_middleware', ['web', 'auth']),
+            'middleware' => $middleware,
         ];
     }
 
