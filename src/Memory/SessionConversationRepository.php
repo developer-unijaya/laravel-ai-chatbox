@@ -46,6 +46,10 @@ class SessionConversationRepository implements ConversationRepositoryInterface
      */
     private function key(string $threadId): string
     {
+        if ($threadId === '') {
+            return self::BASE_KEY;
+        }
+
         if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $threadId)) {
             return self::BASE_KEY . '_' . str_replace('-', '', strtolower($threadId));
         }

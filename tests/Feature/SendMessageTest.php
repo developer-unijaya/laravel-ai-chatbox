@@ -270,12 +270,16 @@ class SendMessageTest extends TestCase
         $this->assertSame('Thread B msg', session($keyB)[0]['content']);
     }
 
-    public function test_invalid_thread_id_falls_back_to_default_session_key(): void
+    public function test_non_uuid_thread_id_gets_its_own_hashed_session_key(): void
     {
+        $threadId = 'not-a-valid-uuid';
         $this->mockGuzzle([$this->openAiResponse('Hi')]);
-        $this->postJson('/ai-chatbox/message', ['message' => 'Hello', 'thread_id' => 'not-a-valid-uuid']);
+        $this->postJson('/ai-chatbox/message', ['message' => 'Hello', 'thread_id' => $threadId]);
 
-        $this->assertNotEmpty(session('ai_chatbox_history'));
+        // Non-UUID thread IDs are hashed to avoid key collisions (issue #10 fix)
+        $hashedKey = 'ai_chatbox_history_' . substr(md5($threadId), 0, 16);
+        $this->assertNotEmpty(session($hashedKey));
+        $this->assertNull(session('ai_chatbox_history')); // default key must be untouched
     }
 
     // ── Token-based context trimming ──────────────────────────────────────────

@@ -23,12 +23,14 @@ class ErrorClassificationTest extends TestCase
 
     private function classifyConnect(string $message): string
     {
-        return $this->engine->classifyConnectException($this->connectException($message));
+        $method = new \ReflectionMethod($this->engine, 'classifyConnectException');
+        return $method->invoke($this->engine, $this->connectException($message));
     }
 
     private function classifyStatus(int $status): string
     {
-        return $this->engine->classifyHttpStatus($status);
+        $method = new \ReflectionMethod($this->engine, 'classifyHttpStatus');
+        return $method->invoke($this->engine, $status);
     }
 
     // ── classifyConnectException ──────────────────────────────────────────────
