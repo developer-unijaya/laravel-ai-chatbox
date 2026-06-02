@@ -139,8 +139,8 @@ class RagController extends Controller
             $cfg['api_token'] ?? null,
             (int) ($cfg['rag_embedding_timeout'] ?? 10),
         );
-        $chunkSize = (int) config('ai-chatbox.rag_chunk_size', 500);
-        $overlap = (int) config('ai-chatbox.rag_chunk_overlap', 50);
+        $chunkSize = (int) ($cfg['rag_chunk_size'] ?? 500);
+        $overlap   = (int) ($cfg['rag_chunk_overlap'] ?? 50);
 
         $textChunks = $chunker->chunk($content, $chunkSize, $overlap);
 
