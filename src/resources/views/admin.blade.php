@@ -14,18 +14,21 @@
 
 @section('content')
 
-    {{-- ── Stat cards row ───────────────────────────────────────────────────── --}}
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+    {{-- ── Stat cards row 1 — RAG + Memory ─────────────────────────────────── --}}
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
 
         {{-- RAG stats --}}
         @if($ragEnabled && $ragStats)
         <a href="{{ $ragUrl }}" class="stat-card bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm block hover:shadow-md hover:brightness-[0.97] dark:hover:brightness-110 transition-all" title="Open Knowledge Base">
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Documents</p>
             <p class="text-2xl font-bold">{{ $ragStats['documents'] }}</p>
-            <p class="text-xs mt-1">
+            <p class="text-xs mt-1 flex flex-wrap gap-x-2">
                 <span class="text-green-600 dark:text-green-400">{{ $ragStats['documents_ready'] }} ready</span>
+                @if($ragStats['documents_processing'] > 0)
+                    <span class="text-blue-600 dark:text-blue-400">{{ $ragStats['documents_processing'] }} processing</span>
+                @endif
                 @if($ragStats['documents_failed'] > 0)
-                &nbsp;·&nbsp;<span class="text-red-600 dark:text-red-400">{{ $ragStats['documents_failed'] }} failed</span>
+                    <span class="text-red-600 dark:text-red-400">{{ $ragStats['documents_failed'] }} failed</span>
                 @endif
             </p>
         </a>
@@ -73,12 +76,50 @@
         @endif
     </div>
 
+    {{-- ── Stat cards row 2 — Activity (database memory only) ─────────────── --}}
+    @if(!empty($activityStats))
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+
+        <div class="stat-card bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Messages Today</p>
+            <p class="text-2xl font-bold">{{ $activityStats['messages_today'] }}</p>
+            <p class="text-xs text-gray-400 mt-1">since midnight</p>
+        </div>
+
+        <div class="stat-card bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Messages This Week</p>
+            <p class="text-2xl font-bold">{{ $activityStats['messages_week'] }}</p>
+            <p class="text-xs text-gray-400 mt-1">since {{ now()->startOfWeek()->format('D d M') }}</p>
+        </div>
+
+        <div class="stat-card bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Avg Msgs / Conv</p>
+            <p class="text-2xl font-bold">{{ $activityStats['avg_messages'] }}</p>
+            <p class="text-xs text-gray-400 mt-1">all time average</p>
+        </div>
+
+        <div class="stat-card bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Auth / Guest</p>
+            <p class="text-2xl font-bold">{{ $activityStats['auth_conversations'] }}<span class="text-base font-normal text-gray-400"> / {{ $activityStats['guest_conversations'] }}</span></p>
+            <p class="text-xs text-gray-400 mt-1">authenticated vs guest</p>
+        </div>
+
+    </div>
+    @else
+    <div class="mb-8"></div>
+    @endif
+
     {{-- ── Diagnostics panel ────────────────────────────────────────────────── --}}
     @php
         $diagErrors   = collect($diagnostics)->where('level', 'error');
         $diagWarnings = collect($diagnostics)->where('level', 'warning');
         $diagInfos    = collect($diagnostics)->where('level', 'info');
     @endphp
+
+    <div class="flex items-center justify-between mb-3">
+        <span class="section-heading">Diagnostics</span>
+        <span class="text-[0.65rem] text-gray-400 dark:text-gray-500">Checked at {{ $diagCheckedAt }}</span>
+    </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
 
@@ -179,7 +220,7 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {{-- ── Left column — config groups ─────────────────────────────────── --}}
+        {{-- ── Left column — config groups + recent conversations ─────────── --}}
         <div class="lg:col-span-2 space-y-5">
 
             @foreach($configGroups as $groupName => $keys)
@@ -226,8 +267,79 @@
 
         </div>
 
-        {{-- ── Right column — providers, env, widget ────────────────────────── --}}
+        {{-- ── Right column ─────────────────────────────────────────────────── --}}
         <div class="space-y-5">
+
+            {{-- Package Info & Queue Health --}}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+                <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-700">
+                    <span class="section-heading">Package &amp; Queue</span>
+                </div>
+                <div class="divide-y divide-gray-50 dark:divide-gray-700/60">
+                    <div class="flex items-center justify-between px-5 py-2.5 text-sm">
+                        <span class="text-gray-500 dark:text-gray-400 shrink-0">Version</span>
+                        <span class="config-val text-xs text-gray-700 dark:text-gray-300">
+                            @if($queueHealth['version'] !== 'dev')
+                                v{{ $queueHealth['version'] }}
+                            @else
+                                <span class="badge badge-gray">dev</span>
+                            @endif
+                        </span>
+                    </div>
+                    @if($queueHealth['hasQueue'])
+                    <div class="flex items-center justify-between px-5 py-2.5 text-sm">
+                        <span class="text-gray-500 dark:text-gray-400 shrink-0">Pending Jobs</span>
+                        <span class="badge {{ $queueHealth['pending'] > 0 ? 'badge-yellow' : 'badge-green' }}">
+                            {{ $queueHealth['pending'] }}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between px-5 py-2.5 text-sm">
+                        <span class="text-gray-500 dark:text-gray-400 shrink-0">Failed Jobs</span>
+                        <span class="badge {{ $queueHealth['failed'] > 0 ? 'badge-red' : 'badge-green' }}">
+                            {{ $queueHealth['failed'] }}
+                        </span>
+                    </div>
+                    @else
+                    <div class="px-5 py-2.5 text-xs text-gray-400 dark:text-gray-500">
+                        No <code class="config-key">jobs</code> table — queue driver not using DB.
+                    </div>
+                    @endif
+                    <div class="flex items-center justify-between px-5 py-2.5 text-sm">
+                        <span class="text-gray-500 dark:text-gray-400 shrink-0">Rate Limit</span>
+                        <span class="text-xs text-gray-700 dark:text-gray-300 font-mono">
+                            {{ $rateLimitCfg['limit'] }}&thinsp;req / {{ $rateLimitCfg['window'] }}&thinsp;min
+                            @if($rateLimitCfg['limit'] === 0)
+                                <span class="badge badge-red ml-1">disabled</span>
+                            @endif
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Top Users --}}
+            @if(!empty($topUsers))
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+                <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-700">
+                    <span class="section-heading">Top Users</span>
+                </div>
+                <ul class="divide-y divide-gray-50 dark:divide-gray-700/60">
+                    @php $topMax = $topUsers[0]['count'] ?? 1; @endphp
+                    @foreach($topUsers as $rank => $u)
+                    <li class="px-5 py-2.5">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs font-medium text-gray-700 dark:text-gray-300 truncate max-w-[70%]">
+                                {{ $u['user_name'] ?? 'User #' . $u['user_id'] }}
+                            </span>
+                            <span class="text-xs text-gray-400 shrink-0">{{ $u['count'] }} conv{{ $u['count'] !== 1 ? 's' : '' }}</span>
+                        </div>
+                        <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5">
+                            <div class="h-1.5 rounded-full" style="width:{{ round($u['count'] / $topMax * 100) }}%;background:var(--theme);opacity:{{ 1 - $rank * 0.15 }}"></div>
+                        </div>
+                    </li>
+                    @endforeach
+                </ul>
+            </div>
+            @endif
 
             {{-- Named providers --}}
             @if(!empty($namedProviders))
@@ -456,11 +568,11 @@
                 </div>
             </div>
 
-            {{-- RAG embedding status --}}
+            {{-- RAG embedding status + KB size --}}
             @if($ragEnabled)
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
                 <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-700">
-                    <span class="section-heading">Embedding Status</span>
+                    <span class="section-heading">Embedding &amp; Knowledge Base</span>
                 </div>
                 <div class="px-5 py-4 space-y-3 text-sm">
                     <div class="flex items-center justify-between gap-2">
@@ -486,6 +598,22 @@
                         <span class="badge {{ $pct === 100 ? 'badge-green' : ($pct === 0 ? 'badge-red' : 'badge-yellow') }}">
                             {{ $pct }}% ({{ $embedded }}/{{ $total }})
                         </span>
+                    </div>
+                    @endif
+                    @if($kbSize)
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-gray-500 dark:text-gray-400">Content Size</span>
+                        <span class="text-xs font-mono text-gray-700 dark:text-gray-300">{{ $kbSize['formatted'] }}</span>
+                    </div>
+                    @endif
+                    @if($ragStats && $ragStats['documents'] > 0)
+                    {{-- Embedding coverage bar --}}
+                    <div>
+                        <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 mt-1">
+                            <div class="h-1.5 rounded-full {{ $pct === 100 ? '' : ($pct === 0 ? 'bg-red-400' : 'bg-amber-400') }}"
+                                 style="{{ $pct > 0 ? 'width:' . $pct . '%;background:var(--theme)' : 'width:100%' }}"></div>
+                        </div>
+                        <p class="text-[0.65rem] text-gray-400 mt-1">{{ $pct }}% embedded</p>
                     </div>
                     @endif
                 </div>

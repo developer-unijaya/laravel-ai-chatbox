@@ -4,6 +4,7 @@ namespace SyafiqUnijaya\AiChatbox\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use SyafiqUnijaya\AiChatbox\AiManager;
@@ -39,6 +40,8 @@ class AdminController extends Controller
         ? (preg_match('#^https?://#i', $rawToggleIcon) ? $rawToggleIcon : asset($rawToggleIcon))
         : null;
 
+        $isDbMemory = config('ai-chatbox.memory_driver') === 'database';
+
         return view('ai-chatbox::admin', [
             'ragStats' => $ragStats,
             'memoryStats' => $this->collectMemoryStats(),
@@ -46,15 +49,19 @@ class AdminController extends Controller
             'namedProviders' => $cfg['providers'] ?? [],
             'env' => $this->collectEnv(),
             'diagnostics' => $this->buildDiagnostics($cfg, $ragStats, $ragEnabled),
+            'diagCheckedAt' => now()->format('H:i:s'),
             'themeColor' => $cfg['theme_color'] ?? '#4f46e5',
             'colorScheme' => $cfg['color_scheme'] ?? 'auto',
             'ragEnabled' => $ragEnabled,
             'frontend' => $cfg['frontend'] ?? 'vue',
             'toggleIconUrl' => $toggleIconUrl,
             'ragUrl' => route('ai-chatbox.rag.index'),
-            'conversationsUrl' => config('ai-chatbox.memory_driver') === 'database'
-            ? route('ai-chatbox.admin.conversations')
-            : null,
+            'conversationsUrl' => $isDbMemory ? route('ai-chatbox.admin.conversations') : null,
+            'activityStats' => $isDbMemory ? $this->collectActivityStats() : [],
+            'topUsers' => $isDbMemory ? $this->collectTopUsers() : [],
+            'queueHealth' => $this->collectQueueHealth(),
+            'kbSize' => $ragEnabled ? $this->collectKnowledgeBaseSize() : null,
+            'rateLimitCfg' => ['limit' => $cfg['rate_limit'] ?? 20, 'window' => $cfg['rate_window'] ?? 1],
         ]);
     }
 
@@ -163,6 +170,7 @@ class AdminController extends Controller
             'documents' => RagDocument::count(),
             'documents_ready' => RagDocument::where('status', 'ready')->count(),
             'documents_failed' => RagDocument::where('status', 'failed')->count(),
+            'documents_processing' => RagDocument::where('status', 'processing')->count(),
             'total_chunks' => RagChunk::count(),
             'embedded_chunks' => RagChunk::whereNotNull('embedding')->count(),
             'null_chunks' => RagChunk::whereNull('embedding')->count(),
@@ -756,6 +764,150 @@ class AdminController extends Controller
                 . 'Ensure it passes event-stream responses through without buffering. '
                 . 'Cloudflare, AWS ALB, and similar services may require explicit configuration to honour SSE (e.g. Cloudflare disables buffering for text/event-stream by default, but custom proxy rules or enterprise WAF policies can re-enable it).'];
         }
+    }
+
+    // ── New dashboard data builders ───────────────────────────────────────────
+
+    private function collectActivityStats(): array
+    {
+        try {
+            $totalMessages = Message::count();
+            $totalConvs = Conversation::count();
+
+            return [
+                'messages_today' => Message::whereDate('created_at', today())->count(),
+                'messages_week' => Message::where('created_at', '>=', now()->startOfWeek())->count(),
+                'avg_messages' => $totalConvs > 0 ? round($totalMessages / $totalConvs, 1) : 0,
+                'auth_conversations' => Conversation::whereNotNull('user_id')->count(),
+                'guest_conversations' => Conversation::whereNull('user_id')->count(),
+            ];
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function collectConversationTrend(): array
+    {
+        try {
+            $counts = Message::selectRaw('DATE(created_at) as day, COUNT(*) as cnt')
+                ->where('created_at', '>=', now()->subDays(6)->startOfDay())
+                ->groupBy('day')
+                ->pluck('cnt', 'day');
+
+            return collect(range(6, 0))->map(function (int $i) use ($counts) {
+                $date = now()->subDays($i)->format('Y-m-d');
+                return [
+                    'label' => now()->subDays($i)->format('D'),
+                    'date' => $date,
+                    'count' => (int) ($counts[$date] ?? 0),
+                ];
+            })->values()->toArray();
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function collectRecentConversations(): array
+    {
+        try {
+            $rows = Conversation::withCount('messages')
+                ->with('latestMessage')
+                ->orderByDesc('updated_at')
+                ->limit(5)
+                ->get();
+
+            $names = $this->resolveUserNames($rows->pluck('user_id'));
+
+            return $rows->map(fn(Conversation $c) => [
+                'id' => $c->id,
+                'thread_id' => $c->thread_id,
+                'user_name' => $names[$c->user_id] ?? null,
+                'messages_count' => $c->messages_count,
+                'last_preview' => $c->latestMessage ? mb_strimwidth($c->latestMessage->content, 0, 60, '…') : null,
+                'last_role' => $c->latestMessage?->role,
+                'updated_at' => $c->updated_at?->diffForHumans(),
+            ])->toArray();
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function collectTopUsers(): array
+    {
+        try {
+            $rows = Conversation::selectRaw('user_id, COUNT(*) as cnt')
+                ->whereNotNull('user_id')
+                ->groupBy('user_id')
+                ->orderByDesc('cnt')
+                ->limit(5)
+                ->get();
+
+            $names = $this->resolveUserNames($rows->pluck('user_id'));
+
+            return $rows->map(fn($r) => [
+                'user_id' => $r->user_id,
+                'user_name' => $names[$r->user_id] ?? null,
+                'count' => (int) $r->cnt,
+            ])->toArray();
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function collectQueueHealth(): array
+    {
+        $version = 'dev';
+        try {
+            if (class_exists(\Composer\InstalledVersions::class)) {
+                $v = \Composer\InstalledVersions::getVersion('syafiq-unijaya/laravel-ai-chatbox');
+                if ($v) {
+                    $version = ltrim($v, 'v');
+                }
+            }
+        } catch (\Throwable) {}
+
+        $pending = 0;
+        $failed = 0;
+        $hasQueue = false;
+        try {
+            if (Schema::hasTable('jobs')) {
+                $pending = DB::table('jobs')->count();
+                $hasQueue = true;
+            }
+            if (Schema::hasTable('failed_jobs')) {
+                $failed = DB::table('failed_jobs')->count();
+            }
+        } catch (\Throwable) {}
+
+        return compact('version', 'pending', 'failed', 'hasQueue');
+    }
+
+    private function collectKnowledgeBaseSize(): array
+    {
+        try {
+            $row = RagDocument::selectRaw("SUM(LENGTH(COALESCE(content, ''))) as total_chars, COUNT(*) as total_docs")->first();
+            $bytes = (int) ($row->total_chars ?? 0);
+            return ['bytes' => $bytes, 'formatted' => $this->formatBytes($bytes)];
+        } catch (\Throwable) {
+            return ['bytes' => 0, 'formatted' => '0 B'];
+        }
+    }
+
+    private function formatBytes(int $bytes): string
+    {
+        if ($bytes < 1_024) {
+            return $bytes . ' B';
+        }
+
+        if ($bytes < 1_048_576) {
+            return round($bytes / 1_024, 1) . ' KB';
+        }
+
+        if ($bytes < 1_073_741_824) {
+            return round($bytes / 1_048_576, 1) . ' MB';
+        }
+
+        return round($bytes / 1_073_741_824, 1) . ' GB';
     }
 
     // ── Shared utilities ──────────────────────────────────────────────────────
