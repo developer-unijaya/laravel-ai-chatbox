@@ -16,6 +16,12 @@ class SessionConversationRepository implements ConversationRepositoryInterface
         return session($this->key($threadId), []);
     }
 
+    public function saveMessage(string $threadId, string $role, string $content): void
+    {
+        // Session driver persists the full history atomically in saveHistory().
+        // No intermediate save is needed here.
+    }
+
     public function saveHistory(string $threadId, array $history): void
     {
         session([$this->key($threadId) => $history]);

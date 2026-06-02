@@ -48,6 +48,18 @@ class ChatboxController extends Controller
         $system = $this->promptBuilder->systemMessages($cfg);
         $contextHistory = $this->contextManager->trim($fullHistory, $system, $userMsg, $cfg, $this->ragBudget($cfg));
 
+        // Persist the user message immediately before calling the AI
+        if ($cfg['history_enabled'] ?? true) {
+            try {
+                $this->repository->saveMessage($threadId, 'user', $userMsg);
+            } catch (\Throwable $e) {
+                Log::error('AI Chatbox: failed to save user message', [
+                    'thread_id' => $threadId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         // Engine layer: build prompt and call AI
         $messages = $this->promptBuilder->build($userMsg, $contextHistory, $cfg);
 
@@ -57,7 +69,7 @@ class ChatboxController extends Controller
             return $this->engineError($e);
         }
 
-        // Memory layer: persist full history + new pair (not the trimmed context)
+        // Persist the AI reply and trim history to the configured limit
         if ($cfg['history_enabled'] ?? true) {
             try {
                 $fullHistory[] = ['role' => 'user', 'content' => $userMsg];
@@ -65,7 +77,7 @@ class ChatboxController extends Controller
                 $this->repository->saveHistory($threadId, $fullHistory);
                 $this->repository->trimToLimit($threadId, (int) ($cfg['history_limit'] ?? 50));
             } catch (\Throwable $e) {
-                Log::error('AI Chatbox: failed to save conversation history', [
+                Log::error('AI Chatbox: failed to save AI reply', [
                     'thread_id' => $threadId,
                     'error' => $e->getMessage(),
                 ]);
@@ -94,6 +106,18 @@ class ChatboxController extends Controller
         $messages = $this->promptBuilder->build($userMsg, $contextHistory, $cfg);
         $useHistory = $cfg['history_enabled'] ?? true;
         $historyLimit = (int) ($cfg['history_limit'] ?? 50);
+
+        // Persist the user message immediately before the stream begins
+        if ($useHistory) {
+            try {
+                $this->repository->saveMessage($threadId, 'user', $userMsg);
+            } catch (\Throwable $e) {
+                Log::error('AI Chatbox: failed to save user message', [
+                    'thread_id' => $threadId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         // Establish the AI connection before starting the HTTP stream response.
         // This ensures connection / config errors can still return proper JSON (non-200).
@@ -132,7 +156,7 @@ class ChatboxController extends Controller
                         $this->repository->trimToLimit($threadId, $historyLimit);
                         session()->save(); // required because the response has already started
                     } catch (\Throwable $e) {
-                        Log::error('AI Chatbox: failed to save conversation history', [
+                        Log::error('AI Chatbox: failed to save AI reply', [
                             'thread_id' => $threadId,
                             'error' => $e->getMessage(),
                         ]);

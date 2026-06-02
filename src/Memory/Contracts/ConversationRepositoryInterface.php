@@ -11,6 +11,12 @@ interface ConversationRepositoryInterface
     public function getHistory(string $threadId): array;
 
     /**
+     * Persist a single message for a thread immediately.
+     * Used to save the user's prompt before the AI call begins.
+     */
+    public function saveMessage(string $threadId, string $role, string $content): void;
+
+    /**
      * Overwrite the stored history for a thread.
      * Used to persist both the context-trimmed history and newly appended messages.
      *

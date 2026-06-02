@@ -28,6 +28,20 @@ class DatabaseConversationRepository implements ConversationRepositoryInterface
             ->toArray();
     }
 
+    public function saveMessage(string $threadId, string $role, string $content): void
+    {
+        $userId = auth()->id();
+        $lookup = ['thread_id' => $threadId];
+
+        if ($userId !== null) {
+            $lookup['user_id'] = $userId;
+        }
+
+        $conversation = Conversation::firstOrCreate($lookup, ['user_id' => $userId]);
+        $conversation->messages()->create(['role' => $role, 'content' => $content]);
+        $conversation->touch();
+    }
+
     public function saveHistory(string $threadId, array $history): void
     {
         $userId = auth()->id();
