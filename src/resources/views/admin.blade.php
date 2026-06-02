@@ -189,77 +189,102 @@
         $diagInfos    = collect($diagnostics)->where('level', 'info');
     @endphp
 
-    @if($diagErrors->isNotEmpty())
-    <div class="mb-4 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 overflow-hidden">
-        <div class="flex items-center gap-2 px-4 py-2.5 bg-red-100 dark:bg-red-900/40 border-b border-red-200 dark:border-red-800">
-            <svg class="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9.303 3.376c.866 1.5-.217 3.374-1.948 3.374H4.645c-1.73 0-2.813-1.874-1.948-3.374L10.05 3.378c.866-1.5 3.032-1.5 3.898 0l5.355 9.748z"/>
-            </svg>
-            <span class="text-sm font-semibold text-red-700 dark:text-red-300">{{ $diagErrors->count() }} Configuration Error{{ $diagErrors->count() > 1 ? 's' : '' }}</span>
-        </div>
-        <ul class="divide-y divide-red-100 dark:divide-red-800/50">
-            @foreach($diagErrors->groupBy('group') as $group => $items)
-                @foreach($items as $d)
-                <li class="flex items-start gap-3 px-4 py-3 text-sm">
-                    <span class="badge badge-red mt-0.5 shrink-0">{{ $group }}</span>
-                    <span class="text-red-700 dark:text-red-300">{{ $d['message'] }}</span>
-                </li>
-                @endforeach
-            @endforeach
-        </ul>
-    </div>
-    @endif
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
 
-    @if($diagWarnings->isNotEmpty())
-    <div class="mb-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 overflow-hidden">
-        <div class="flex items-center gap-2 px-4 py-2.5 bg-amber-100 dark:bg-amber-900/40 border-b border-amber-200 dark:border-amber-800">
-            <svg class="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"/>
-            </svg>
-            <span class="text-sm font-semibold text-amber-700 dark:text-amber-300">{{ $diagWarnings->count() }} Warning{{ $diagWarnings->count() > 1 ? 's' : '' }}</span>
-        </div>
-        <ul class="divide-y divide-amber-100 dark:divide-amber-800/50">
-            @foreach($diagWarnings->groupBy('group') as $group => $items)
-                @foreach($items as $d)
-                <li class="flex items-start gap-3 px-4 py-3 text-sm">
-                    <span class="badge badge-yellow mt-0.5 shrink-0">{{ $group }}</span>
-                    <span class="text-amber-700 dark:text-amber-300">{{ $d['message'] }}</span>
-                </li>
+        {{-- Errors --}}
+        <div class="rounded-xl border overflow-hidden flex flex-col {{ $diagErrors->isNotEmpty() ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800' }}">
+            <div class="flex items-center gap-2 px-4 py-2.5 border-b {{ $diagErrors->isNotEmpty() ? 'bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800' : 'border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30' }}">
+                <svg class="w-4 h-4 shrink-0 {{ $diagErrors->isNotEmpty() ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500' }}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9.303 3.376c.866 1.5-.217 3.374-1.948 3.374H4.645c-1.73 0-2.813-1.874-1.948-3.374L10.05 3.378c.866-1.5 3.032-1.5 3.898 0l5.355 9.748z"/>
+                </svg>
+                <span class="text-sm font-semibold {{ $diagErrors->isNotEmpty() ? 'text-red-700 dark:text-red-300' : 'text-gray-500 dark:text-gray-400' }}">
+                    {{ $diagErrors->count() }} Error{{ $diagErrors->count() !== 1 ? 's' : '' }}
+                </span>
+            </div>
+            @if($diagErrors->isNotEmpty())
+            <ul class="divide-y divide-red-100 dark:divide-red-800/50 flex-1">
+                @foreach($diagErrors->groupBy('group') as $group => $items)
+                    @foreach($items as $d)
+                    <li class="flex items-start gap-3 px-4 py-3 text-sm">
+                        <span class="badge badge-red mt-0.5 shrink-0">{{ $group }}</span>
+                        <span class="text-red-700 dark:text-red-300">{{ $d['message'] }}</span>
+                    </li>
+                    @endforeach
                 @endforeach
-            @endforeach
-        </ul>
-    </div>
-    @endif
-
-    @if($diagInfos->isNotEmpty())
-    <div class="mb-4 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 overflow-hidden">
-        <div class="flex items-center gap-2 px-4 py-2.5 bg-blue-100 dark:bg-blue-900/40 border-b border-blue-200 dark:border-blue-800">
-            <svg class="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/>
-            </svg>
-            <span class="text-sm font-semibold text-blue-700 dark:text-blue-300">{{ $diagInfos->count() }} Notice{{ $diagInfos->count() > 1 ? 's' : '' }}</span>
+            </ul>
+            @else
+            <div class="flex flex-col items-center justify-center px-4 py-8 flex-1 text-center">
+                <svg class="w-6 h-6 text-green-400 dark:text-green-500 mb-1.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+                </svg>
+                <span class="text-sm text-gray-400 dark:text-gray-500">No errors</span>
+            </div>
+            @endif
         </div>
-        <ul class="divide-y divide-blue-100 dark:divide-blue-800/50">
-            @foreach($diagInfos->groupBy('group') as $group => $items)
-                @foreach($items as $d)
-                <li class="flex items-start gap-3 px-4 py-3 text-sm">
-                    <span class="badge badge-blue mt-0.5 shrink-0">{{ $group }}</span>
-                    <span class="text-blue-700 dark:text-blue-300">{{ $d['message'] }}</span>
-                </li>
-                @endforeach
-            @endforeach
-        </ul>
-    </div>
-    @endif
 
-    @if(empty($diagnostics))
-    <div class="mb-6 flex items-center gap-2 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 px-4 py-3 text-sm text-green-700 dark:text-green-300">
-        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
-        </svg>
-        All configuration checks passed.
+        {{-- Warnings --}}
+        <div class="rounded-xl border overflow-hidden flex flex-col {{ $diagWarnings->isNotEmpty() ? 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800' }}">
+            <div class="flex items-center gap-2 px-4 py-2.5 border-b {{ $diagWarnings->isNotEmpty() ? 'bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800' : 'border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30' }}">
+                <svg class="w-4 h-4 shrink-0 {{ $diagWarnings->isNotEmpty() ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400 dark:text-gray-500' }}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"/>
+                </svg>
+                <span class="text-sm font-semibold {{ $diagWarnings->isNotEmpty() ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400' }}">
+                    {{ $diagWarnings->count() }} Warning{{ $diagWarnings->count() !== 1 ? 's' : '' }}
+                </span>
+            </div>
+            @if($diagWarnings->isNotEmpty())
+            <ul class="divide-y divide-amber-100 dark:divide-amber-800/50 flex-1">
+                @foreach($diagWarnings->groupBy('group') as $group => $items)
+                    @foreach($items as $d)
+                    <li class="flex items-start gap-3 px-4 py-3 text-sm">
+                        <span class="badge badge-yellow mt-0.5 shrink-0">{{ $group }}</span>
+                        <span class="text-amber-700 dark:text-amber-300">{{ $d['message'] }}</span>
+                    </li>
+                    @endforeach
+                @endforeach
+            </ul>
+            @else
+            <div class="flex flex-col items-center justify-center px-4 py-8 flex-1 text-center">
+                <svg class="w-6 h-6 text-green-400 dark:text-green-500 mb-1.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+                </svg>
+                <span class="text-sm text-gray-400 dark:text-gray-500">No warnings</span>
+            </div>
+            @endif
+        </div>
+
+        {{-- Notices --}}
+        <div class="rounded-xl border overflow-hidden flex flex-col {{ $diagInfos->isNotEmpty() ? 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800' }}">
+            <div class="flex items-center gap-2 px-4 py-2.5 border-b {{ $diagInfos->isNotEmpty() ? 'bg-blue-100 dark:bg-blue-900/40 border-blue-200 dark:border-blue-800' : 'border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30' }}">
+                <svg class="w-4 h-4 shrink-0 {{ $diagInfos->isNotEmpty() ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500' }}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/>
+                </svg>
+                <span class="text-sm font-semibold {{ $diagInfos->isNotEmpty() ? 'text-blue-700 dark:text-blue-300' : 'text-gray-500 dark:text-gray-400' }}">
+                    {{ $diagInfos->count() }} Notice{{ $diagInfos->count() !== 1 ? 's' : '' }}
+                </span>
+            </div>
+            @if($diagInfos->isNotEmpty())
+            <ul class="divide-y divide-blue-100 dark:divide-blue-800/50 flex-1">
+                @foreach($diagInfos->groupBy('group') as $group => $items)
+                    @foreach($items as $d)
+                    <li class="flex items-start gap-3 px-4 py-3 text-sm">
+                        <span class="badge badge-blue mt-0.5 shrink-0">{{ $group }}</span>
+                        <span class="text-blue-700 dark:text-blue-300">{{ $d['message'] }}</span>
+                    </li>
+                    @endforeach
+                @endforeach
+            </ul>
+            @else
+            <div class="flex flex-col items-center justify-center px-4 py-8 flex-1 text-center">
+                <svg class="w-6 h-6 text-green-400 dark:text-green-500 mb-1.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+                </svg>
+                <span class="text-sm text-gray-400 dark:text-gray-500">No notices</span>
+            </div>
+            @endif
+        </div>
+
     </div>
-    @endif
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
