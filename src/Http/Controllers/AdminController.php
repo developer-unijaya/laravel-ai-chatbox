@@ -244,7 +244,7 @@ class AdminController extends Controller
         }
         $origins = $cfg['allowed_origins'] ?? [];
         if (in_array('*', (array) $origins)) {
-            $diagnostics[] = ['level' => 'warning', 'group' => 'Security', 'message' => 'allowed_origins includes "*" — CORS is open to all origins. Restrict this in production.'];
+            $diagnostics[] = ['level' => 'warning', 'group' => 'Security', 'message' => 'allowed_origins includes "*" — CORS accepts requests from any origin. Restrict this to specific domains in production.'];
         }
         $rateLimit = (int) ($cfg['rate_limit'] ?? 20);
         if ($rateLimit > 100) {
