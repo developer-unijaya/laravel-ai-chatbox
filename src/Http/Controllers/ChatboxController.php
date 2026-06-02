@@ -13,6 +13,7 @@ use SyafiqUnijaya\AiChatbox\Engine\PromptBuilder;
 use SyafiqUnijaya\AiChatbox\Memory\ContextManager;
 use SyafiqUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 /**
  * Layer 3 — UI
@@ -52,7 +53,7 @@ class ChatboxController extends Controller
         if ($cfg['history_enabled'] ?? true) {
             try {
                 $this->repository->saveMessage($threadId, 'user', $userMsg);
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 Log::error('AI Chatbox: failed to save user message', [
                     'thread_id' => $threadId,
                     'error' => $e->getMessage(),
@@ -76,7 +77,7 @@ class ChatboxController extends Controller
                 $fullHistory[] = ['role' => 'assistant', 'content' => $reply];
                 $this->repository->saveHistory($threadId, $fullHistory);
                 $this->repository->trimToLimit($threadId, (int) ($cfg['history_limit'] ?? 50));
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 Log::error('AI Chatbox: failed to save AI reply', [
                     'thread_id' => $threadId,
                     'error' => $e->getMessage(),
@@ -111,7 +112,7 @@ class ChatboxController extends Controller
         if ($useHistory) {
             try {
                 $this->repository->saveMessage($threadId, 'user', $userMsg);
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 Log::error('AI Chatbox: failed to save user message', [
                     'thread_id' => $threadId,
                     'error' => $e->getMessage(),
@@ -143,7 +144,7 @@ class ChatboxController extends Controller
                         'message' => $e->getMessage(),
                     ]);
                     $fullReply = '';
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     Log::error('AI Chatbox stream error', ['message' => $e->getMessage()]);
                     $fullReply = '';
                 }
@@ -155,7 +156,7 @@ class ChatboxController extends Controller
                         $this->repository->saveHistory($threadId, $fullHistory);
                         $this->repository->trimToLimit($threadId, $historyLimit);
                         session()->save(); // required because the response has already started
-                    } catch (\Throwable $e) {
+                    } catch (Throwable $e) {
                         Log::error('AI Chatbox: failed to save AI reply', [
                             'thread_id' => $threadId,
                             'error' => $e->getMessage(),

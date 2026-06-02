@@ -12,6 +12,7 @@ use SyafiqUnijaya\AiChatbox\Memory\Models\Conversation;
 use SyafiqUnijaya\AiChatbox\Memory\Models\Message;
 use SyafiqUnijaya\AiChatbox\Models\RagChunk;
 use SyafiqUnijaya\AiChatbox\Models\RagDocument;
+use Throwable;
 
 class AdminController extends Controller
 {
@@ -188,7 +189,7 @@ class AdminController extends Controller
                 'conversations' => Conversation::count(),
                 'messages' => Message::count(),
             ];
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return ['error' => 'Run php artisan migrate to create the conversations/messages tables.'];
         }
     }
@@ -766,7 +767,7 @@ class AdminController extends Controller
         }
     }
 
-    // ── New dashboard data builders ───────────────────────────────────────────
+    // ── dashboard data builders ───────────────────────────────────────────
 
     private function collectActivityStats(): array
     {
@@ -781,7 +782,7 @@ class AdminController extends Controller
                 'auth_conversations' => Conversation::whereNotNull('user_id')->count(),
                 'guest_conversations' => Conversation::whereNull('user_id')->count(),
             ];
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [];
         }
     }
@@ -802,7 +803,7 @@ class AdminController extends Controller
                     'count' => (int) ($counts[$date] ?? 0),
                 ];
             })->values()->toArray();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [];
         }
     }
@@ -827,7 +828,7 @@ class AdminController extends Controller
                 'last_role' => $c->latestMessage?->role,
                 'updated_at' => $c->updated_at?->diffForHumans(),
             ])->toArray();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [];
         }
     }
@@ -849,7 +850,7 @@ class AdminController extends Controller
                 'user_name' => $names[$r->user_id] ?? null,
                 'count' => (int) $r->cnt,
             ])->toArray();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [];
         }
     }
@@ -864,7 +865,7 @@ class AdminController extends Controller
                     $version = ltrim($v, 'v');
                 }
             }
-        } catch (\Throwable) {}
+        } catch (Throwable) {}
 
         $pending = 0;
         $failed = 0;
@@ -877,7 +878,7 @@ class AdminController extends Controller
             if (Schema::hasTable('failed_jobs')) {
                 $failed = DB::table('failed_jobs')->count();
             }
-        } catch (\Throwable) {}
+        } catch (Throwable) {}
 
         return compact('version', 'pending', 'failed', 'hasQueue');
     }
@@ -888,7 +889,7 @@ class AdminController extends Controller
             $row = RagDocument::selectRaw("SUM(LENGTH(COALESCE(content, ''))) as total_chars, COUNT(*) as total_docs")->first();
             $bytes = (int) ($row->total_chars ?? 0);
             return ['bytes' => $bytes, 'formatted' => $this->formatBytes($bytes)];
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return ['bytes' => 0, 'formatted' => '0 B'];
         }
     }
@@ -933,7 +934,7 @@ class AdminController extends Controller
                         $userNames[$u->id] = $u->name ?? $u->username ?? $u->email ?? null;
                     });
             }
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // User model unavailable — degrade gracefully
         }
         return $userNames;

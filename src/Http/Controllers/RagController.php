@@ -10,6 +10,7 @@ use SyafiqUnijaya\AiChatbox\Models\RagChunk;
 use SyafiqUnijaya\AiChatbox\Models\RagDocument;
 use SyafiqUnijaya\AiChatbox\Services\DocumentChunker;
 use SyafiqUnijaya\AiChatbox\Services\EmbeddingService;
+use Throwable;
 
 class RagController extends Controller
 {
@@ -70,7 +71,7 @@ class RagController extends Controller
             return redirect()->route('ai-chatbox.rag.index')
                 ->with('success', "'{$title}' indexed successfully ({$document->chunk_count} chunks).");
 
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $document->update(['status' => 'failed', 'error_message' => $e->getMessage()]);
             return redirect()->route('ai-chatbox.rag.index')
                 ->with('error', "Failed to index '{$title}': " . $e->getMessage());
@@ -109,7 +110,7 @@ class RagController extends Controller
             return redirect()->route('ai-chatbox.rag.index')
                 ->with('success', "'{$document->title}' reprocessed successfully ({$document->chunk_count} chunks).");
 
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $document->update(['status' => 'failed', 'error_message' => $e->getMessage()]);
             return redirect()->route('ai-chatbox.rag.index')
                 ->with('error', "Failed to reprocess '{$document->title}': " . $e->getMessage());
