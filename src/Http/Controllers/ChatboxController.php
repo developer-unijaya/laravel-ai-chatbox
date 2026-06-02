@@ -59,10 +59,17 @@ class ChatboxController extends Controller
 
         // Memory layer: persist full history + new pair (not the trimmed context)
         if ($cfg['history_enabled'] ?? true) {
-            $fullHistory[] = ['role' => 'user', 'content' => $userMsg];
-            $fullHistory[] = ['role' => 'assistant', 'content' => $reply];
-            $this->repository->saveHistory($threadId, $fullHistory);
-            $this->repository->trimToLimit($threadId, (int) ($cfg['history_limit'] ?? 50));
+            try {
+                $fullHistory[] = ['role' => 'user', 'content' => $userMsg];
+                $fullHistory[] = ['role' => 'assistant', 'content' => $reply];
+                $this->repository->saveHistory($threadId, $fullHistory);
+                $this->repository->trimToLimit($threadId, (int) ($cfg['history_limit'] ?? 50));
+            } catch (\Throwable $e) {
+                Log::error('AI Chatbox: failed to save conversation history', [
+                    'thread_id' => $threadId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         return response()->json(['reply' => $reply]);
@@ -106,20 +113,30 @@ class ChatboxController extends Controller
                         }
                         flush();
                     });
-
-                    if ($useHistory && $fullReply !== '') {
-                        $fullHistory[] = ['role' => 'user', 'content' => $userMsg];
-                        $fullHistory[] = ['role' => 'assistant', 'content' => $fullReply];
-                        $this->repository->saveHistory($threadId, $fullHistory);
-                        $this->repository->trimToLimit($threadId, $historyLimit);
-                        session()->save(); // required because the response has already started
-                    }
-
                 } catch (AiEngineException $e) {
                     Log::error('AI Chatbox stream error', [
                         'code' => $e->errorCode,
                         'message' => $e->getMessage(),
                     ]);
+                    $fullReply = '';
+                } catch (\Throwable $e) {
+                    Log::error('AI Chatbox stream error', ['message' => $e->getMessage()]);
+                    $fullReply = '';
+                }
+
+                if ($useHistory && $fullReply !== '') {
+                    try {
+                        $fullHistory[] = ['role' => 'user', 'content' => $userMsg];
+                        $fullHistory[] = ['role' => 'assistant', 'content' => $fullReply];
+                        $this->repository->saveHistory($threadId, $fullHistory);
+                        $this->repository->trimToLimit($threadId, $historyLimit);
+                        session()->save(); // required because the response has already started
+                    } catch (\Throwable $e) {
+                        Log::error('AI Chatbox: failed to save conversation history', [
+                            'thread_id' => $threadId,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 }
 
                 echo "data: [DONE]\n\n";
