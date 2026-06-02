@@ -10,6 +10,35 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.3.0] — 2026-06-02
+
+### Added
+- **Admin conversations keyword search** — the `/ai-chatbox/admin/conversations/data` endpoint now accepts a `search` query parameter; conversations are filtered server-side to those containing at least one message matching the term (SQL `LIKE`) so large conversation lists can be narrowed down without a page reload
+- **Keyword highlighting in conversation search results** — matching search terms are highlighted in the admin conversations list view
+- **`saveMessage()` on `ConversationRepositoryInterface`** — new interface method that persists a single message immediately (before the AI call starts); `DatabaseConversationRepository` creates the conversation record if it doesn't exist and appends the message directly; `SessionConversationRepository` is a no-op (session history is saved atomically by `saveHistory()`)
+- **Streaming configuration diagnostics** — the admin diagnostic panel now checks several real-world streaming issues:
+  - PHP `output_buffering` ini setting — warns when enabled, as it can silently buffer SSE tokens before they reach the browser
+  - NginX server software — info notice to confirm `proxy_buffering off` / `X-Accel-Buffering: no` is set (the package sets the header automatically, but NginX config may override it)
+  - Apache server software — warning about `mod_deflate` gzip compression buffering SSE streams
+  - Reverse proxy headers (`X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`) — info notice to verify that the CDN or proxy forwards SSE without buffering
+- **Extended admin diagnostic checks** — additional config validations across multiple categories: `temperature` range, `max_tokens` floor, `timeout`, history/context-token-limit mismatch estimate, frontend driver validity, widget appearance settings (`color_scheme`, `position`, `sound_volume`, `toggle_icon`), admin middleware security posture, and RAG pipeline configuration completeness
+
+### Changed
+- **Default `max_tokens` changed from `null` to `300`** — gives small local models a sensible upper bound out of the box; set to `null` to restore the model's own default
+- **Default `temperature` changed from `0.7` to `0.5`** — more consistent and factual responses by default; increase for creative use cases
+- **`AdminController::index()` refactored to modular style** — the monolithic `index()` method has been split into 11 focused private check methods (`checkPhpExtensions`, `checkActiveProvider`, `checkNamedProviders`, `checkSecurity`, `checkResponse`, `checkHistory`, `checkFrontendAndWidget`, `checkRag`, `checkMemoryDriver`, `checkAdminProtection`, `checkStreaming`) plus dedicated data-builder helpers; `index()` is now ~30 lines; class constants hold shared placeholder arrays
+- **Admin diagnostics UI changed to a 3-column grid** — errors, warnings, and notices are now displayed side by side in a responsive `grid-cols-1 md:grid-cols-3` layout; each column always renders and shows "No errors / No warnings / No notices" with a checkmark when empty, replacing the previous stacked conditional panels and separate all-clear banner
+- **CORS wildcard `*` handling corrected** — `CorsMiddleware` now sets `Access-Control-Allow-Origin: *` on both preflight and regular responses when `allowed_origins` contains `'*'`; previously it echoed the request `Origin` header instead, which is technically incorrect and may be rejected by strict CORS implementations
+
+### Fixed
+- **`max_tokens` not forwarded to AI API during streaming** — `OpenAiCompatibleEngine::beginStream()` was missing `max_tokens` from the JSON payload; the value is now read from the resolved config and included in the stream request (excluded when `null` via `array_filter`)
+- **`rag_chunk_size` and `rag_chunk_overlap` ignored in per-provider config** — `RagController` was reading these values directly from the global `config()` helper instead of from the resolved provider config array; switching providers or overriding chunk settings per-provider now takes effect correctly
+- **User messages lost when AI call fails** — in both `sendMessage()` and `streamMessage()`, the user's turn is now persisted to the repository immediately before the AI call begins; if the AI call fails the user message is already stored rather than being discarded
+- **Streaming history not saved after stream errors** — in `streamMessage()` the history persistence block was nested inside the stream-reading try/catch, causing it to be skipped when any stream error occurred; restructured so history is saved after the stream finishes (successfully or not) as long as `$fullReply` is non-empty
+- **History persistence exceptions crashing responses** — `sendMessage()` and `streamMessage()` now wrap all repository save calls in try/catch blocks; a persistence failure is logged but does not abort the HTTP response
+
+---
+
 ## [0.2.9] — 2026-05-12
 
 ### Added
@@ -385,7 +414,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Configurable API URL, token, and model via `.env`
 - Service provider with auto-discovery, asset publishing, and view publishing
 
-[Unreleased]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.7...HEAD
+[Unreleased]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.3.0...HEAD
+[0.3.0]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.9...0.3.0
+[0.2.9]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.7...0.2.9
 [0.2.7]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.6...0.2.7
 [0.2.6]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.5...0.2.6
 [0.2.5]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.4...0.2.5
