@@ -93,6 +93,23 @@
     .dark .bubble-assistant th, .dark .bubble-assistant td { border-color: rgba(255,255,255,0.15); }
     .bubble-assistant th { font-weight: 600; background: rgba(0,0,0,0.05); }
 
+    /* Smooth scrollbar – modal body */
+    #modal-body {
+        scroll-behavior: smooth;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(156,163,175,0.5) transparent;
+    }
+    #modal-body::-webkit-scrollbar { width: 5px; }
+    #modal-body::-webkit-scrollbar-track { background: transparent; }
+    #modal-body::-webkit-scrollbar-thumb {
+        background: rgba(156,163,175,0.45);
+        border-radius: 9999px;
+        transition: background 0.2s;
+    }
+    #modal-body::-webkit-scrollbar-thumb:hover { background: rgba(107,114,128,0.7); }
+    .dark #modal-body::-webkit-scrollbar-thumb { background: rgba(75,85,99,0.55); }
+    .dark #modal-body::-webkit-scrollbar-thumb:hover { background: rgba(107,114,128,0.8); }
+
     /* Spinner */
     .spin { animation: spin 0.7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
