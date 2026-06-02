@@ -174,7 +174,7 @@ class AdminDiagnosticsTest extends TestCase
             ->assertSee('ssrf_protection is enabled');
     }
 
-    // ── All-pass green banner ─────────────────────────────────────────────────
+    // ── All-pass state (3-column layout shows "No X" in each column) ──────────
 
     public function test_all_pass_banner_shown_when_no_issues(): void
     {
@@ -198,8 +198,12 @@ class AdminDiagnosticsTest extends TestCase
         $this->app['config']->set('ai-chatbox.storage', 'local');
         $this->app['config']->set('ai-chatbox.rag_admin_middleware', ['web', 'auth', 'role:admin']);
 
+        // The diagnostics panel now uses a 3-column layout; each column shows
+        // "No errors / No warnings / No notices" when there are no issues.
         $this->get('/ai-chatbox/admin')
             ->assertOk()
-            ->assertSee('All configuration checks passed');
+            ->assertSee('No errors')
+            ->assertSee('No warnings')
+            ->assertSee('No notices');
     }
 }
