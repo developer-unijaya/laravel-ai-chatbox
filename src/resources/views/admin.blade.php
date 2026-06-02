@@ -1,127 +1,18 @@
-@php
-    $scheme = $colorScheme ?? 'auto';
-    $activeProvider = $configGroups['AI API']['active_provider'] ?? 'default';
-@endphp
-<!DOCTYPE html>
-<html lang="en" @if($scheme === 'dark') class="dark" @endif>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Chatbox - Admin</title>
-    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-    <script>tailwind.config = { darkMode: 'class' }</script>
-    @if($scheme === 'auto')
-    <script>
-        (function () {
-            var mq = window.matchMedia('(prefers-color-scheme: dark)');
-            function apply() { document.documentElement.classList.toggle('dark', mq.matches); }
-            apply();
-            mq.addEventListener('change', apply);
-        })();
-    </script>
-    @endif
-    <style>
-        :root { --theme: {{ $themeColor }}; }
+@extends('ai-chatbox::admin-layout')
 
-        .btn-primary {
-            background-color: var(--theme);
-            color: #fff;
-            display: inline-flex; align-items: center; gap: 0.5rem;
-            border-radius: 0.5rem; padding: 0.5rem 1.25rem;
-            font-size: 0.875rem; font-weight: 500;
-            transition: filter 0.15s; text-decoration: none;
-        }
-        .btn-primary:hover { filter: brightness(0.88); }
+@php $activeProvider = $configGroups['AI API']['active_provider'] ?? 'default'; @endphp
 
-        .btn-secondary {
-            display: inline-flex; align-items: center; gap: 0.5rem;
-            border-radius: 0.5rem; padding: 0.5rem 1.25rem;
-            font-size: 0.875rem; font-weight: 500;
-            color: var(--theme);
-            background-color: color-mix(in srgb, var(--theme) 10%, transparent);
-            transition: background-color 0.15s; text-decoration: none;
-            border: 1px solid color-mix(in srgb, var(--theme) 25%, transparent);
-        }
-        .btn-secondary:hover { background-color: color-mix(in srgb, var(--theme) 18%, transparent); }
+@section('title', 'Dashboard')
+@section('page-title', 'Dashboard')
 
-        .stat-card { border-left: 3px solid var(--theme); }
+@section('navbar-right')
+    Laravel {{ $env['laravel'] }} &nbsp;·&nbsp; PHP {{ $env['php'] }} &nbsp;·&nbsp;
+    <span class="{{ $env['app_debug'] ? 'text-amber-600 dark:text-amber-400 font-medium' : '' }}">
+        {{ $env['app_env'] }}{{ $env['app_debug'] ? ' (debug)' : '' }}
+    </span>
+@endsection
 
-        .section-heading {
-            font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: var(--theme);
-        }
-
-        .config-key {
-            font-family: ui-monospace, 'Cascadia Code', monospace;
-            font-size: 0.8rem;
-        }
-
-        .config-val {
-            font-family: ui-monospace, 'Cascadia Code', monospace;
-            font-size: 0.8rem;
-            word-break: break-all;
-        }
-
-        .badge { display: inline-flex; align-items: center; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; }
-        .badge-green  { background: #dcfce7; color: #166534; }
-        .badge-red    { background: #fee2e2; color: #991b1b; }
-        .badge-yellow { background: #fef9c3; color: #854d0e; }
-        .badge-blue   { background: #dbeafe; color: #1e40af; }
-        .badge-gray   { background: #f3f4f6; color: #374151; }
-        .dark .badge-green  { background: #14532d; color: #86efac; }
-        .dark .badge-red    { background: #7f1d1d; color: #fca5a5; }
-        .dark .badge-yellow { background: #713f12; color: #fde68a; }
-        .dark .badge-blue   { background: #1e3a5f; color: #93c5fd; }
-        .dark .badge-gray   { background: #374151; color: #d1d5db; }
-    </style>
-</head>
-<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 antialiased min-h-screen">
-
-<div class="w-full px-6 py-10">
-
-    {{-- ── Header ──────────────────────────────────────────────────────────── --}}
-    <div class="flex flex-wrap items-start justify-between gap-4 mb-8">
-        <div>
-            <div class="flex items-center gap-2 mb-1">
-                <svg class="w-6 h-6" style="color:var(--theme)" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1 1 .03 2.716-1.42 2.416L12 17.25l-7.782 1.468c-1.45.3-2.42-1.416-1.42-2.416L4.2 15.3" />
-                </svg>
-                <h1 class="text-2xl font-bold tracking-tight">AI Chatbox Admin</h1>
-            </div>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-                Laravel {{ $env['laravel'] }} &nbsp;·&nbsp;
-                PHP {{ $env['php'] }} &nbsp;·&nbsp;
-                <span class="{{ $env['app_debug'] ? 'text-amber-600 dark:text-amber-400 font-medium' : '' }}">
-                    {{ $env['app_env'] }}{{ $env['app_debug'] ? ' (debug on)' : '' }}
-                </span>
-            </p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-            @if($ragEnabled)
-            <a href="{{ $ragUrl }}" class="btn-primary">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                </svg>
-                Knowledge Base
-            </a>
-            @endif
-        </div>
-    </div>
-
-    {{-- ── Flash ────────────────────────────────────────────────────────────── --}}
-    @if(session('success'))
-    <div class="mb-6 flex items-center gap-2 rounded-lg bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 px-4 py-3 text-sm text-green-800 dark:text-green-300">
-        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-        {{ session('success') }}
-    </div>
-    @endif
-    @if(session('error'))
-    <div class="mb-6 flex items-center gap-2 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-800 dark:text-red-300">
-        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75h.007v.008H12v-.008z"/></svg>
-        {{ session('error') }}
-    </div>
-    @endif
+@section('content')
 
     {{-- ── Stat cards row ───────────────────────────────────────────────────── --}}
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
@@ -308,7 +199,6 @@
                             @elseif(is_array($val))
                                 {{ implode(', ', $val) }}
                             @elseif($key === 'api_token')
-                                {{-- Mask token — show only last 4 chars to avoid leaking guessable prefixes --}}
                                 {{ str_repeat('•', min(12, max(0, strlen($val) - 4))) }}{{ strlen($val) > 4 ? substr($val, -4) : $val }}
                             @elseif($key === 'system_prompt' || $key === 'rag_context_prompt')
                                 <span class="line-clamp-2 text-gray-600 dark:text-gray-400">{{ $val }}</span>
@@ -317,9 +207,7 @@
                             @elseif($key === 'rag_embedding_url')
                                 <span class="break-all">{{ $val ?: '—' }}</span>
                             @elseif($key === 'toggle_icon')
-                                @php
-                                    $resolvedIcon = preg_match('#^https?://#i', $val) ? $val : asset($val);
-                                @endphp
+                                @php $resolvedIcon = preg_match('#^https?://#i', $val) ? $val : asset($val); @endphp
                                 <span class="flex items-center gap-2 flex-wrap">
                                     <span class="break-all text-gray-600 dark:text-gray-400">{{ $val }}</span>
                                     <img src="{{ $resolvedIcon }}" alt="toggle icon preview"
@@ -338,27 +226,8 @@
 
         </div>
 
-        {{-- ── Right column — providers, env, links ─────────────────────────── --}}
+        {{-- ── Right column — providers, env, widget ────────────────────────── --}}
         <div class="space-y-5">
-
-            {{-- Quick links --}}
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-                <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-700">
-                    <span class="section-heading">Quick Links</span>
-                </div>
-                <div class="px-5 py-4 space-y-2">
-                    @if($ragEnabled)
-                    <a href="{{ $ragUrl }}" class="flex items-center gap-2 text-sm hover:underline" style="color:var(--theme)">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
-                        Knowledge Base (RAG)
-                    </a>
-                    @endif
-                    <a href="/" class="flex items-center gap-2 text-sm hover:underline" style="color:var(--theme)">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>
-                        App Home
-                    </a>
-                </div>
-            </div>
 
             {{-- Named providers --}}
             @if(!empty($namedProviders))
@@ -392,7 +261,6 @@
                     @endphp
                     <div class="rounded-lg px-3 py-2.5 {{ $isActive ? 'bg-gray-50 dark:bg-gray-700/50' : 'bg-gray-50 dark:bg-gray-700/30' }}"
                          style="{{ $isActive ? 'outline: 2px solid var(--theme); outline-offset: -2px;' : '' }}">
-                        {{-- Provider header --}}
                         <div class="flex items-center gap-2 mb-1.5">
                             <p class="text-xs font-semibold {{ $isActive ? 'text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300' }} flex-1">{{ $name }}</p>
                             @if($isActive)
@@ -403,7 +271,6 @@
                             </span>
                         </div>
 
-                        {{-- Provider fields --}}
                         @foreach($provider as $k => $v)
                         <div class="grid grid-cols-[auto_1fr] gap-x-3 text-xs mb-0.5">
                             <span class="config-key text-gray-400 whitespace-nowrap">{{ $k }}</span>
@@ -417,38 +284,28 @@
                         </div>
                         @endforeach
 
-                        {{-- Incomplete reasons --}}
                         @if(!$isComplete)
-                        <p class="text-xs text-red-500 dark:text-red-400 mt-1.5">
-                            {{ implode(', ', $incompleteReasons) }}
-                        </p>
+                        <p class="text-xs text-red-500 dark:text-red-400 mt-1.5">{{ implode(', ', $incompleteReasons) }}</p>
                         @endif
 
-                        {{-- Health check button + result --}}
                         <div class="flex items-center gap-2 mt-2">
                             @if($isComplete)
-                            <button
-                                type="button"
-                                onclick="providerHealthCheck(this, '{{ $healthBaseUrl }}?provider={{ urlencode($name) }}', '{{ $resultId }}')"
-                                class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium border transition-colors
-                                       border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300
-                                       hover:border-[var(--theme)] hover:text-[var(--theme)] dark:hover:border-[var(--theme)] dark:hover:text-[var(--theme)]
-                                       disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
+                            <button type="button"
+                                    onclick="providerHealthCheck(this, '{{ $healthBaseUrl }}?provider={{ urlencode($name) }}', '{{ $resultId }}')"
+                                    class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium border transition-colors
+                                           border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300
+                                           hover:border-[var(--theme)] hover:text-[var(--theme)]
+                                           disabled:opacity-50 disabled:cursor-not-allowed">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/>
                                 </svg>
                                 Test
                             </button>
                             @else
-                            <button
-                                type="button"
-                                disabled
-                                title="{{ implode('; ', $incompleteReasons) }}"
-                                class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium border
-                                       border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-600
-                                       cursor-not-allowed opacity-50"
-                            >
+                            <button type="button" disabled title="{{ implode('; ', $incompleteReasons) }}"
+                                    class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium border
+                                           border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-600
+                                           cursor-not-allowed opacity-50">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/>
                                 </svg>
@@ -461,7 +318,7 @@
                     @endforeach
                 </div>
             </div>
-
+            @push('scripts')
             <script>
             async function providerHealthCheck(btn, url, resultId) {
                 btn.disabled = true;
@@ -470,13 +327,12 @@
                 const el = document.getElementById(resultId);
                 el.innerHTML = '';
                 try {
-                    const res = await fetch(url);
+                    const res  = await fetch(url);
                     const data = await res.json();
-                    const online = data.status === 'online';
-                    if (online) {
+                    if (data.status === 'online') {
                         el.innerHTML = '<span class="badge badge-green">online</span>';
                     } else {
-                        const msg = data.message || 'offline';
+                        const msg  = data.message || 'offline';
                         const code = data.code ? ' <span style="opacity:0.75">[' + data.code + ']</span>' : '';
                         el.innerHTML = '<span class="badge badge-red">' + msg + code + '</span>';
                     }
@@ -484,9 +340,10 @@
                     el.innerHTML = '<span class="badge badge-red">request failed</span>';
                 }
                 btn.innerHTML = original;
-                btn.disabled = false;
+                btn.disabled  = false;
             }
             </script>
+            @endpush
             @endif
 
             {{-- Widget Preview --}}
@@ -495,11 +352,10 @@
                     <span class="section-heading">Widget Preview</span>
                 </div>
                 <div class="px-5 py-4 space-y-4">
-                    {{-- Toggle button preview --}}
                     <div>
                         <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Toggle Button</p>
                         <div class="flex items-center gap-4">
-                            <div class="w-14 h-14 rounded-full flex items-center justify-content-center justify-center shadow-md shrink-0"
+                            <div class="w-14 h-14 rounded-full flex items-center justify-center shadow-md shrink-0"
                                  style="background:var(--theme)">
                                 @if($toggleIconUrl)
                                     <img src="{{ $toggleIconUrl }}" alt="Toggle icon"
@@ -538,17 +394,15 @@
                         @endif
                     </div>
 
-                    {{-- Hidden fallback SVG for onerror --}}
                     <svg id="aicb-admin-default-icon" class="w-[26px] h-[26px] text-white hidden" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/>
                     </svg>
 
-                    {{-- Other widget settings at a glance --}}
                     <div class="space-y-1.5 text-xs border-t border-gray-100 dark:border-gray-700 pt-3">
                         @foreach([
-                            'Title'   => $configGroups['Widget']['title'] ?? '—',
+                            'Title'    => $configGroups['Widget']['title']    ?? '—',
                             'Greeting' => $configGroups['Widget']['greeting'] ?? '—',
-                            'Frontend'=> $configGroups['Widget']['frontend'] ?? '—',
+                            'Frontend' => $configGroups['Widget']['frontend'] ?? '—',
                         ] as $label => $value)
                         <div class="flex gap-2">
                             <span class="text-gray-500 dark:text-gray-400 w-16 shrink-0">{{ $label }}</span>
@@ -562,10 +416,10 @@
             {{-- Frontend Driver --}}
             @php
                 $drivers = [
-                    'vue'      => ['label' => 'Vue 3',    'desc' => 'Pre-built Vue 3 widget. Zero-config, recommended default.',              'req' => null],
-                    'blade'    => ['label' => 'Blade',    'desc' => 'Vanilla JS widget. No framework required.',                              'req' => null],
-                    'livewire' => ['label' => 'Livewire', 'desc' => 'Alpine.js widget mounted via Livewire.',                                 'req' => 'livewire/livewire'],
-                    'none'     => ['label' => 'None',     'desc' => 'Outputs window.AiChatboxConfig only. Bring your own frontend.',          'req' => null],
+                    'vue'      => ['label' => 'Vue 3',    'desc' => 'Pre-built Vue 3 widget. Zero-config, recommended default.',     'req' => null],
+                    'blade'    => ['label' => 'Blade',    'desc' => 'Vanilla JS widget. No framework required.',                     'req' => null],
+                    'livewire' => ['label' => 'Livewire', 'desc' => 'Alpine.js widget mounted via Livewire.',                        'req' => 'livewire/livewire'],
+                    'none'     => ['label' => 'None',     'desc' => 'Outputs window.AiChatboxConfig only. Bring your own frontend.', 'req' => null],
                 ];
                 $livewireInstalled = class_exists(\Livewire\Livewire::class);
             @endphp
@@ -625,9 +479,9 @@
                     <div class="flex items-center justify-between gap-2">
                         <span class="text-gray-500 dark:text-gray-400">Coverage</span>
                         @php
-                            $total = $ragStats['total_chunks'];
+                            $total    = $ragStats['total_chunks'];
                             $embedded = $ragStats['embedded_chunks'];
-                            $pct = $total > 0 ? round($embedded / $total * 100) : 0;
+                            $pct      = $total > 0 ? round($embedded / $total * 100) : 0;
                         @endphp
                         <span class="badge {{ $pct === 100 ? 'badge-green' : ($pct === 0 ? 'badge-red' : 'badge-yellow') }}">
                             {{ $pct }}% ({{ $embedded }}/{{ $total }})
@@ -660,6 +514,4 @@
         </div>{{-- end right column --}}
     </div>{{-- end grid --}}
 
-</div>{{-- end container --}}
-</body>
-</html>
+@endsection
