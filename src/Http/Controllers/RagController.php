@@ -140,7 +140,7 @@ class RagController extends Controller
             (int) ($cfg['rag_embedding_timeout'] ?? 10),
         );
         $chunkSize = (int) ($cfg['rag_chunk_size'] ?? 500);
-        $overlap   = (int) ($cfg['rag_chunk_overlap'] ?? 50);
+        $overlap = (int) ($cfg['rag_chunk_overlap'] ?? 50);
 
         $textChunks = $chunker->chunk($content, $chunkSize, $overlap);
 
