@@ -419,8 +419,45 @@ class AdminController extends Controller
         }
 
         // — Streaming —
-        if (($cfg['stream'] ?? false) && !function_exists('ob_flush')) {
-            $diagnostics[] = ['level' => 'warning', 'group' => 'Streaming', 'message' => 'stream is enabled but output buffering functions are unavailable. Streaming responses may not work correctly.'];
+        if ($cfg['stream'] ?? false) {
+            if (!function_exists('ob_flush')) {
+                $diagnostics[] = ['level' => 'warning', 'group' => 'Streaming', 'message' =>
+                    'stream is enabled but ob_flush() is unavailable. SSE tokens may not flush to the client correctly.'];
+            }
+
+            $obSetting = ini_get('output_buffering');
+            $obEnabled = $obSetting !== false
+                && $obSetting !== ''
+                && $obSetting !== '0'
+                && strtolower((string) $obSetting) !== 'off';
+            if ($obEnabled) {
+                $diagnostics[] = ['level' => 'warning', 'group' => 'Streaming', 'message' =>
+                    "PHP output_buffering is enabled (php.ini value: \"{$obSetting}\"). PHP will accumulate the entire response before sending it, silently breaking SSE. "
+                    . 'Set output_buffering=Off in php.ini or your PHP-FPM pool config (e.g. php_admin_value[output_buffering] = Off).'];
+            }
+
+            $serverSoftware = strtolower((string) ($_SERVER['SERVER_SOFTWARE'] ?? ''));
+            if (str_contains($serverSoftware, 'nginx')) {
+                $diagnostics[] = ['level' => 'info', 'group' => 'Streaming', 'message' =>
+                    'Nginx detected. The package already sends X-Accel-Buffering: no on stream responses to disable Nginx proxy buffering. '
+                    . 'If tokens still arrive in batches, also add "proxy_buffering off;" to the Nginx location block for your chatbox routes.'];
+            } elseif (str_contains($serverSoftware, 'apache')) {
+                $routePrefix = $cfg['route_prefix'] ?? 'ai-chatbox';
+                $diagnostics[] = ['level' => 'warning', 'group' => 'Streaming', 'message' =>
+                    'Apache detected. If mod_deflate or mod_gzip is active it buffers output before compression, breaking SSE. '
+                    . "Disable compression for chatbox routes by adding to your VirtualHost: "
+                    . "SetEnvIf Request_URI \"{$routePrefix}\" no-gzip dont-vary"];
+            }
+
+            $behindProxy = isset($_SERVER['HTTP_X_FORWARDED_FOR'])
+                || isset($_SERVER['HTTP_X_FORWARDED_HOST'])
+                || isset($_SERVER['HTTP_X_FORWARDED_PROTO']);
+            if ($behindProxy) {
+                $diagnostics[] = ['level' => 'info', 'group' => 'Streaming', 'message' =>
+                    'A reverse proxy or CDN is detected (X-Forwarded-* headers present). '
+                    . 'Ensure it passes event-stream responses through without buffering. '
+                    . 'Cloudflare, AWS ALB, and similar services may require explicit configuration to honour SSE (e.g. Cloudflare disables buffering for text/event-stream by default, but custom proxy rules or enterprise WAF policies can re-enable it).'];
+            }
         }
 
         // ── Environment ───────────────────────────────────────────────────────
