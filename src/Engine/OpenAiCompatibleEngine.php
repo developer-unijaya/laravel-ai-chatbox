@@ -108,6 +108,7 @@ class OpenAiCompatibleEngine implements AiEngineInterface
         $model = $options['api_model'] ?? '';
         $timeout = $options['timeout'] ?? 30;
         $temp = (float) ($options['temperature'] ?? 0.7);
+        $maxTokens = $options['max_tokens'] ?? null;
 
         $this->assertConfig($apiUrl, $apiToken, $model);
 
@@ -127,6 +128,7 @@ class OpenAiCompatibleEngine implements AiEngineInterface
                     'model' => $model,
                     'messages' => $messages,
                     'temperature' => $temp,
+                    'max_tokens' => $maxTokens,
                     'stream' => true,
                 ], fn($v) => $v !== null),
                 'stream' => true,
