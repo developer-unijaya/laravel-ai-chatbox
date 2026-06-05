@@ -10,11 +10,11 @@ class AnthropicEngine extends OpenAiCompatibleEngine
 {
     public function complete(array $messages, array $options = []): string
     {
-        $apiUrl    = $options['api_url']    ?? '';
-        $apiToken  = $options['api_token']  ?? '';
-        $model     = $options['api_model']  ?? '';
-        $timeout   = $options['timeout']    ?? 30;
-        $temp      = (float) ($options['temperature'] ?? 0.7);
+        $apiUrl = $options['api_url'] ?? '';
+        $apiToken = $options['api_token'] ?? '';
+        $model = $options['api_model'] ?? '';
+        $timeout = $options['timeout'] ?? 30;
+        $temp = (float) ($options['temperature'] ?? 0.7);
         $maxTokens = $options['max_tokens'] ?? 1024;
 
         $this->assertConfig($apiUrl, $apiToken, $model);
@@ -31,10 +31,10 @@ class AnthropicEngine extends OpenAiCompatibleEngine
 
             $response = $client->post($apiUrl, [
                 'headers' => $this->anthropicHeaders($apiToken),
-                'json'    => $payload,
+                'json' => $payload,
             ]);
 
-            $data  = json_decode($response->getBody()->getContents(), true);
+            $data = json_decode($response->getBody()->getContents(), true);
             $reply = $data['content'][0]['text'] ?? null;
 
             if ($reply === null || trim($reply) === '') {
@@ -59,11 +59,11 @@ class AnthropicEngine extends OpenAiCompatibleEngine
 
     public function beginStream(array $messages, array $options): \Closure
     {
-        $apiUrl    = $options['api_url']    ?? '';
-        $apiToken  = $options['api_token']  ?? '';
-        $model     = $options['api_model']  ?? '';
-        $timeout   = $options['timeout']    ?? 30;
-        $temp      = (float) ($options['temperature'] ?? 0.7);
+        $apiUrl = $options['api_url'] ?? '';
+        $apiToken = $options['api_token'] ?? '';
+        $model = $options['api_model'] ?? '';
+        $timeout = $options['timeout'] ?? 30;
+        $temp = (float) ($options['temperature'] ?? 0.7);
         $maxTokens = $options['max_tokens'] ?? 1024;
 
         $this->assertConfig($apiUrl, $apiToken, $model);
@@ -80,8 +80,8 @@ class AnthropicEngine extends OpenAiCompatibleEngine
 
             $response = $client->post($apiUrl, [
                 'headers' => $this->anthropicHeaders($apiToken),
-                'json'    => $payload,
-                'stream'  => true,
+                'json' => $payload,
+                'stream' => true,
             ]);
 
         } catch (TooManyRedirectsException $e) {
@@ -99,13 +99,13 @@ class AnthropicEngine extends OpenAiCompatibleEngine
 
         return function (callable $onToken) use ($stream): string {
             $fullReply = '';
-            $buffer    = '';
+            $buffer = '';
 
             while (!$stream->eof()) {
                 $buffer .= $stream->read(1024);
 
                 while (($nl = strpos($buffer, "\n")) !== false) {
-                    $line   = rtrim(substr($buffer, 0, $nl), "\r");
+                    $line = rtrim(substr($buffer, 0, $nl), "\r");
                     $buffer = substr($buffer, $nl + 1);
 
                     if ($line === '' || str_starts_with($line, ':') || str_starts_with($line, 'event:')) {
@@ -113,7 +113,7 @@ class AnthropicEngine extends OpenAiCompatibleEngine
                     }
 
                     $jsonStr = str_starts_with($line, 'data: ') ? substr($line, 6) : $line;
-                    $data    = json_decode($jsonStr, true);
+                    $data = json_decode($jsonStr, true);
 
                     if (!is_array($data)) {
                         continue;
@@ -143,10 +143,10 @@ class AnthropicEngine extends OpenAiCompatibleEngine
     private function anthropicHeaders(string $apiToken): array
     {
         return [
-            'x-api-key'         => $apiToken,
+            'x-api-key' => $apiToken,
             'anthropic-version' => '2023-06-01',
-            'Content-Type'      => 'application/json',
-            'Accept'            => 'application/json',
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
         ];
     }
 
@@ -156,7 +156,7 @@ class AnthropicEngine extends OpenAiCompatibleEngine
     private function splitMessages(array $messages): array
     {
         $systemParts = [];
-        $filtered    = [];
+        $filtered = [];
 
         foreach ($messages as $msg) {
             if (($msg['role'] ?? '') === 'system') {

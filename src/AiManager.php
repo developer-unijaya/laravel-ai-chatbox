@@ -59,8 +59,8 @@ class AiManager
     public function resolveEngine(array $config): AiEngineInterface
     {
         return str_contains($config['api_url'] ?? '', 'api.anthropic.com')
-            ? new AnthropicEngine()
-            : app(AiEngineInterface::class);
+        ? new AnthropicEngine()
+        : app(AiEngineInterface::class);
     }
 
     // ── Internals ─────────────────────────────────────────────────────────────
