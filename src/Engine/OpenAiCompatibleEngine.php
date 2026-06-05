@@ -197,7 +197,7 @@ class OpenAiCompatibleEngine implements AiEngineInterface
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private function assertConfig(string $apiUrl, string $apiToken, string $model): void
+    protected function assertConfig(string $apiUrl, string $apiToken, string $model): void
     {
         if (empty($apiUrl)) {
             throw new AiEngineException(self::E01, 'AI API URL is not configured.', 500);

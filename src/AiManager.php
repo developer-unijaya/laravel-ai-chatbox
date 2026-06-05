@@ -2,6 +2,7 @@
 namespace SyafiqUnijaya\AiChatbox;
 
 use SyafiqUnijaya\AiChatbox\Engine\AiProvider;
+use SyafiqUnijaya\AiChatbox\Engine\AnthropicEngine;
 use SyafiqUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
 use SyafiqUnijaya\AiChatbox\Engine\PromptBuilder;
 
@@ -35,7 +36,7 @@ class AiManager
         $config = $this->resolveConfig($name);
 
         return new AiProvider(
-            app(AiEngineInterface::class),
+            $this->resolveEngine($config),
             new PromptBuilder(),
             $config,
         );
@@ -49,6 +50,17 @@ class AiManager
     public function __call(string $method, array $args): mixed
     {
         return $this->provider('default')->{$method}(...$args);
+    }
+
+    /**
+     * Return the correct engine for a resolved config array.
+     * Used by the chatbox controller and provider() to avoid duplication.
+     */
+    public function resolveEngine(array $config): AiEngineInterface
+    {
+        return str_contains($config['api_url'] ?? '', 'api.anthropic.com')
+            ? new AnthropicEngine()
+            : app(AiEngineInterface::class);
     }
 
     // ── Internals ─────────────────────────────────────────────────────────────

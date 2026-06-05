@@ -6,7 +6,6 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
 use SyafiqUnijaya\AiChatbox\AiManager;
-use SyafiqUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
 use SyafiqUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
 use SyafiqUnijaya\AiChatbox\Engine\HealthChecker;
 use SyafiqUnijaya\AiChatbox\Engine\PromptBuilder;
@@ -24,7 +23,7 @@ use Throwable;
 class ChatboxController extends Controller
 {
     public function __construct(
-        private readonly AiEngineInterface $engine,
+        private readonly AiManager $aiManager,
         private readonly ConversationRepositoryInterface $repository,
         private readonly PromptBuilder $promptBuilder,
         private readonly ContextManager $contextManager,
@@ -65,7 +64,7 @@ class ChatboxController extends Controller
         $messages = $this->promptBuilder->build($userMsg, $contextHistory, $cfg);
 
         try {
-            $reply = $this->engine->complete($messages, $cfg);
+            $reply = $this->aiManager->resolveEngine($cfg)->complete($messages, $cfg);
         } catch (AiEngineException $e) {
             return $this->engineError($e);
         }
@@ -123,7 +122,7 @@ class ChatboxController extends Controller
         // Establish the AI connection before starting the HTTP stream response.
         // This ensures connection / config errors can still return proper JSON (non-200).
         try {
-            $streamReader = $this->engine->beginStream($messages, $cfg);
+            $streamReader = $this->aiManager->resolveEngine($cfg)->beginStream($messages, $cfg);
         } catch (AiEngineException $e) {
             return $this->engineError($e);
         }
@@ -196,7 +195,7 @@ class ChatboxController extends Controller
         $providerName = $request->query('provider');
         try {
             $cfg = $providerName
-            ? app(AiManager::class)->resolveConfig((string) $providerName)
+            ? $this->aiManager->resolveConfig((string) $providerName)
             : $this->effectiveConfig();
         } catch (\InvalidArgumentException) {
             return response()->json(['error' => 'Unknown provider.'], 400);
@@ -217,7 +216,7 @@ class ChatboxController extends Controller
      */
     private function effectiveConfig(): array
     {
-        return app(AiManager::class)->resolveConfig(
+        return $this->aiManager->resolveConfig(
             config('ai-chatbox.active_provider', 'default')
         );
     }

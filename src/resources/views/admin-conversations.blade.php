@@ -36,17 +36,31 @@
     .page-btn.active { background-color: var(--theme); color: #fff; border-color: var(--theme); }
     .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    /* Modal */
+    /* Modal backdrop */
     #msg-modal-backdrop {
         position: fixed; inset: 0; z-index: 50;
         background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);
-        align-items: center; justify-content: center; padding: 1rem;
+        display: flex; align-items: center; justify-content: center; padding: 1rem;
+        opacity: 0; visibility: hidden;
+        transition: opacity 0.22s ease, visibility 0s ease 0.22s;
     }
+    #msg-modal-backdrop.is-open {
+        opacity: 1; visibility: visible;
+        transition: opacity 0.22s ease, visibility 0s ease 0s;
+    }
+    /* Modal panel */
     #msg-modal {
         background: #fff; border-radius: 0.75rem;
         width: 100%; max-width: 640px; max-height: 85vh;
         display: flex; flex-direction: column;
         box-shadow: 0 20px 60px rgba(0,0,0,0.25); overflow: hidden;
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+        transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1);
+    }
+    #msg-modal-backdrop.is-open #msg-modal {
+        opacity: 1;
+        transform: scale(1) translateY(0);
     }
     .dark #msg-modal { background: #1f2937; }
 
@@ -165,7 +179,7 @@
     </div>
 
     {{-- ── Message modal ─────────────────────────────────────────────────────── --}}
-    <div id="msg-modal-backdrop" style="display:none" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div id="msg-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div id="msg-modal">
             <div class="flex items-start justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
                 <div>
@@ -371,7 +385,7 @@
         title.textContent = 'Loading…';
         meta.textContent  = '';
         body.innerHTML    = `<div class="flex justify-center py-8"><svg class="spin w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg></div>`;
-        backdrop.style.display = 'flex';
+        backdrop.classList.add('is-open');
         document.body.style.overflow = 'hidden';
 
         try {
@@ -434,7 +448,7 @@
     }
 
     function closeModal() {
-        document.getElementById('msg-modal-backdrop').style.display = 'none';
+        document.getElementById('msg-modal-backdrop').classList.remove('is-open');
         document.body.style.overflow = '';
         currentConversation = null;
         resetCopyIcon();

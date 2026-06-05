@@ -448,6 +448,14 @@ return [
             'rag_embedding_url' => env('OPENAI_EMBEDDING_URL', ''),
             'rag_embedding_model' => env('OPENAI_EMBEDDING_MODEL', ''),
         ],
+
+        'anthropic' => [
+            'api_url' => env('ANTH_URL', 'https://api.anthropic.com/v1/messages'),
+            'api_token' => env('ANTH_API_KEY', ''),
+            'api_model' => env('ANTH_MODEL', 'claude-sonnet-4-6'),
+            'rag_embedding_url' => env('ANTH_EMBEDDING_URL', ''),
+            'rag_embedding_model' => env('ANTH_EMBEDDING_MODEL', ''),
+        ],
     ],
 
 ];
