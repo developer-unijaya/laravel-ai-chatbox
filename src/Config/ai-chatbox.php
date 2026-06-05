@@ -352,10 +352,36 @@ return [
 |   php artisan vendor:publish --tag=ai-chatbox-config
 */
 
-    'rag_context_prompt' => "Use the following knowledge-base excerpts as your PRIMARY source when answering. "
-    . "Prioritize this context over your general knowledge. "
-    . "If the answer is not found in the context, say \"I don't have that information in my knowledge base.\"\n\n"
+    'rag_context_prompt' => "Answer the user's question using ONLY the knowledge-base excerpts below. "
+    . "Do not use any prior or general knowledge, and do not add facts that are not present in these excerpts. "
+    . "If the excerpts do not contain the answer, reply exactly: \"I don't have that information in my knowledge base.\" "
+    . "You may still respond naturally to greetings, thanks, and small talk.\n\n"
     . "Context:\n{chunks}",
+
+/*
+|--------------------------------------------------------------------------
+| RAG No-Context Prompt (grounding guard)
+|--------------------------------------------------------------------------
+| Injected when RAG is enabled but NO knowledge-base chunk is relevant to
+| the user's question — nothing cleared rag_similarity_threshold, there are
+| no indexed documents, or the embedding/retrieval call failed.
+|
+| Without this guard the model receives no grounding instruction at all on
+| unmatched questions, so it answers freely from its training data. That is
+| the usual cause of "the bot answered outside the knowledge base".
+|
+| This default refuses factual questions while still allowing greetings and
+| small talk. Set to an empty string to disable the guard entirely (the
+| model answers unconstrained when nothing matches).
+|
+| Publish the config to customise:
+|   php artisan vendor:publish --tag=ai-chatbox-config
+*/
+
+    'rag_no_context_prompt' => "No relevant knowledge-base entries were found for this question. "
+    . "If the user is asking for information or a factual answer, do not answer from general knowledge — "
+    . "reply exactly: \"I don't have that information in my knowledge base.\" "
+    . "You may still respond naturally to greetings, thanks, and small talk.",
 
 /*
 |--------------------------------------------------------------------------

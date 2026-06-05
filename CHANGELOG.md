@@ -8,6 +8,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **Anthropic (Claude) engine** — native support for the Anthropic Messages API alongside the OpenAI-compatible providers:
+  - New `AnthropicEngine` (extends `OpenAiCompatibleEngine`) that targets the native Messages API (`/v1/messages`) with `x-api-key` and `anthropic-version: 2023-06-01` headers — Anthropic is **not** OpenAI-compatible, so it needs a dedicated engine
+  - System messages are hoisted into Anthropic's top-level `system` field; the remaining turns are sent as `messages`. `complete()` reads `content[0].text`; `beginStream()` parses SSE `content_block_delta` events and stops on `message_stop`
+  - `max_tokens` defaults to `1024` when unset (Anthropic requires the field and rejects `null`)
+  - **Automatic engine selection** — `AiManager::resolveEngine()` returns `AnthropicEngine` when the resolved provider's `api_url` contains `api.anthropic.com`, otherwise the bound `AiEngineInterface` (OpenAI-compatible) is used; no manual binding required
+  - New default `anthropic` provider block in `config/ai-chatbox.php` — `ANTH_URL` (default `https://api.anthropic.com/v1/messages`), `ANTH_API_KEY`, `ANTH_MODEL` (default `claude-sonnet-4-6`), `ANTH_EMBEDDING_URL`, `ANTH_EMBEDDING_MODEL`
+- **`rag_no_context_prompt` config key — RAG grounding guard** — a new system instruction injected when RAG is enabled but no chunk matches the user's query (nothing cleared `rag_similarity_threshold`, no indexed documents, or retrieval failed). The default refuses factual answers from general knowledge while still allowing greetings and small talk; set it to an empty string to restore the previous unconstrained behaviour
+
+### Changed
+- **Stricter default `rag_context_prompt`** — reworded from "use this as your PRIMARY source / prioritize this context" to "answer using ONLY these excerpts; do not use general knowledge; reply '_I don't have that information in my knowledge base._' if the answer isn't present" (greetings/small talk still allowed). The old wording explicitly permitted the model to fall back on training data
+- **`ChatboxController` resolves the engine per request via `AiManager`** — the controller now injects `AiManager` instead of `AiEngineInterface` directly and calls `$aiManager->resolveEngine($cfg)` in `sendMessage()` and `streamMessage()`, so the correct engine (OpenAI-compatible or Anthropic) is chosen from the active provider's config on every request
+- **`OpenAiCompatibleEngine::assertConfig()` changed from `private` to `protected`** — so `AnthropicEngine` can reuse the same `E01`–`E04` config validation
+- **Admin conversations modal — animated open/close** — the message-preview modal now fades and scales in/out via CSS transitions and an `.is-open` class instead of toggling `display`, replacing the previous instant show/hide
+
+### Fixed
+- **Bot answering outside the knowledge base when no chunk matched** — when RAG retrieval returned no results, `PromptBuilder` previously injected nothing, leaving the model with only the generic "helpful assistant" system prompt and free to answer from its training data. It now injects `rag_no_context_prompt` in that case (and when retrieval throws), so the model stays grounded instead of going off-context. Covered by the new `RagContextInjectionTest`
+
 ---
 
 ## [0.3.0] — 2026-06-02

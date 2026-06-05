@@ -85,23 +85,27 @@ class PromptBuilder
                 (int) ($cfg['rag_embedding_timeout'] ?? 10),
             ));
             $chunks = $retriever->retrieve($query);
-
-            if (empty($chunks)) {
-                return [];
-            }
-
-            $joined = implode("\n\n---\n\n", $chunks);
-            $prompt = $cfg['rag_context_prompt'] ?? '';
-
-            $content = str_contains($prompt, '{chunks}')
-            ? str_replace('{chunks}', $joined, $prompt)
-            : ($prompt !== '' ? $prompt . "\n\n" . $joined : $joined);
-
-            return [['role' => 'system', 'content' => $content]];
-
         } catch (\Throwable $e) {
             Log::warning('AI Chatbox RAG retrieval failed', ['error' => $e->getMessage()]);
-            return [];
+            $chunks = [];
         }
+
+        // No relevant chunk matched (below threshold, no indexed documents, or
+        // retrieval failed). Inject the grounding guard so the model is still
+        // told to refuse instead of being left completely unconstrained — this
+        // is the usual cause of the bot answering "outside" the knowledge base.
+        if (empty($chunks)) {
+            $guard = $cfg['rag_no_context_prompt'] ?? '';
+            return $guard !== '' ? [['role' => 'system', 'content' => $guard]] : [];
+        }
+
+        $joined = implode("\n\n---\n\n", $chunks);
+        $prompt = $cfg['rag_context_prompt'] ?? '';
+
+        $content = str_contains($prompt, '{chunks}')
+        ? str_replace('{chunks}', $joined, $prompt)
+        : ($prompt !== '' ? $prompt . "\n\n" . $joined : $joined);
+
+        return [['role' => 'system', 'content' => $content]];
     }
 }

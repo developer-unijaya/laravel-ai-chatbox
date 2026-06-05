@@ -10,7 +10,7 @@
 
 A drop-in AI chatbox widget for Laravel. One Blade directive — no build tools required in your application.
 
-Connect to any **OpenAI-compatible API** including Ollama, OpenAI, Groq, LM Studio, and OpenRouter. Includes real-time token streaming, conversation memory, a full **RAG (Retrieval-Augmented Generation)** system, an admin dashboard, and a PHP facade for calling AI from anywhere in your codebase.
+Connect to any **OpenAI-compatible API** including Ollama, OpenAI, Groq, LM Studio, and OpenRouter — plus native **Anthropic (Claude)** support via the Messages API. Includes real-time token streaming, conversation memory, a full **RAG (Retrieval-Augmented Generation)** system, an admin dashboard, and a PHP facade for calling AI from anywhere in your codebase.
 
 ---
 
@@ -53,6 +53,7 @@ Connect to any **OpenAI-compatible API** including Ollama, OpenAI, Groq, LM Stud
 
 **AI & Streaming**
 - Supports Ollama, OpenAI, Groq, LM Studio, OpenRouter, and any OpenAI-compatible endpoint
+- Native **Anthropic (Claude)** support via the Messages API — auto-selected when the provider URL points at `api.anthropic.com`
 - Real-time token streaming via Server-Sent Events (SSE) with a blinking cursor
 - Configurable system prompt, language enforcement, temperature, and max tokens
 - `AI` facade for calling providers directly from controllers, jobs, or commands
@@ -271,7 +272,8 @@ Then edit `config/ai-chatbox.php` directly.
 | `rag_chunk_size` | - | `500` | Target chunk size in tokens (~4 chars/token) |
 | `rag_chunk_overlap` | - | `50` | Overlap between consecutive chunks in tokens |
 | `rag_similarity_threshold` | - | `0.2` | Minimum cosine similarity score (`0.0`–`1.0`) |
-| `rag_context_prompt` | - | *(see below)* | Instruction prepended to retrieved chunks — use `{chunks}` as placeholder |
+| `rag_context_prompt` | - | *(see below)* | Instruction prepended to retrieved chunks when a match is found — use `{chunks}` as placeholder |
+| `rag_no_context_prompt` | - | *(see below)* | Grounding guard injected when RAG is on but **no** chunk matches — keeps the model from answering off-context. Empty string disables it |
 | `rag_processing_timeout` | `AI_CHATBOX_RAG_PROCESSING_TIMEOUT` | `0` | Max seconds for a single upload or reprocess — `0` = no limit |
 
 > `rag_embedding_url` and `rag_embedding_model` are per-provider settings defined inside the `providers` block and resolved through the active named provider. See [AI Providers](#ai-providers).
@@ -310,10 +312,19 @@ Named providers are defined under the `providers` key in `config/ai-chatbox.php`
         'rag_embedding_url'   => env('LMSTUDIO_EMBEDDING_URL',   'http://127.0.0.1:1234/v1/embeddings'),
         'rag_embedding_model' => env('LMSTUDIO_EMBEDDING_MODEL', 'text-embedding-nomic-embed-text-v1.5'),
     ],
+    'anthropic' => [
+        'api_url'             => env('ANTH_URL',                 'https://api.anthropic.com/v1/messages'),
+        'api_token'           => env('ANTH_API_KEY',            ''),
+        'api_model'           => env('ANTH_MODEL',               'claude-sonnet-4-6'),
+        'rag_embedding_url'   => env('ANTH_EMBEDDING_URL',       ''),
+        'rag_embedding_model' => env('ANTH_EMBEDDING_MODEL',     ''),
+    ],
 ],
 ```
 
 > `groq` and other providers are not in the default config — add them as custom entries after publishing (see [OpenRouter example](#openrouter-custom-provider) below for the pattern).
+
+> **Anthropic is not OpenAI-compatible.** When a provider's `api_url` contains `api.anthropic.com`, the package automatically uses the dedicated `AnthropicEngine` (native Messages API) instead of the OpenAI-compatible engine — no extra configuration is needed. Anthropic has no embeddings endpoint, so leave `ANTH_EMBEDDING_*` empty and use a different provider for RAG embeddings if needed.
 
 **Env var reference per provider:**
 
@@ -322,6 +333,7 @@ Named providers are defined under the `providers` key in `config/ai-chatbox.php`
 | `ollama` | `OLLAMA_URL` | `OLLAMA_TOKEN` | `OLLAMA_MODEL` | `OLLAMA_EMBEDDING_URL` | `OLLAMA_EMBEDDING_MODEL` |
 | `openai` | `OPENAI_URL` | `OPENAI_API_KEY` | `OPENAI_MODEL` | `OPENAI_EMBEDDING_URL` | `OPENAI_EMBEDDING_MODEL` |
 | `lmstudio` | `LMSTUDIO_URL` | `LMSTUDIO_TOKEN` | `LMSTUDIO_MODEL` | `LMSTUDIO_EMBEDDING_URL` | `LMSTUDIO_EMBEDDING_MODEL` |
+| `anthropic` | `ANTH_URL` | `ANTH_API_KEY` | `ANTH_MODEL` | `ANTH_EMBEDDING_URL` | `ANTH_EMBEDDING_MODEL` |
 
 > `rag_embedding_timeout` (`AI_CHATBOX_EMBEDDING_TIMEOUT`) is a universal setting — it applies to all providers and is not overridable per provider. Configure it once in the RAG section.
 
@@ -358,6 +370,19 @@ OPENAI_URL=https://api.openai.com/v1/chat/completions
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o
 ```
+
+#### Anthropic (Claude)
+
+Anthropic uses its own Messages API, not the OpenAI-compatible format. The package detects `api.anthropic.com` in the URL and switches to the native `AnthropicEngine` automatically — chat and streaming both work out of the box.
+
+```env
+AI_CHATBOX_ACTIVE_PROVIDER=anthropic
+ANTH_URL=https://api.anthropic.com/v1/messages
+ANTH_API_KEY=sk-ant-...
+ANTH_MODEL=claude-sonnet-4-6
+```
+
+> Anthropic does not expose an embeddings endpoint, so RAG embeddings must come from a different provider. Set `AI_CHATBOX_ACTIVE_PROVIDER=anthropic` for chat and configure embeddings separately if you use RAG.
 
 #### Groq (custom provider)
 
@@ -597,6 +622,7 @@ $reply = AI::provider('default')->chat('Follow-up question', $history);
 | `AI::chat()` / `AI::provider('default')` | Provider named by `AI_CHATBOX_ACTIVE_PROVIDER` |
 | `AI::provider('openai')` | `openai` entry in `config/ai-chatbox.php` |
 | `AI::provider('ollama')` | `ollama` entry in `config/ai-chatbox.php` |
+| `AI::provider('anthropic')` | `anthropic` entry — engine auto-switches to `AnthropicEngine` |
 
 ---
 
@@ -908,11 +934,23 @@ On every chat message:
 3. Chunks below `rag_similarity_threshold` (default `0.2`) are discarded
 4. The top `rag_top_k` (default `3`) chunks are injected as a system message using `rag_context_prompt`, replacing the `{chunks}` placeholder
 
-The default prompt instructs the model to treat retrieved chunks as its **primary source** and say "I don't have that information in my knowledge base" if the answer is not found there. Customise via `.env`:
+The default prompt instructs the model to answer **only** from the retrieved chunks and say "I don't have that information in my knowledge base" if the answer is not found there. Edit `rag_context_prompt` in the published config to customise it (use `{chunks}` as the placeholder for the retrieved text).
 
-```env
-AI_CHATBOX_RAG_CONTEXT_PROMPT="Use only the following context to answer:\n\n{chunks}\n\nDo not use any other knowledge."
+#### Grounding when nothing matches
+
+A common complaint is *"the bot answered from its own knowledge instead of my documents."* This happens on questions the knowledge base doesn't cover: when **no chunk clears `rag_similarity_threshold`** (or the embedding call fails, or there are no indexed documents), there is nothing to inject — so without a guard the model is left completely unconstrained and falls back to its training data.
+
+To prevent this, when RAG is enabled but no chunk matches, the package injects `rag_no_context_prompt` instead. The default refuses factual answers while still allowing greetings and small talk:
+
+```php
+// config/ai-chatbox.php — default
+'rag_no_context_prompt' => "No relevant knowledge-base entries were found for this question. "
+    . "If the user is asking for information or a factual answer, do not answer from general knowledge — "
+    . "reply exactly: \"I don't have that information in my knowledge base.\" "
+    . "You may still respond naturally to greetings, thanks, and small talk.",
 ```
+
+Set it to an empty string to disable the guard (the model answers unconstrained when nothing matches). If your bot is *still* going off-context even when chunks **are** retrieved, tighten `rag_context_prompt` to forbid outside knowledge outright, and consider raising `rag_similarity_threshold` so weak/irrelevant chunks aren't injected.
 
 > **Scale:** Similarity is computed in PHP and works well up to a few thousand chunks. For larger knowledge bases, consider switching to a database with native vector support such as `pgvector` for PostgreSQL.
 
@@ -1130,8 +1168,8 @@ The package is organised into four explicit layers. Each layer communicates only
 │  History persistence and context trimming            │
 ├──────────────────────────────────────────────────────┤
 │  Layer 1 — AI Engine                                 │
-│  OpenAiCompatibleEngine · AiEngineInterface          │
-│  PromptBuilder · HealthChecker                       │
+│  OpenAiCompatibleEngine · AnthropicEngine            │
+│  AiEngineInterface · PromptBuilder · HealthChecker   │
 │  AiEngineException (error codes E01–E19)             │
 │  HTTP calls, prompt assembly, error handling         │
 └──────────────────────────────────────────────────────┘
@@ -1151,6 +1189,7 @@ src/
 ├── Engine/
 │   ├── Contracts/AiEngineInterface.php
 │   ├── OpenAiCompatibleEngine.php
+│   ├── AnthropicEngine.php          # native Anthropic Messages API (extends OpenAiCompatibleEngine)
 │   ├── HealthChecker.php
 │   └── PromptBuilder.php
 ├── Http/
@@ -1192,7 +1231,9 @@ src/
 
 ### Custom AI engine
 
-Implement `AiEngineInterface` to support a provider that is not OpenAI-compatible (Anthropic, Gemini, Cohere, etc.):
+> **Anthropic (Claude) ships built in.** The package includes `AnthropicEngine` and auto-selects it when a provider's `api_url` contains `api.anthropic.com` — see [Anthropic (Claude)](#anthropic-claude) under provider examples. You only need a custom engine for *other* non-OpenAI-compatible providers.
+
+Implement `AiEngineInterface` to support a provider that is not OpenAI-compatible (Gemini, Cohere, etc.):
 
 ```php
 use SyafiqUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
@@ -1368,6 +1409,14 @@ OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o
 OPENAI_EMBEDDING_URL=https://api.openai.com/v1/embeddings
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+
+# Anthropic (Claude) — native Messages API, auto-detected via api.anthropic.com
+ANTH_URL=https://api.anthropic.com/v1/messages
+ANTH_API_KEY=
+ANTH_MODEL=claude-sonnet-4-6
+# Anthropic has no embeddings endpoint — leave these empty and use another provider for RAG
+ANTH_EMBEDDING_URL=
+ANTH_EMBEDDING_MODEL=
 
 # Groq / OpenRouter / custom providers — add a 'providers' entry in config/ai-chatbox.php
 # (see Provider examples in the docs above)
