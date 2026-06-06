@@ -274,6 +274,14 @@
 
                             <td class="px-6 py-4 text-right">
                                 <div class="flex items-center justify-end gap-2" id="actions-{{ $doc->id }}">
+                                    @if($doc->status === 'ready')
+                                    <a href="{{ route('ai-chatbox.rag.chunks', $doc->id) }}" class="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors" style="color:var(--theme);background-color:color-mix(in srgb, var(--theme) 10%, transparent);" onmouseover="this.style.backgroundColor='color-mix(in srgb, var(--theme) 18%, transparent)'" onmouseout="this.style.backgroundColor='color-mix(in srgb, var(--theme) 10%, transparent)'">
+                                        <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                        Chunks
+                                    </a>
+                                    @endif
                                     <form action="{{ route('ai-chatbox.rag.reprocess', $doc->id) }}" method="POST" class="reprocess-form" data-doc-id="{{ $doc->id }}" data-doc-title="{{ $doc->title }}">
                                         @csrf
                                         <button type="submit" class="btn-reprocess" {{ !$uploadEnabled ? 'disabled title="Configure embedding model first"' : '' }}>
