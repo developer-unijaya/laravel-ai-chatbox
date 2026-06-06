@@ -24,8 +24,8 @@ class RagRetriever
             return [];
         }
 
-        $topK = max(1, (int) config('ai-chatbox.rag_top_k', 3));
-        $threshold = (float) config('ai-chatbox.rag_similarity_threshold', 0.3);
+        $topK = max(1, (int) config('ai-chatbox.rag_top_k', 10));
+        $threshold = (float) config('ai-chatbox.rag_similarity_threshold', 0.2);
 
         $queryEmbedding = $this->embedder->embed($query);
 
@@ -95,7 +95,7 @@ class RagRetriever
 
         if (empty($scored)) {
             if ($belowThreshold > 0) {
-                Log::info('AI Chatbox RAG: No chunks met the similarity threshold — consider lowering AI_CHATBOX_RAG_THRESHOLD.', [
+                Log::info('AI Chatbox RAG: No chunks met the similarity threshold — consider lowering rag_similarity_threshold in your published config.', [
                     'threshold' => $threshold,
                     'chunks_scored' => $belowThreshold,
                 ]);

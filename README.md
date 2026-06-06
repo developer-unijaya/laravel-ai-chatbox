@@ -208,8 +208,8 @@ Then edit `config/ai-chatbox.php` directly.
 
 | Key | Env var | Default | Description |
 |---|---|---|---|
-| `temperature` | - | `0.7` | Creativity — `0.0` deterministic, `1.0` creative |
-| `max_tokens` | - | `null` | Max reply length — `null` lets the model decide |
+| `temperature` | - | `0.5` | Creativity — `0.0` deterministic, `1.0` creative |
+| `max_tokens` | - | `300` | Max reply length — set to `null` to let the model decide (not supported by Anthropic) |
 | `timeout` | `AI_CHATBOX_TIMEOUT` | `30` | Request timeout in seconds — increase for slow local models |
 
 ---
@@ -269,7 +269,7 @@ Then edit `config/ai-chatbox.php` directly.
 | `rag_enabled` | `AI_CHATBOX_RAG` | `false` | Master switch — enable RAG context injection |
 | `rag_embedding_timeout` | `AI_CHATBOX_EMBEDDING_TIMEOUT` | `10` | Timeout in seconds for every embedding HTTP request — applies to all providers |
 | `rag_keyword_fallback` | `AI_CHATBOX_RAG_KEYWORD_FALLBACK` | `true` | When the embedding URL is absent or the embedding call fails, fall back to SQL keyword search instead of injecting the no-context guard. Words shorter than 3 characters are ignored. Set `false` to disable |
-| `rag_top_k` | - | `3` | Number of chunks retrieved per query |
+| `rag_top_k` | - | `10` | Number of chunks retrieved per query |
 | `rag_chunk_size` | - | `500` | Target chunk size in tokens (~4 chars/token) |
 | `rag_chunk_overlap` | - | `50` | Overlap between consecutive chunks in tokens |
 | `rag_similarity_threshold` | - | `0.2` | Minimum cosine similarity score (`0.0`–`1.0`) |
@@ -812,9 +812,10 @@ Limits how long the AI's reply can be. Leave `null` to let the model decide.
 
 ```php
 // config/ai-chatbox.php
-'max_tokens' => 512,   // short replies
+'max_tokens' => 300,   // default — short replies
+'max_tokens' => 512,   // medium replies
 'max_tokens' => 2048,  // longer replies
-'max_tokens' => null,  // model default (default)
+'max_tokens' => null,  // let the model decide (not supported by Anthropic)
 ```
 
 Both limits work together: `history_limit` caps by message count, `context_token_limit` caps by estimated tokens. Whichever is reached first applies.
@@ -824,7 +825,7 @@ Both limits work together: `history_limit` caps by message count, `context_token
 ```php
 // config/ai-chatbox.php
 'temperature' => 0.2,  // focused, deterministic
-'temperature' => 0.7,  // balanced (default)
+'temperature' => 0.5,  // balanced (default)
 'temperature' => 1.0,  // creative, unpredictable
 ```
 
@@ -959,7 +960,7 @@ On every chat message:
 1. The user's message is embedded using the configured embedding model — **or**, when no embedding URL is set, the package skips embedding and goes straight to step 3
 2. Cosine similarity is computed **in PHP** against every stored chunk; chunks below `rag_similarity_threshold` (default `0.2`) are discarded
 3. **Keyword fallback** (when `rag_keyword_fallback` is `true`, which is the default) — if embedding returned no results (no URL configured, or the embedding call failed), the user's message is split into words ≥ 3 characters and a SQL `LIKE` search is run across all chunks from `ready` documents
-4. The top `rag_top_k` (default `3`) chunks are injected as a system message using `rag_context_prompt`, replacing the `{chunks}` placeholder
+4. The top `rag_top_k` (default `10`) chunks are injected as a system message using `rag_context_prompt`, replacing the `{chunks}` placeholder
 
 The default prompt instructs the model to answer **only** from the retrieved chunks and say "I don't have that information in my knowledge base" if the answer is not found there. Edit `rag_context_prompt` in the published config to customise it (use `{chunks}` as the placeholder for the retrieved text).
 

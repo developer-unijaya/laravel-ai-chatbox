@@ -283,10 +283,11 @@ return [
 | AI Response Tuning
 |--------------------------------------------------------------------------
 | 'max_tokens'  — maximum tokens in the AI reply. Lower = shorter/cheaper.
-|                 Set to null to let the model decide (API default).
+|                 Default: 300. Set to null to let the model decide (not
+|                 supported by Anthropic — its engine always requires a number).
 |
 | 'temperature' — creativity/randomness of replies.
-|                 0.0 = deterministic, 1.0 = creative. Typical: 0.7.
+|                 0.0 = deterministic, 1.0 = creative. Default: 0.5.
 */
 
     'max_tokens' => 300,

@@ -14,8 +14,9 @@ class AnthropicEngine extends OpenAiCompatibleEngine
         $apiToken = $options['api_token'] ?? '';
         $model = $options['api_model'] ?? '';
         $timeout = $options['timeout'] ?? 30;
-        $temp = (float) ($options['temperature'] ?? 0.7);
-        $maxTokens = $options['max_tokens'] ?? 1024;
+        $temp = (float) ($options['temperature'] ?? 0.5);
+        // Anthropic requires max_tokens to be a positive integer — null is not accepted.
+        $maxTokens = ($options['max_tokens'] ?? null) !== null ? (int) $options['max_tokens'] : 300;
 
         $this->assertConfig($apiUrl, $apiToken, $model);
 
@@ -24,7 +25,7 @@ class AnthropicEngine extends OpenAiCompatibleEngine
         try {
             $client = $this->makeClient(['timeout' => $timeout]);
 
-            $payload = ['model' => $model, 'messages' => $filtered, 'temperature' => $temp, 'max_tokens' => (int) $maxTokens, 'stream' => false];
+            $payload = ['model' => $model, 'messages' => $filtered, 'temperature' => $temp, 'max_tokens' => $maxTokens, 'stream' => false];
             if ($system !== '') {
                 $payload['system'] = $system;
             }
@@ -63,8 +64,9 @@ class AnthropicEngine extends OpenAiCompatibleEngine
         $apiToken = $options['api_token'] ?? '';
         $model = $options['api_model'] ?? '';
         $timeout = $options['timeout'] ?? 30;
-        $temp = (float) ($options['temperature'] ?? 0.7);
-        $maxTokens = $options['max_tokens'] ?? 1024;
+        $temp = (float) ($options['temperature'] ?? 0.5);
+        // Anthropic requires max_tokens to be a positive integer — null is not accepted.
+        $maxTokens = ($options['max_tokens'] ?? null) !== null ? (int) $options['max_tokens'] : 300;
 
         $this->assertConfig($apiUrl, $apiToken, $model);
 
@@ -73,7 +75,7 @@ class AnthropicEngine extends OpenAiCompatibleEngine
         try {
             $client = $this->makeClient(['timeout' => $timeout]);
 
-            $payload = ['model' => $model, 'messages' => $filtered, 'temperature' => $temp, 'max_tokens' => (int) $maxTokens, 'stream' => true];
+            $payload = ['model' => $model, 'messages' => $filtered, 'temperature' => $temp, 'max_tokens' => $maxTokens, 'stream' => true];
             if ($system !== '') {
                 $payload['system'] = $system;
             }

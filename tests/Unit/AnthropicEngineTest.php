@@ -36,8 +36,10 @@ class AnthropicEngineTest extends TestCase
         $captured = null;
         $this->app->bind('ai-chatbox.guzzle', function () use (&$captured) {
             return function (array $config) use (&$captured) {
-                return new class($captured) extends \GuzzleHttp\Client {
-                    public function __construct(private &$captured) {}
+                return new class($captured) extends \GuzzleHttp\Client
+                {
+                    public function __construct(private  &$captured)
+                    {}
                     public function post($uri, array $options = []): \GuzzleHttp\Psr7\Response
                     {
                         $this->captured = $options['json'];
@@ -65,8 +67,10 @@ class AnthropicEngineTest extends TestCase
         $captured = null;
         $this->app->bind('ai-chatbox.guzzle', function () use (&$captured) {
             return function (array $config) use (&$captured) {
-                return new class($captured) extends \GuzzleHttp\Client {
-                    public function __construct(private &$captured) {}
+                return new class($captured) extends \GuzzleHttp\Client
+                {
+                    public function __construct(private  &$captured)
+                    {}
                     public function post($uri, array $options = []): \GuzzleHttp\Psr7\Response
                     {
                         $this->captured = $options['json'];
@@ -93,8 +97,10 @@ class AnthropicEngineTest extends TestCase
         $captured = null;
         $this->app->bind('ai-chatbox.guzzle', function () use (&$captured) {
             return function (array $config) use (&$captured) {
-                return new class($captured) extends \GuzzleHttp\Client {
-                    public function __construct(private &$captured) {}
+                return new class($captured) extends \GuzzleHttp\Client
+                {
+                    public function __construct(private  &$captured)
+                    {}
                     public function post($uri, array $options = []): \GuzzleHttp\Psr7\Response
                     {
                         $this->captured = $options['json'];
@@ -133,8 +139,10 @@ class AnthropicEngineTest extends TestCase
         $capturedHeaders = null;
         $this->app->bind('ai-chatbox.guzzle', function () use (&$capturedHeaders) {
             return function (array $config) use (&$capturedHeaders) {
-                return new class($capturedHeaders) extends \GuzzleHttp\Client {
-                    public function __construct(private &$capturedHeaders) {}
+                return new class($capturedHeaders) extends \GuzzleHttp\Client
+                {
+                    public function __construct(private  &$capturedHeaders)
+                    {}
                     public function post($uri, array $options = []): \GuzzleHttp\Psr7\Response
                     {
                         $this->capturedHeaders = $options['headers'];
@@ -159,8 +167,10 @@ class AnthropicEngineTest extends TestCase
         $capturedHeaders = null;
         $this->app->bind('ai-chatbox.guzzle', function () use (&$capturedHeaders) {
             return function (array $config) use (&$capturedHeaders) {
-                return new class($capturedHeaders) extends \GuzzleHttp\Client {
-                    public function __construct(private &$capturedHeaders) {}
+                return new class($capturedHeaders) extends \GuzzleHttp\Client
+                {
+                    public function __construct(private  &$capturedHeaders)
+                    {}
                     public function post($uri, array $options = []): \GuzzleHttp\Psr7\Response
                     {
                         $this->capturedHeaders = $options['headers'];
@@ -207,7 +217,7 @@ class AnthropicEngineTest extends TestCase
         $reader = $engine->beginStream([['role' => 'user', 'content' => 'Hi']], $this->baseOptions);
 
         $tokens = [];
-        $fullReply = $reader(function (string $t) use (&$tokens) { $tokens[] = $t; });
+        $fullReply = $reader(function (string $t) use (&$tokens) {$tokens[] = $t;});
 
         $this->assertSame(['Hello', ' world'], $tokens);
         $this->assertSame('Hello world', $fullReply);

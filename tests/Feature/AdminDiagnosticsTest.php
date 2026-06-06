@@ -217,6 +217,7 @@ class AdminDiagnosticsTest extends TestCase
         $this->app['config']->set('ai-chatbox.rag_enabled', false);
         $this->app['config']->set('ai-chatbox.rag_embedding_url', 'http://embed.example.com/v1/embeddings');
         $this->app['config']->set('ai-chatbox.rag_embedding_model', 'nomic-embed-text');
+        $this->app['config']->set('ai-chatbox.rag_embedding_token', 'test-embed-token'); // suppress external-token notice
         $this->app['config']->set('ai-chatbox.memory_driver', 'session');
         $this->app['config']->set('ai-chatbox.storage', 'local');
         $this->app['config']->set('ai-chatbox.rag_admin_middleware', ['web', 'auth', 'role:admin']);

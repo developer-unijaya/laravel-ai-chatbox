@@ -31,7 +31,7 @@ class RagController extends Controller
         // URL absent → keyword-only mode: uploads work, no vectors generated.
         // URL present but model absent → broken config: uploads disabled.
         $keywordOnlyMode = empty($embeddingUrl);
-        $uploadEnabled   = $embeddingConfigured || $keywordOnlyMode;
+        $uploadEnabled = $embeddingConfigured || $keywordOnlyMode;
 
         return view('ai-chatbox::rag', [
             'documents' => $documents,
@@ -221,8 +221,8 @@ class RagController extends Controller
         }
 
         $errorMessage = $embedFailed > 0
-            ? "{$embedFailed} of {$count} chunks failed to embed and will be skipped during vector retrieval."
-            : null;
+        ? "{$embedFailed} of {$count} chunks failed to embed and will be skipped during vector retrieval."
+        : null;
 
         $document->update([
             'status' => 'ready',

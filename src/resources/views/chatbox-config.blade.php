@@ -6,7 +6,7 @@
     $position    = config('ai-chatbox.position', 'bottom-right');
     $markdown    = config('ai-chatbox.markdown', true);
     $sound       = config('ai-chatbox.sound', true);
-    $soundVolume = config('ai-chatbox.sound_volume', 0.4);
+    $soundVolume = config('ai-chatbox.sound_volume', 0.3);
     $healthCheck = config('ai-chatbox.health_check', true);
     $stream      = config('ai-chatbox.stream', true);
     $routeUrl    = route('ai-chatbox.message');

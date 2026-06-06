@@ -231,7 +231,7 @@ class ChatboxController extends Controller
             return 0;
         }
 
-        $topK = max(1, (int) ($cfg['rag_top_k'] ?? 3));
+        $topK = max(1, (int) ($cfg['rag_top_k'] ?? 10));
         $chunkSize = max(1, (int) ($cfg['rag_chunk_size'] ?? 500));
 
         return $topK * $chunkSize;

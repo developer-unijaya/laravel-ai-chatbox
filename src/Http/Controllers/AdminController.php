@@ -437,6 +437,11 @@ class AdminController extends Controller
                 "allowed_origins contains invalid entries: \"{$joined}\". Each entry must be a full URL (e.g. https://example.com) or \"*\". Invalid entries are silently ignored by the CORS middleware."];
         }
 
+        if (!(bool) ($cfg['health_check'] ?? true) && in_array(strtolower((string) config('app.env', '')), self::PROD_ENVS, true)) {
+            $diagnostics[] = ['level' => 'info', 'group' => 'Security', 'message' =>
+                'health_check is disabled in production. Users who open the chatbox while the AI service is down will see request errors instead of the configured offline_message.'];
+        }
+
         $rateLimit = (int) ($cfg['rate_limit'] ?? 20);
         $rateWindow = (int) ($cfg['rate_window'] ?? 1);
 
@@ -456,7 +461,7 @@ class AdminController extends Controller
 
     private function checkResponse(array &$diagnostics, array $cfg): void
     {
-        $temperature = (float) ($cfg['temperature'] ?? 0.7);
+        $temperature = (float) ($cfg['temperature'] ?? 0.5);
         if ($temperature < 0) {
             $diagnostics[] = ['level' => 'error', 'group' => 'Response', 'message' =>
                 "temperature is {$temperature} — negative values are invalid for all known AI APIs and will cause a request error. Valid range: 0.0–2.0."];
@@ -481,6 +486,20 @@ class AdminController extends Controller
         } elseif ($timeout > 300) {
             $diagnostics[] = ['level' => 'info', 'group' => 'Response', 'message' =>
                 "timeout is {$timeout}s — very high. PHP workers will be held open for up to {$timeout}s on slow requests."];
+        }
+
+        $isAnthropic = strtolower($cfg['engine'] ?? '') === 'anthropic'
+        || str_contains(strtolower($cfg['api_url'] ?? ''), 'anthropic.com');
+        if ($isAnthropic && $maxTokens === null) {
+            $diagnostics[] = ['level' => 'warning', 'group' => 'Response', 'message' =>
+                'max_tokens is null but the active provider uses the Anthropic engine. Anthropic requires a positive integer for max_tokens — null will cause API errors. Set a value (e.g. 300).'];
+        }
+
+        $contextTokens = (int) ($cfg['context_token_limit'] ?? 4000);
+        if ($contextTokens > 0 && $maxTokens !== null && (int) $maxTokens > 0 && (int) $maxTokens >= $contextTokens) {
+            $diagnostics[] = ['level' => 'warning', 'group' => 'Response', 'message' =>
+                "max_tokens ({$maxTokens}) is greater than or equal to context_token_limit ({$contextTokens}). "
+                . 'The AI reply alone can consume the entire context budget, leaving no room for conversation history.'];
         }
 
         $systemPrompt = $cfg['system_prompt'] ?? '';
@@ -546,8 +565,8 @@ class AdminController extends Controller
                 "position is \"{$position}\" which is not a recognised value. Expected one of: bottom-right, bottom-left."];
         }
 
-        if ($cfg['sound'] ?? false) {
-            $volume = $cfg['sound_volume'] ?? 0.5;
+        if ($cfg['sound'] ?? true) {
+            $volume = $cfg['sound_volume'] ?? 0.3;
             if (!is_numeric($volume) || (float) $volume < 0.0 || (float) $volume > 1.0) {
                 $diagnostics[] = ['level' => 'warning', 'group' => 'Widget', 'message' =>
                     "sound is enabled but sound_volume is \"{$volume}\" which is outside the valid range 0.0–1.0. The browser may clamp or ignore this value."];
@@ -593,6 +612,20 @@ class AdminController extends Controller
                     'rag_embedding_url is set but rag_embedding_model is empty. Document upload and reprocessing will fail. '
                     . 'Set the provider-specific model env var (e.g. LMSTUDIO_EMBEDDING_MODEL, OPENAI_EMBEDDING_MODEL).'];
             }
+
+            $embeddingToken = $cfg['rag_embedding_token'] ?? '';
+            if (empty($embeddingToken) && !$this->isLocalHost((string) $embHost)) {
+                $diagnostics[] = ['level' => 'info', 'group' => 'RAG', 'message' =>
+                    "rag_embedding_url points to an external service ({$embHost}) but rag_embedding_token is not set. "
+                    . 'If the service requires authentication, set the provider-specific token env var (e.g. ANTH_EMBEDDING_TOKEN, OPENAI_EMBEDDING_TOKEN).'];
+            }
+        }
+
+        $embTimeout = (int) ($cfg['rag_embedding_timeout'] ?? 10);
+        if ($embTimeout === 0) {
+            $diagnostics[] = ['level' => 'info', 'group' => 'RAG', 'message' =>
+                'rag_embedding_timeout is 0 — embedding requests have no timeout. A slow or unresponsive embedding service will stall document uploads indefinitely. '
+                . 'Set a positive value (e.g. AI_CHATBOX_EMBEDDING_TIMEOUT=30) for production use.'];
         }
 
         if (!$ragEnabled) {
@@ -608,17 +641,17 @@ class AdminController extends Controller
                 'Table ai_chatbox_rag_chunks is missing. Run: php artisan migrate'];
         }
 
-        $threshold = (float) ($cfg['rag_similarity_threshold'] ?? 0.3);
+        $threshold = (float) ($cfg['rag_similarity_threshold'] ?? 0.2);
         $chunkSize = (int) ($cfg['rag_chunk_size'] ?? 500);
         $chunkOverlap = (int) ($cfg['rag_chunk_overlap'] ?? 50);
-        $topK = (int) ($cfg['rag_top_k'] ?? 3);
+        $topK = (int) ($cfg['rag_top_k'] ?? 10);
 
         if ($threshold <= 0) {
             $diagnostics[] = ['level' => 'warning', 'group' => 'RAG', 'message' =>
-                'rag_similarity_threshold is 0 — all chunks are returned regardless of relevance. Recommended: 0.3–0.85.'];
+                'rag_similarity_threshold is 0 — all chunks are returned regardless of relevance. Recommended: 0.2–0.85.'];
         } elseif ($threshold > 0.95) {
             $diagnostics[] = ['level' => 'warning', 'group' => 'RAG', 'message' =>
-                "rag_similarity_threshold is very high ({$threshold}). Most chunks will be filtered out, even relevant ones. Recommended: 0.3–0.85."];
+                "rag_similarity_threshold is very high ({$threshold}). Most chunks will be filtered out, even relevant ones. Recommended: 0.2–0.85."];
         }
 
         if ($topK === 0) {
@@ -626,7 +659,7 @@ class AdminController extends Controller
                 'rag_top_k is 0 — no chunks will be retrieved. RAG context will never be injected into AI requests.'];
         } elseif ($topK > 20) {
             $diagnostics[] = ['level' => 'warning', 'group' => 'RAG', 'message' =>
-                "rag_top_k is {$topK} — injecting this many chunks may exceed your model's context window. Recommended: 3–10."];
+                "rag_top_k is {$topK} — injecting this many chunks may exceed your model's context window. Recommended: 3–20."];
         }
 
         if ($chunkSize < 100) {
@@ -646,8 +679,8 @@ class AdminController extends Controller
 
         if (isset($ragStats['null_chunks']) && $ragStats['null_chunks'] > 0) {
             $pct = $ragStats['total_chunks'] > 0
-                ? round($ragStats['null_chunks'] / $ragStats['total_chunks'] * 100)
-                : 0;
+            ? round($ragStats['null_chunks'] / $ragStats['total_chunks'] * 100)
+            : 0;
 
             if ($keywordFallback) {
                 $diagnostics[] = ['level' => 'info', 'group' => 'RAG', 'message' =>
@@ -746,8 +779,14 @@ class AdminController extends Controller
 
     private function checkStreaming(array &$diagnostics, array $cfg): void
     {
-        if (!($cfg['stream'] ?? false)) {
+        if (!($cfg['stream'] ?? true)) {
             return;
+        }
+
+        $frontendDriver = $cfg['frontend'] ?? 'vue';
+        if ($frontendDriver === 'none') {
+            $diagnostics[] = ['level' => 'info', 'group' => 'Streaming', 'message' =>
+                'stream is enabled but frontend is "none". Your custom frontend is responsible for consuming the SSE response from the stream endpoint.'];
         }
 
         if (!function_exists('ob_flush')) {
@@ -804,52 +843,6 @@ class AdminController extends Controller
                 'auth_conversations' => Conversation::whereNotNull('user_id')->count(),
                 'guest_conversations' => Conversation::whereNull('user_id')->count(),
             ];
-        } catch (Throwable) {
-            return [];
-        }
-    }
-
-    private function collectConversationTrend(): array
-    {
-        try {
-            $counts = Message::selectRaw('DATE(created_at) as day, COUNT(*) as cnt')
-                ->where('created_at', '>=', now()->subDays(6)->startOfDay())
-                ->groupBy('day')
-                ->pluck('cnt', 'day');
-
-            return collect(range(6, 0))->map(function (int $i) use ($counts) {
-                $date = now()->subDays($i)->format('Y-m-d');
-                return [
-                    'label' => now()->subDays($i)->format('D'),
-                    'date' => $date,
-                    'count' => (int) ($counts[$date] ?? 0),
-                ];
-            })->values()->toArray();
-        } catch (Throwable) {
-            return [];
-        }
-    }
-
-    private function collectRecentConversations(): array
-    {
-        try {
-            $rows = Conversation::withCount('messages')
-                ->with('latestMessage')
-                ->orderByDesc('updated_at')
-                ->limit(5)
-                ->get();
-
-            $names = $this->resolveUserNames($rows->pluck('user_id'));
-
-            return $rows->map(fn(Conversation $c) => [
-                'id' => $c->id,
-                'thread_id' => $c->thread_id,
-                'user_name' => $names[$c->user_id] ?? null,
-                'messages_count' => $c->messages_count,
-                'last_preview' => $c->latestMessage ? mb_strimwidth($c->latestMessage->content, 0, 60, '…') : null,
-                'last_role' => $c->latestMessage?->role,
-                'updated_at' => $c->updated_at?->diffForHumans(),
-            ])->toArray();
         } catch (Throwable) {
             return [];
         }

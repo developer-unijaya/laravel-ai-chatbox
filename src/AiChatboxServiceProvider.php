@@ -83,6 +83,11 @@ class AiChatboxServiceProvider extends ServiceProvider
             return;
         }
 
+        // Never block the test suite — Testbench has no published config by design.
+        if ($this->app->environment('testing')) {
+            return;
+        }
+
         // Let `vendor:publish` through so the user can publish for the first time.
         if ($this->app->runningInConsole() && (($_SERVER['argv'][1] ?? '') === 'vendor:publish')) {
             return;

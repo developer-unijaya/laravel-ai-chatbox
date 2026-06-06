@@ -59,7 +59,7 @@ class AiManager
     public function resolveEngine(array $config): AiEngineInterface
     {
         $isAnthropic = ($config['engine'] ?? '') === 'anthropic'
-            || str_contains($config['api_url'] ?? '', 'anthropic.com');
+        || str_contains($config['api_url'] ?? '', 'anthropic.com');
 
         return $isAnthropic ? new AnthropicEngine() : app(AiEngineInterface::class);
     }
