@@ -31,6 +31,7 @@ abstract class TestCase extends Orchestra
             'foreign_key_constraints' => true,
         ]);
 
+        $app['config']->set('ai-chatbox.stream', false);
         $app['config']->set('ai-chatbox.ssrf_protection', false);
         $app['config']->set('ai-chatbox.allowed_origins', ['http://localhost']);
         $app['config']->set('ai-chatbox.offline_message', 'AI service is currently unreachable.');

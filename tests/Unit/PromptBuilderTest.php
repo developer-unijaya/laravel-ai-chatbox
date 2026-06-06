@@ -149,6 +149,86 @@ class PromptBuilderTest extends TestCase
         $this->assertSame('user', $messages[1]['role']);
     }
 
+    // ── buildWithChunks() ─────────────────────────────────────────────────────
+
+    public function test_build_with_chunks_injects_context_prompt_when_chunks_provided(): void
+    {
+        $chunks = ['Chunk A content.', 'Chunk B content.'];
+        $cfg = $this->cfg([
+            'rag_context_prompt'    => "Use ONLY this context:\n\n{chunks}",
+            'rag_no_context_prompt' => 'NO_CONTEXT_GUARD',
+        ]);
+
+        $messages = $this->builder->buildWithChunks('my question', [], $cfg, $chunks);
+
+        // system, rag-system, user
+        $this->assertCount(3, $messages);
+        $this->assertSame('system', $messages[1]['role']);
+        $this->assertStringContainsString('Chunk A content.', $messages[1]['content']);
+        $this->assertStringContainsString('Chunk B content.', $messages[1]['content']);
+        $this->assertStringNotContainsString('NO_CONTEXT_GUARD', $messages[1]['content']);
+    }
+
+    public function test_build_with_chunks_injects_guard_when_chunks_empty(): void
+    {
+        $cfg = $this->cfg([
+            'rag_context_prompt'    => "Use ONLY this context:\n\n{chunks}",
+            'rag_no_context_prompt' => 'NO_CONTEXT_GUARD',
+        ]);
+
+        $messages = $this->builder->buildWithChunks('my question', [], $cfg, []);
+
+        // system, guard-system, user
+        $this->assertCount(3, $messages);
+        $this->assertSame('system', $messages[1]['role']);
+        $this->assertSame('NO_CONTEXT_GUARD', $messages[1]['content']);
+    }
+
+    public function test_build_with_chunks_skips_rag_message_when_guard_empty_and_no_chunks(): void
+    {
+        $cfg = $this->cfg(['rag_no_context_prompt' => '']);
+
+        $messages = $this->builder->buildWithChunks('hello', [], $cfg, []);
+
+        // system + user only
+        $this->assertCount(2, $messages);
+    }
+
+    public function test_build_with_chunks_last_message_is_user(): void
+    {
+        $cfg = $this->cfg(['rag_no_context_prompt' => '']);
+
+        $messages = $this->builder->buildWithChunks('hello', [], $cfg, ['some chunk']);
+
+        $this->assertSame('user', end($messages)['role']);
+    }
+
+    public function test_build_with_chunks_applies_system_prompt_and_language(): void
+    {
+        $cfg = $this->cfg([
+            'language'              => 'Malay',
+            'system_prompt'         => 'You are helpful. Reply in {language}.',
+            'rag_no_context_prompt' => '',
+        ]);
+
+        $messages = $this->builder->buildWithChunks('hello', [], $cfg, []);
+
+        $this->assertSame('system', $messages[0]['role']);
+        $this->assertStringContainsString('Malay', $messages[0]['content']);
+        $this->assertStringNotContainsString('{language}', $messages[0]['content']);
+    }
+
+    public function test_build_with_chunks_appends_language_reminder_to_user_message(): void
+    {
+        $cfg = $this->cfg(['language' => 'French', 'rag_no_context_prompt' => '']);
+
+        $messages = $this->builder->buildWithChunks('Bonjour', [], $cfg, []);
+
+        $userContent = end($messages)['content'];
+        $this->assertStringContainsString('Bonjour', $userContent);
+        $this->assertStringContainsString('French', $userContent);
+    }
+
     // ── RAG disabled ──────────────────────────────────────────────────────────
 
     public function test_build_does_not_inject_rag_context_when_disabled(): void

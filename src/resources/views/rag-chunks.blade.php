@@ -291,13 +291,13 @@
     return; // provider not configured — chat is disabled
     @endif
 
-    var chatUrl   = @json(route('ai-chatbox.rag.chat', $document->id));
-    var csrf      = document.querySelector('meta[name="csrf-token"]').content;
-    var messages  = document.getElementById('chat-messages');
-    var input     = document.getElementById('chat-input');
-    var sendBtn   = document.getElementById('chat-send');
+    var chatUrl       = @json(route('ai-chatbox.rag.chat', $document->id));
+    var csrf          = document.querySelector('meta[name="csrf-token"]').content;
+    var messages      = document.getElementById('chat-messages');
+    var input         = document.getElementById('chat-input');
+    var sendBtn       = document.getElementById('chat-send');
+    var streamEnabled = @json($streamEnabled);
 
-    // Configure marked: keep target="_blank" for links, sanitize off (admin-only page)
     if (typeof marked !== 'undefined') {
         marked.use({ breaks: true, gfm: true });
     }
@@ -306,18 +306,14 @@
         if (typeof marked !== 'undefined') {
             return marked.parse(text);
         }
-        // Fallback: plain text with line breaks
         return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
     }
 
-    function scrollBottom() {
-        messages.scrollTop = messages.scrollHeight;
-    }
+    function scrollBottom() { messages.scrollTop = messages.scrollHeight; }
 
     function appendBubble(role, text) {
         var row = document.createElement('div');
         var b   = document.createElement('div');
-
         if (role === 'user') {
             row.className = 'flex justify-end';
             b.className   = 'bubble-user';
@@ -331,11 +327,21 @@
             b.className   = 'bubble-ai';
             b.innerHTML   = renderMarkdown(text);
         }
-
         row.appendChild(b);
         messages.appendChild(row);
         scrollBottom();
         return row;
+    }
+
+    function appendStreamBubble() {
+        var row = document.createElement('div');
+        row.className = 'flex justify-start';
+        var b = document.createElement('div');
+        b.className = 'bubble-ai';
+        row.appendChild(b);
+        messages.appendChild(row);
+        scrollBottom();
+        return b;
     }
 
     function appendChunksBadge(count) {
@@ -375,48 +381,116 @@
     async function sendMessage() {
         var query = input.value.trim();
         if (!query) return;
-
         input.value = '';
         setLoading(true);
         appendBubble('user', query);
         showThinking();
-
         try {
-            var res = await fetch(chatUrl, {
-                method:  'POST',
-                headers: {
-                    'Content-Type':  'application/json',
-                    'Accept':        'application/json',
-                    'X-CSRF-TOKEN':  csrf,
-                },
-                body: JSON.stringify({ message: query }),
-            });
-
-            var data = await res.json();
-            removeThinking();
-
-            if (data.error) {
-                appendBubble('error', data.error);
+            if (streamEnabled) {
+                await sendStreaming(query);
             } else {
-                appendBubble('ai', data.reply);
-                appendChunksBadge(data.chunks_used ?? 0);
+                await sendJson(query);
             }
         } catch (err) {
             removeThinking();
             appendBubble('error', 'Request failed — check your network or provider config.');
+            setLoading(false);
+            input.focus();
+        }
+    }
+
+    async function sendJson(query) {
+        var res  = await fetch(chatUrl, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+            body:    JSON.stringify({ message: query }),
+        });
+        var data = await res.json();
+        removeThinking();
+        if (data.error) {
+            appendBubble('error', data.error);
+        } else {
+            appendBubble('ai', data.reply);
+            appendChunksBadge(data.chunks_used ?? 0);
+        }
+        setLoading(false);
+        input.focus();
+    }
+
+    async function sendStreaming(query) {
+        var res = await fetch(chatUrl, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream', 'X-CSRF-TOKEN': csrf },
+            body:    JSON.stringify({ message: query }),
+        });
+
+        // Non-2xx means an error JSON was returned (e.g. 422, 502) before streaming started
+        if (!res.ok) {
+            var data = await res.json().catch(function () { return {}; });
+            removeThinking();
+            appendBubble('error', data.error || 'Request failed (' + res.status + ').');
+            setLoading(false);
+            input.focus();
+            return;
         }
 
+        removeThinking();
+
+        var aiBubble  = null;
+        var fullReply = '';
+        var chunksUsed = 0;
+        var reader    = res.body.getReader();
+        var decoder   = new TextDecoder();
+        var buffer    = '';
+
+        try {
+            outer: while (true) {
+                var chunk = await reader.read();
+                if (chunk.done) break;
+
+                buffer += decoder.decode(chunk.value, { stream: true });
+
+                var idx;
+                while ((idx = buffer.indexOf('\n')) !== -1) {
+                    var line = buffer.slice(0, idx).replace(/\r$/, '');
+                    buffer = buffer.slice(idx + 1);
+
+                    if (!line || !line.startsWith('data: ')) continue;
+                    var payload = line.slice(6);
+                    if (payload === '[DONE]') { reader.cancel(); break outer; }
+
+                    try {
+                        var evt = JSON.parse(payload);
+                        if ('chunks_used' in evt) { chunksUsed = evt.chunks_used; continue; }
+                        if (evt.error) {
+                            appendBubble('error', evt.error);
+                            setLoading(false);
+                            input.focus();
+                            return;
+                        }
+                        if (evt.token) {
+                            if (!aiBubble) { aiBubble = appendStreamBubble(); }
+                            fullReply += evt.token;
+                            aiBubble.textContent = fullReply;
+                            scrollBottom();
+                        }
+                    } catch (e) {}
+                }
+            }
+        } catch (e) {}
+
+        if (aiBubble) {
+            aiBubble.innerHTML = renderMarkdown(fullReply);
+            scrollBottom();
+        }
+        appendChunksBadge(chunksUsed);
         setLoading(false);
         input.focus();
     }
 
     sendBtn.addEventListener('click', sendMessage);
-
     input.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
     });
 })();
 </script>

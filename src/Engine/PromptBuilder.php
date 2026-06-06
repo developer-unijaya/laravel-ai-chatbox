@@ -53,6 +53,40 @@ class PromptBuilder
     }
 
     /**
+     * Like build() but uses pre-retrieved chunk content strings instead of
+     * running global RAG retrieval. Use this when the caller has already
+     * scoped retrieval to a specific document (e.g. the per-document test chat).
+     *
+     * @param  string[]  $chunks  Ordered chunk content strings (best match first)
+     */
+    public function buildWithChunks(string $userMessage, array $history, array $cfg, array $chunks): array
+    {
+        $language = $cfg['language'] ?? 'English';
+        $systemPrompt = $cfg['system_prompt'] ?? '';
+        $messages = [];
+
+        if (!empty($systemPrompt)) {
+            $messages[] = ['role' => 'system', 'content' => str_replace('{language}', $language, $systemPrompt)];
+        }
+
+        foreach ($history as $entry) {
+            $messages[] = $entry;
+        }
+
+        foreach ($this->ragContextFromChunks($chunks, $cfg) as $ragMsg) {
+            $messages[] = $ragMsg;
+        }
+
+        $apiMessage = (!empty($systemPrompt) && !empty($language))
+        ? $userMessage . "\n\n[Important: Reply in {$language} only.]"
+        : $userMessage;
+
+        $messages[] = ['role' => 'user', 'content' => $apiMessage];
+
+        return $messages;
+    }
+
+    /**
      * Build a system-role messages array from the configured system prompt.
      * Returns an empty array when the system prompt is blank.
      *
@@ -91,10 +125,19 @@ class PromptBuilder
             $chunks = [];
         }
 
-        // No relevant chunk matched (below threshold, no indexed documents, or
-        // retrieval failed). Inject the grounding guard so the model is still
-        // told to refuse instead of being left completely unconstrained — this
-        // is the usual cause of the bot answering "outside" the knowledge base.
+        return $this->ragContextFromChunks($chunks, $cfg);
+    }
+
+    /**
+     * Build the RAG system message(s) from pre-retrieved chunk strings.
+     * When chunks is empty the grounding guard is injected instead so the
+     * model is still told to refuse rather than being left unconstrained.
+     *
+     * @param  string[]  $chunks
+     * @return array<int, array{role: string, content: string}>
+     */
+    private function ragContextFromChunks(array $chunks, array $cfg): array
+    {
         if (empty($chunks)) {
             $guard = $cfg['rag_no_context_prompt'] ?? '';
             return $guard !== '' ? [['role' => 'system', 'content' => $guard]] : [];

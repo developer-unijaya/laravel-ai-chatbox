@@ -7,16 +7,20 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\View\View;
 use SyafiqUnijaya\AiChatbox\AiManager;
+use SyafiqUnijaya\AiChatbox\Engine\PromptBuilder;
 use SyafiqUnijaya\AiChatbox\Models\RagChunk;
 use SyafiqUnijaya\AiChatbox\Models\RagDocument;
 use SyafiqUnijaya\AiChatbox\Services\DocumentChunker;
 use SyafiqUnijaya\AiChatbox\Services\EmbeddingService;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class RagController extends Controller
 {
-    public function __construct(private readonly AiManager $aiManager)
-    {}
+    public function __construct(
+        private readonly AiManager $aiManager,
+        private readonly PromptBuilder $promptBuilder,
+    ) {}
 
     // ── List ─────────────────────────────────────────────────────────────────
 
@@ -152,6 +156,7 @@ class RagController extends Controller
             'ragEnabled' => (bool) ($cfg['rag_enabled'] ?? false),
             'providerConfigured' => $providerConfigured,
             'providerIssue' => $providerIssue,
+            'streamEnabled' => (bool) ($cfg['stream'] ?? false),
             'themeColor' => config('ai-chatbox.theme_color', '#4f46e5'),
             'colorScheme' => config('ai-chatbox.color_scheme', 'auto'),
         ]);
@@ -159,7 +164,7 @@ class RagController extends Controller
 
     // ── Chat test endpoint ────────────────────────────────────────────────────
 
-    public function chat(Request $request, int $id): JsonResponse
+    public function chat(Request $request, int $id): JsonResponse | StreamedResponse
     {
         $request->validate(['message' => ['required', 'string', 'max:2000']]);
 
@@ -173,30 +178,59 @@ class RagController extends Controller
         $query = $request->input('message');
 
         $chunks = $document->chunks()->get(['id', 'chunk_index', 'content', 'embedding']);
-
-        if ($chunks->isEmpty()) {
-            return response()->json(['reply' => 'This document has no chunks to retrieve from.', 'chunks_used' => 0]);
-        }
-
         $context = $this->retrieveContext($chunks, $query, $cfg);
+        $messages = $this->promptBuilder->buildWithChunks($query, [], $cfg, $context);
+        $chunksUsed = count($context);
 
-        if (empty($context)) {
-            $noContextPrompt = $cfg['rag_no_context_prompt'] ?? 'I could not find relevant information in this document for your question.';
-            return response()->json(['reply' => $noContextPrompt, 'chunks_used' => 0]);
+        if ($cfg['stream'] ?? false) {
+            try {
+                $streamReader = $this->aiManager->resolveEngine($cfg)->beginStream($messages, $cfg);
+            } catch (Throwable $e) {
+                return response()->json(['error' => 'AI call failed. Check your provider config in the dashboard.'], 502);
+            }
+
+            return response()->stream(
+                function () use ($streamReader, $chunksUsed) {
+                    echo 'data: ' . json_encode(['chunks_used' => $chunksUsed]) . "\n\n";
+                    if (ob_get_level() > 0) {
+                        ob_flush();
+                    }
+
+                    flush();
+
+                    try {
+                        $streamReader(function (string $token) {
+                            echo 'data: ' . json_encode(['token' => $token]) . "\n\n";
+                            if (ob_get_level() > 0) {
+                                ob_flush();
+                            }
+
+                            flush();
+                        });
+                    } catch (Throwable $e) {
+                        // Stream read error — end gracefully
+                    }
+
+                    echo "data: [DONE]\n\n";
+                    if (ob_get_level() > 0) {
+                        ob_flush();
+                    }
+
+                    flush();
+                },
+                200,
+                [
+                    'Content-Type' => 'text/event-stream',
+                    'Cache-Control' => 'no-cache',
+                    'X-Accel-Buffering' => 'no',
+                    'Connection' => 'keep-alive',
+                ]
+            );
         }
-
-        $contextText = implode("\n\n---\n\n", $context);
-        $base = trim($cfg['system_prompt'] ?? 'You are a helpful assistant.');
-        $systemContent = $base . "\n\nAnswer the user's question using ONLY the following document content:\n\n" . $contextText;
-
-        $messages = [
-            ['role' => 'system', 'content' => $systemContent],
-            ['role' => 'user', 'content' => $query],
-        ];
 
         try {
             $reply = $this->aiManager->resolveEngine($cfg)->complete($messages, $cfg);
-            return response()->json(['reply' => $reply, 'chunks_used' => count($context)]);
+            return response()->json(['reply' => $reply, 'chunks_used' => $chunksUsed]);
         } catch (Throwable $e) {
             return response()->json(['error' => 'AI call failed. Check your provider config in the dashboard.'], 502);
         }

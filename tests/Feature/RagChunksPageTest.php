@@ -4,6 +4,7 @@ namespace SyafiqUnijaya\AiChatbox\Tests\Feature;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
+use GuzzleHttp\Psr7\Utils;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use SyafiqUnijaya\AiChatbox\Models\RagChunk;
 use SyafiqUnijaya\AiChatbox\Models\RagDocument;
@@ -50,6 +51,17 @@ class RagChunksPageTest extends TestCase
         ]);
         $doc->increment('chunk_count');
         return $chunk;
+    }
+
+    private function sseResponse(array $tokens): Response
+    {
+        $body = '';
+        foreach ($tokens as $token) {
+            $body .= 'data: ' . json_encode(['choices' => [['delta' => ['content' => $token]]]]) . "\n\n";
+        }
+        $body .= "data: [DONE]\n\n";
+
+        return new Response(200, ['Content-Type' => 'text/event-stream'], Utils::streamFor($body));
     }
 
     private function chatResponse(string $content): Response
@@ -228,9 +240,13 @@ class RagChunksPageTest extends TestCase
 
     public function test_chat_returns_no_context_reply_when_nothing_matches(): void
     {
-        // Chunk has no embedding → keyword fallback; query words won't match the chunk
+        // Chunk has no embedding → keyword fallback; query words won't match the chunk.
+        // With no matching context, the rag_no_context_prompt guard is injected as a
+        // system message and the AI is called (same as the live chatbox behaviour).
         $doc = $this->makeReadyDocument();
         $this->addChunk($doc, 'Laravel is a PHP framework.', null);
+
+        $this->mockGuzzle([$this->chatResponse("I don't have that information in my knowledge base.")]);
 
         $this->withoutMiddleware()
             ->postJson("/ai-chatbox/rag/{$doc->id}/chat", ['message' => 'xyz zzz qqq'])
@@ -317,6 +333,23 @@ class RagChunksPageTest extends TestCase
             ->assertJsonPath('chunks_used', 1);
     }
 
+    // ── POST /{id}/chat — no history persistence ──────────────────────────────
+
+    public function test_chat_does_not_save_conversation_or_message_records(): void
+    {
+        $doc = $this->makeReadyDocument();
+        $this->addChunk($doc, 'Laravel ships with Artisan CLI.', null);
+
+        $this->mockGuzzle([$this->chatResponse('Artisan is a command-line tool.')]);
+
+        $this->withoutMiddleware()
+            ->postJson("/ai-chatbox/rag/{$doc->id}/chat", ['message' => 'Tell me about Artisan'])
+            ->assertOk();
+
+        $this->assertDatabaseCount('ai_chatbox_conversations', 0);
+        $this->assertDatabaseCount('ai_chatbox_messages', 0);
+    }
+
     // ── POST /{id}/chat — AI failure ──────────────────────────────────────────
 
     public function test_chat_returns_502_when_ai_call_fails(): void
@@ -351,5 +384,69 @@ class RagChunksPageTest extends TestCase
         $this->withoutMiddleware()
             ->postJson("/ai-chatbox/rag/{$doc->id}/chat", ['message' => 'Eloquent queries'])
             ->assertStatus(502);
+    }
+
+    // ── POST /{id}/chat — streaming ───────────────────────────────────────────
+
+    public function test_chat_streams_sse_when_stream_config_is_enabled(): void
+    {
+        $this->app['config']->set('ai-chatbox.stream', true);
+
+        $doc = $this->makeReadyDocument();
+        $this->addChunk($doc, 'Laravel ships with Artisan CLI.', null);
+
+        $this->mockGuzzle([$this->sseResponse(['Artisan', ' is', ' great.'])]);
+
+        $response = $this->withoutMiddleware()
+            ->postJson("/ai-chatbox/rag/{$doc->id}/chat", ['message' => 'Tell me about Artisan']);
+
+        $response->assertOk();
+        $this->assertStringContainsString('text/event-stream', $response->headers->get('Content-Type'));
+
+        $body = $response->streamedContent();
+        $this->assertStringContainsString('"chunks_used"', $body);
+        $this->assertStringContainsString('"token"', $body);
+        $this->assertStringContainsString('[DONE]', $body);
+    }
+
+    public function test_chat_stream_first_event_carries_chunks_used_count(): void
+    {
+        $this->app['config']->set('ai-chatbox.stream', true);
+
+        $doc = $this->makeReadyDocument();
+        $this->addChunk($doc, 'Laravel uses Eloquent ORM.', null);
+
+        $this->mockGuzzle([$this->sseResponse(['Eloquent', ' handles', ' queries.'])]);
+
+        $body = $this->withoutMiddleware()
+            ->postJson("/ai-chatbox/rag/{$doc->id}/chat", ['message' => 'Eloquent queries'])
+            ->streamedContent();
+
+        // First data line must be the metadata event with chunks_used
+        $firstLine = explode("\n", ltrim($body))[0];
+        $this->assertStringStartsWith('data: ', $firstLine);
+        $meta = json_decode(substr($firstLine, 6), true);
+        $this->assertArrayHasKey('chunks_used', $meta);
+        $this->assertGreaterThanOrEqual(1, $meta['chunks_used']);
+    }
+
+    public function test_chat_returns_502_json_when_stream_connection_fails(): void
+    {
+        $this->app['config']->set('ai-chatbox.stream', true);
+
+        $doc = $this->makeReadyDocument();
+        $this->addChunk($doc, 'Laravel ships with Artisan CLI.', null);
+
+        $this->mockGuzzle([
+            new ConnectException(
+                'connection refused',
+                new Request('POST', 'http://ai.example.com/v1/chat/completions'),
+            ),
+        ]);
+
+        $this->withoutMiddleware()
+            ->postJson("/ai-chatbox/rag/{$doc->id}/chat", ['message' => 'Tell me about Artisan'])
+            ->assertStatus(502)
+            ->assertJson(['error' => 'AI call failed. Check your provider config in the dashboard.']);
     }
 }
