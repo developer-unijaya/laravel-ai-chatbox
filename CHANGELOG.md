@@ -6,13 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased]
+## [0.4.0] — 2026-06-06
 
 ### Added
 - **Anthropic (Claude) engine** — native support for the Anthropic Messages API alongside the OpenAI-compatible providers:
   - New `AnthropicEngine` (extends `OpenAiCompatibleEngine`) that targets the native Messages API (`/v1/messages`) with `x-api-key` and `anthropic-version: 2023-06-01` headers — Anthropic is **not** OpenAI-compatible, so it needs a dedicated engine
   - System messages are hoisted into Anthropic's top-level `system` field; the remaining turns are sent as `messages`. `complete()` reads `content[0].text`; `beginStream()` parses SSE `content_block_delta` events and stops on `message_stop`
-  - `max_tokens` defaults to `1024` when unset (Anthropic requires the field and rejects `null`)
+  - `max_tokens` defaults to `300` when unset (Anthropic requires the field and rejects `null`; the value matches the global `max_tokens` config default)
   - **Automatic engine selection** — `AiManager::resolveEngine()` returns `AnthropicEngine` when the resolved provider's `api_url` contains `anthropic.com` or the `engine` key is set to `'anthropic'`; otherwise the bound `AiEngineInterface` (OpenAI-compatible) is used; no manual binding required
   - New default `anthropic` provider block in `config/ai-chatbox.php` — `ANTH_URL` (default `https://api.anthropic.com/v1/messages`), `ANTH_API_KEY`, `ANTH_MODEL` (default `claude-sonnet-4-6`), `ANTH_VERSION` (default `2023-06-01`), `ANTH_EMBEDDING_URL`, `ANTH_EMBEDDING_MODEL`, `ANTH_EMBEDDING_TOKEN`
   - Explicit `engine: 'anthropic'` key in the `anthropic` provider block — both the `engine` key and the `api_url` containing `anthropic.com` trigger engine selection; either alone is sufficient
@@ -441,7 +441,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Configurable API URL, token, and model via `.env`
 - Service provider with auto-discovery, asset publishing, and view publishing
 
-[Unreleased]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.3.0...HEAD
+[Unreleased]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.4.0...HEAD
+[0.4.0]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.9...0.3.0
 [0.2.9]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.7...0.2.9
 [0.2.7]: https://github.com/syafiq-unijaya/laravel-ai-chatbox/compare/0.2.6...0.2.7
