@@ -560,9 +560,9 @@ class AdminController extends Controller
         }
 
         $position = (string) ($cfg['position'] ?? 'bottom-right');
-        if (!in_array($position, ['bottom-right', 'bottom-left'], true)) {
+        if (!in_array($position, ['bottom-right', 'bottom-left', 'top-right', 'top-left'], true)) {
             $diagnostics[] = ['level' => 'warning', 'group' => 'Widget', 'message' =>
-                "position is \"{$position}\" which is not a recognised value. Expected one of: bottom-right, bottom-left."];
+                "position is \"{$position}\" which is not a recognised value. Expected one of: bottom-right, bottom-left, top-right, top-left."];
         }
 
         if ($cfg['sound'] ?? true) {
