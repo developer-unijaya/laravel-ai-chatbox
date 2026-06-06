@@ -119,14 +119,14 @@ class RagRetriever
      */
     private function keywordSearch(string $query, int $topK): array
     {
-        static $stopWords = [
+        $stopWords = config('ai-chatbox.rag_keyword_stop_words', [
             'what', 'which', 'where', 'when', 'how', 'why', 'who',
             'the', 'this', 'that', 'these', 'those',
             'are', 'was', 'were', 'will', 'would', 'can', 'could',
             'should', 'shall', 'may', 'might', 'must',
             'have', 'has', 'had', 'does', 'did',
             'for', 'and', 'but', 'not', 'you', 'your',
-        ];
+        ]);
 
         $rawTokens = preg_split('/\s+/', mb_strtolower(trim($query))) ?: [];
 

@@ -312,7 +312,7 @@ return [
 | 'rag_enabled'              — master switch (default: false)
 | 'rag_embedding_timeout'    — timeout in seconds for every embedding HTTP request (default: 10).
 |                              Applies to all providers. Env: AI_CHATBOX_EMBEDDING_TIMEOUT
-| 'rag_top_k'                — number of chunks to retrieve per query (default: 3)
+| 'rag_top_k'                — number of chunks to retrieve per query (default: 10)
 | 'rag_chunk_size'           — target chunk size in tokens (~4 chars/token, default: 500)
 | 'rag_chunk_overlap'        — overlap between chunks in tokens (default: 50)
 | 'rag_similarity_threshold' — minimum cosine similarity score 0.0–1.0 (default: 0.2)
@@ -328,7 +328,7 @@ return [
 
     'rag_enabled' => env('AI_CHATBOX_RAG', false),
     'rag_embedding_timeout' => (int) env('AI_CHATBOX_EMBEDDING_TIMEOUT', 10),
-    'rag_top_k' => 3,
+    'rag_top_k' => 10,
     'rag_chunk_size' => 500,
     'rag_chunk_overlap' => 50,
     'rag_similarity_threshold' => 0.2,
@@ -336,6 +336,27 @@ return [
     // embedding service is unavailable or rag_embedding_url is not configured.
     // Set to false to return no context instead of the keyword fallback.
     'rag_keyword_fallback' => env('AI_CHATBOX_RAG_KEYWORD_FALLBACK', true),
+
+/*
+|--------------------------------------------------------------------------
+| RAG Keyword Fallback — Stop Words
+|--------------------------------------------------------------------------
+| Words stripped from the user's query before keyword search so that
+| common interrogative and function words (e.g. "what", "how", "the")
+| do not flood the results with irrelevant chunks.
+|
+| Extend this list with domain-specific noise words for your knowledge base.
+| Set to an empty array [] to disable stop-word filtering entirely.
+*/
+
+    'rag_keyword_stop_words' => [
+        'what', 'which', 'where', 'when', 'how', 'why', 'who',
+        'the', 'this', 'that', 'these', 'those',
+        'are', 'was', 'were', 'will', 'would', 'can', 'could',
+        'should', 'shall', 'may', 'might', 'must',
+        'have', 'has', 'had', 'does', 'did',
+        'for', 'and', 'but', 'not', 'you', 'your',
+    ],
     'rag_admin_middleware' => ['web', 'auth'],
     'admin_middleware' => null, // null = inherit rag_admin_middleware
 
