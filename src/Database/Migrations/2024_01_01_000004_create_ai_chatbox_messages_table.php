@@ -13,6 +13,8 @@ return new class extends Migration
             $table->string('role', 20);
             $table->text('content');
             $table->timestamps();
+
+            $table->index(['conversation_id', 'id']);
         });
     }
 
