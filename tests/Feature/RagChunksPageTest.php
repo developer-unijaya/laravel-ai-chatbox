@@ -42,12 +42,14 @@ class RagChunksPageTest extends TestCase
         ?array $embedding = null,
         int $index = 0,
     ): RagChunk {
-        return RagChunk::create([
+        $chunk = RagChunk::create([
             'document_id' => $doc->id,
             'chunk_index' => $index,
             'content'     => $content,
             'embedding'   => $embedding,
         ]);
+        $doc->increment('chunk_count');
+        return $chunk;
     }
 
     private function chatResponse(string $content): Response
@@ -167,11 +169,11 @@ class RagChunksPageTest extends TestCase
             ->assertStatus(422);
     }
 
-    public function test_chat_returns_422_for_a_non_ready_document(): void
+    public function test_chat_returns_422_when_document_has_no_chunks(): void
     {
         $doc = RagDocument::create([
-            'title'             => 'Pending',
-            'original_filename' => 'pending.txt',
+            'title'             => 'Empty',
+            'original_filename' => 'empty.txt',
             'file_type'         => 'txt',
             'status'            => 'processing',
             'chunk_count'       => 0,
@@ -180,7 +182,29 @@ class RagChunksPageTest extends TestCase
         $this->withoutMiddleware()
             ->postJson("/ai-chatbox/rag/{$doc->id}/chat", ['message' => 'Hello'])
             ->assertStatus(422)
-            ->assertJson(['error' => 'Document is not ready for retrieval.']);
+            ->assertJson(['error' => 'Document has no chunks to retrieve from.']);
+    }
+
+    public function test_chat_works_for_failed_document_that_still_has_chunks(): void
+    {
+        // Embedding failed for all chunks → status='failed', but chunk_count>0.
+        // Keyword retrieval should still work.
+        $doc = RagDocument::create([
+            'title'             => 'Embed Failed',
+            'original_filename' => 'failed.txt',
+            'file_type'         => 'txt',
+            'status'            => 'failed',
+            'chunk_count'       => 1,
+            'error_message'     => 'Embedding failed for all 1 chunks.',
+        ]);
+        $this->addChunk($doc, 'Laravel supports multiple database drivers.', null);
+
+        $this->mockGuzzle([$this->chatResponse('Laravel supports SQLite, MySQL, and more.')]);
+
+        $this->withoutMiddleware()
+            ->postJson("/ai-chatbox/rag/{$doc->id}/chat", ['message' => 'database drivers'])
+            ->assertOk()
+            ->assertJsonPath('chunks_used', 1);
     }
 
     public function test_chat_returns_404_for_a_non_existent_document(): void
@@ -192,14 +216,14 @@ class RagChunksPageTest extends TestCase
 
     // ── POST /{id}/chat — no chunks / no context ──────────────────────────────
 
-    public function test_chat_returns_zero_chunks_used_when_document_has_no_chunks(): void
+    public function test_chat_returns_422_when_document_has_no_chunks_at_all(): void
     {
-        $doc = $this->makeReadyDocument(); // no chunks
+        $doc = $this->makeReadyDocument(); // chunk_count = 0, no chunk rows
 
         $this->withoutMiddleware()
             ->postJson("/ai-chatbox/rag/{$doc->id}/chat", ['message' => 'Hello'])
-            ->assertOk()
-            ->assertJson(['chunks_used' => 0]);
+            ->assertStatus(422)
+            ->assertJson(['error' => 'Document has no chunks to retrieve from.']);
     }
 
     public function test_chat_returns_no_context_reply_when_nothing_matches(): void

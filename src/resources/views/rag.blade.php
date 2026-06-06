@@ -43,10 +43,14 @@
     .badge-pending    { background: #fef9c3; color: #854d0e; }
     .badge-processing { background: #dbeafe; color: #1e40af; }
     .badge-failed     { background: #fee2e2; color: #991b1b; }
+    .badge-partial    { background: #ffedd5; color: #9a3412; }
+    .badge-keyword    { background: #f3f4f6; color: #374151; }
     .dark .badge-ready      { background: #14532d; color: #86efac; }
     .dark .badge-pending    { background: #713f12; color: #fde68a; }
     .dark .badge-processing { background: #1e3a5f; color: #93c5fd; }
     .dark .badge-failed     { background: #7f1d1d; color: #fca5a5; }
+    .dark .badge-partial    { background: #431407; color: #fdba74; }
+    .dark .badge-keyword    { background: #1f2937; color: #9ca3af; }
 
     /* Spinner */
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -215,8 +219,8 @@
                         <tr>
                             <th class="px-6 py-3 text-left">Title</th>
                             <th class="px-6 py-3 text-left">File</th>
-                            <th class="px-6 py-3 text-center">Status</th>
-                            <th class="px-6 py-3 text-center">Chunks</th>
+                            <th class="px-6 py-3 text-center">Chunking</th>
+                            <th class="px-6 py-3 text-center">Embedding</th>
                             <th class="px-6 py-3 text-left">Uploaded</th>
                             <th class="px-6 py-3 text-right">Actions</th>
                         </tr>
@@ -247,25 +251,56 @@
                                 </span>
                             </td>
 
+                            {{-- ── Chunking status ───────────────────────────── --}}
                             <td class="px-6 py-4 text-center">
-                                <span class="badge badge-{{ $doc->status }}" id="status-{{ $doc->id }}">
-                                    @if($doc->status === 'ready')
-                                        <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                                        Ready
-                                    @elseif($doc->status === 'processing')
+                                @if($doc->status === 'processing' || $doc->status === 'pending')
+                                    <span class="badge badge-processing" id="chunk-status-{{ $doc->id }}">
                                         <span class="spinner" style="width:0.65rem;height:0.65rem;border-width:1.5px"></span>
-                                        Processing
-                                    @elseif($doc->status === 'failed')
+                                        {{ $doc->status === 'processing' ? 'Processing' : 'Pending' }}
+                                    </span>
+                                @elseif($doc->chunk_count > 0)
+                                    <span class="badge badge-ready" id="chunk-status-{{ $doc->id }}">
+                                        <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                        {{ $doc->chunk_count }} {{ Str::plural('chunk', $doc->chunk_count) }}
+                                    </span>
+                                @elseif($doc->status === 'failed')
+                                    <span class="badge badge-failed" id="chunk-status-{{ $doc->id }}">
                                         <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
                                         Failed
-                                    @else
-                                        Pending
-                                    @endif
-                                </span>
+                                    </span>
+                                @else
+                                    <span class="text-gray-400 dark:text-gray-500" id="chunk-status-{{ $doc->id }}">—</span>
+                                @endif
                             </td>
 
-                            <td class="px-6 py-4 text-center text-gray-600 dark:text-gray-400 tabular-nums">
-                                {{ $doc->chunk_count ?: '—' }}
+                            {{-- ── Embedding status ──────────────────────────── --}}
+                            <td class="px-6 py-4 text-center">
+                                @if($doc->chunk_count === 0)
+                                    <span class="text-gray-400 dark:text-gray-500" id="embed-status-{{ $doc->id }}">—</span>
+                                @elseif($doc->status === 'processing')
+                                    <span class="badge badge-processing" id="embed-status-{{ $doc->id }}">
+                                        <span class="spinner" style="width:0.65rem;height:0.65rem;border-width:1.5px"></span>
+                                        Embedding…
+                                    </span>
+                                @elseif($keywordOnlyMode)
+                                    <span class="badge badge-keyword" id="embed-status-{{ $doc->id }}">
+                                        Keyword-only
+                                    </span>
+                                @elseif($doc->vector_count === $doc->chunk_count)
+                                    <span class="badge badge-ready" id="embed-status-{{ $doc->id }}">
+                                        <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                        {{ $doc->vector_count }} {{ Str::plural('vector', $doc->vector_count) }}
+                                    </span>
+                                @elseif($doc->vector_count > 0)
+                                    <span class="badge badge-partial" id="embed-status-{{ $doc->id }}">
+                                        {{ $doc->vector_count }} / {{ $doc->chunk_count }}
+                                    </span>
+                                @else
+                                    <span class="badge badge-failed" id="embed-status-{{ $doc->id }}">
+                                        <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                                        0 / {{ $doc->chunk_count }}
+                                    </span>
+                                @endif
                             </td>
 
                             <td class="px-6 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs">
@@ -274,7 +309,7 @@
 
                             <td class="px-6 py-4 text-right">
                                 <div class="flex items-center justify-end gap-2" id="actions-{{ $doc->id }}">
-                                    @if($doc->status === 'ready')
+                                    @if($doc->chunk_count > 0)
                                     <a href="{{ route('ai-chatbox.rag.chunks', $doc->id) }}" class="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors" style="color:var(--theme);background-color:color-mix(in srgb, var(--theme) 10%, transparent);" onmouseover="this.style.backgroundColor='color-mix(in srgb, var(--theme) 18%, transparent)'" onmouseout="this.style.backgroundColor='color-mix(in srgb, var(--theme) 10%, transparent)'">
                                         <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                                             <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
@@ -338,15 +373,17 @@
             var docTitle = form.dataset.docTitle;
             if (!confirm('Re-chunk and re-embed "' + docTitle + '"?')) { e.preventDefault(); return; }
 
-            var row   = document.getElementById('row-' + docId);
-            var badge = document.getElementById('status-' + docId);
-            var btn   = form.querySelector('button[type="submit"]');
+            var row         = document.getElementById('row-' + docId);
+            var chunkBadge  = document.getElementById('chunk-status-' + docId);
+            var embedBadge  = document.getElementById('embed-status-' + docId);
+            var btn         = form.querySelector('button[type="submit"]');
+            var spinner     = '<span class="spinner" style="width:0.65rem;height:0.65rem;border-width:1.5px"></span>';
 
             document.querySelectorAll('#actions-' + docId + ' button').forEach(function (b) { b.disabled = true; });
-            btn.innerHTML = '<span class="spinner" style="width:0.65rem;height:0.65rem;border-width:1.5px"></span> Reprocessing…';
+            btn.innerHTML = spinner + ' Reprocessing…';
             row.classList.add('row-processing');
-            badge.className = 'badge badge-processing';
-            badge.innerHTML = '<span class="spinner" style="width:0.65rem;height:0.65rem;border-width:1.5px"></span> Reprocessing';
+            if (chunkBadge)  { chunkBadge.className  = 'badge badge-processing'; chunkBadge.innerHTML  = spinner + ' Processing'; }
+            if (embedBadge)  { embedBadge.className   = 'badge badge-processing'; embedBadge.innerHTML  = spinner + ' Embedding…'; }
             overlayTitle.textContent = 'Reprocessing "' + docTitle + '"…';
             overlay.classList.add('visible');
         });

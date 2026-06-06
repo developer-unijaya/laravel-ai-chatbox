@@ -22,7 +22,10 @@ class RagController extends Controller
 
     public function index(): View
     {
-        $documents = RagDocument::withCount('chunks')->latest()->get();
+        $documents = RagDocument::withCount([
+            'chunks',
+            'chunks as vector_count' => fn($q) => $q->whereNotNull('embedding'),
+        ])->latest()->get();
         $cfg = $this->effectiveConfig();
 
         $embeddingUrl = $cfg['rag_embedding_url'] ?? '';
@@ -162,8 +165,8 @@ class RagController extends Controller
 
         $document = RagDocument::findOrFail($id);
 
-        if ($document->status !== 'ready') {
-            return response()->json(['error' => 'Document is not ready for retrieval.'], 422);
+        if ($document->chunk_count === 0) {
+            return response()->json(['error' => 'Document has no chunks to retrieve from.'], 422);
         }
 
         $cfg = $this->effectiveConfig();
