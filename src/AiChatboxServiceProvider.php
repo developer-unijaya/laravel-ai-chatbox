@@ -51,6 +51,8 @@ class AiChatboxServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->enforceConfigPublished();
+
         try {
             $providerToken = app(AiManager::class)->resolveConfig('default')['api_token'] ?? '';
         } catch (\InvalidArgumentException) {
@@ -73,6 +75,24 @@ class AiChatboxServiceProvider extends ServiceProvider
         $this->registerBladeDirective();
         $this->registerLivewireComponent();
         $this->registerCommands();
+    }
+
+    private function enforceConfigPublished(): void
+    {
+        if (file_exists(config_path('ai-chatbox.php'))) {
+            return;
+        }
+
+        // Let `vendor:publish` through so the user can publish for the first time.
+        if ($this->app->runningInConsole() && (($_SERVER['argv'][1] ?? '') === 'vendor:publish')) {
+            return;
+        }
+
+        throw new \RuntimeException(
+            "AI Chatbox config has not been published.\n\n"
+            . "Run the following command, then configure the file it creates:\n\n"
+            . "  php artisan vendor:publish --tag=ai-chatbox-config\n"
+        );
     }
 
     protected function registerRoutes(): void
