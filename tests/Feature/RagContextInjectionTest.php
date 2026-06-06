@@ -83,6 +83,169 @@ class RagContextInjectionTest extends TestCase
         $this->assertStringNotContainsString('NO_CONTEXT_GUARD', json_encode($messages));
     }
 
+    // ── Keyword fallback (no embedding URL) ──────────────────────────────────
+
+    public function test_keyword_fallback_injects_matching_chunk_when_embedding_unavailable(): void
+    {
+        config(['ai-chatbox.rag_enabled' => true, 'ai-chatbox.rag_keyword_fallback' => true]);
+
+        $doc = RagDocument::create([
+            'title' => 'Shipping Policy',
+            'original_filename' => 'shipping.txt',
+            'file_type' => 'txt',
+            'status' => 'ready',
+            'chunk_count' => 1,
+            'content' => 'Widgets ship within three business days.',
+        ]);
+
+        RagChunk::create([
+            'document_id' => $doc->id,
+            'chunk_index' => 0,
+            'content' => 'Widgets ship within three business days.',
+            'embedding' => null,
+        ]);
+
+        // No embedding URL → EmbeddingService returns null immediately → keyword fallback fires.
+        $messages = $this->builder->build(
+            'When do widgets ship?',
+            [],
+            $this->cfg(['rag_embedding_url' => '', 'api_token' => 'tok'])
+        );
+
+        $injected = $this->ragSystemMessage($messages);
+        $this->assertNotNull($injected);
+        $this->assertStringContainsString('Widgets ship within three business days.', $injected);
+        $this->assertStringNotContainsString('NO_CONTEXT_GUARD', $injected);
+    }
+
+    public function test_keyword_fallback_respects_top_k_limit(): void
+    {
+        config(['ai-chatbox.rag_enabled' => true, 'ai-chatbox.rag_keyword_fallback' => true, 'ai-chatbox.rag_top_k' => 2]);
+
+        $doc = RagDocument::create([
+            'title' => 'Policies',
+            'original_filename' => 'policies.txt',
+            'file_type' => 'txt',
+            'status' => 'ready',
+            'chunk_count' => 5,
+            'content' => 'policy content',
+        ]);
+
+        foreach (range(1, 5) as $i) {
+            RagChunk::create([
+                'document_id' => $doc->id,
+                'chunk_index' => $i - 1,
+                'content' => "Policy chunk {$i}: this policy applies.",
+                'embedding' => null,
+            ]);
+        }
+
+        $messages = $this->builder->build(
+            'policy',
+            [],
+            $this->cfg(['rag_embedding_url' => '', 'api_token' => 'tok'])
+        );
+
+        $injected = $this->ragSystemMessage($messages);
+        $this->assertNotNull($injected);
+        // With top_k=2, only 2 of the 5 matching chunks should be injected.
+        $this->assertSame(2, substr_count($injected, 'Policy chunk'));
+    }
+
+    public function test_keyword_fallback_ignores_words_shorter_than_3_chars(): void
+    {
+        config(['ai-chatbox.rag_enabled' => true, 'ai-chatbox.rag_keyword_fallback' => true]);
+
+        $doc = RagDocument::create([
+            'title' => 'Doc',
+            'original_filename' => 'doc.txt',
+            'file_type' => 'txt',
+            'status' => 'ready',
+            'chunk_count' => 1,
+            'content' => 'Unrelated content here.',
+        ]);
+
+        RagChunk::create([
+            'document_id' => $doc->id,
+            'chunk_index' => 0,
+            'content' => 'Unrelated content here.',
+            'embedding' => null,
+        ]);
+
+        // Query "is it ok" → all words are ≤2 chars → no match → guard injected.
+        $messages = $this->builder->build(
+            'is it ok',
+            [],
+            $this->cfg(['rag_embedding_url' => '', 'api_token' => 'tok'])
+        );
+
+        $injected = $this->ragSystemMessage($messages);
+        $this->assertStringContainsString('NO_CONTEXT_GUARD', $injected);
+    }
+
+    public function test_keyword_fallback_disabled_returns_guard_when_embedding_unavailable(): void
+    {
+        config(['ai-chatbox.rag_enabled' => true, 'ai-chatbox.rag_keyword_fallback' => false]);
+
+        $doc = RagDocument::create([
+            'title' => 'Doc',
+            'original_filename' => 'doc.txt',
+            'file_type' => 'txt',
+            'status' => 'ready',
+            'chunk_count' => 1,
+            'content' => 'Widgets ship within three business days.',
+        ]);
+
+        RagChunk::create([
+            'document_id' => $doc->id,
+            'chunk_index' => 0,
+            'content' => 'Widgets ship within three business days.',
+            'embedding' => null,
+        ]);
+
+        $messages = $this->builder->build(
+            'When do widgets ship?',
+            [],
+            $this->cfg(['rag_embedding_url' => '', 'api_token' => 'tok'])
+        );
+
+        $injected = $this->ragSystemMessage($messages);
+        // Fallback disabled → embedding null → guard injected, chunk NOT injected.
+        $this->assertStringContainsString('NO_CONTEXT_GUARD', $injected);
+        $this->assertStringNotContainsString('Widgets ship', $injected);
+    }
+
+    public function test_keyword_fallback_skips_non_ready_documents(): void
+    {
+        config(['ai-chatbox.rag_enabled' => true, 'ai-chatbox.rag_keyword_fallback' => true]);
+
+        $doc = RagDocument::create([
+            'title' => 'Pending Doc',
+            'original_filename' => 'pending.txt',
+            'file_type' => 'txt',
+            'status' => 'pending',
+            'chunk_count' => 1,
+            'content' => 'Widgets ship within three business days.',
+        ]);
+
+        RagChunk::create([
+            'document_id' => $doc->id,
+            'chunk_index' => 0,
+            'content' => 'Widgets ship within three business days.',
+            'embedding' => null,
+        ]);
+
+        $messages = $this->builder->build(
+            'When do widgets ship?',
+            [],
+            $this->cfg(['rag_embedding_url' => '', 'api_token' => 'tok'])
+        );
+
+        $injected = $this->ragSystemMessage($messages);
+        $this->assertStringContainsString('NO_CONTEXT_GUARD', $injected);
+        $this->assertStringNotContainsString('Widgets ship', $injected);
+    }
+
     // ── Match → strict context prompt ─────────────────────────────────────────
 
     public function test_context_prompt_is_injected_when_a_chunk_matches(): void

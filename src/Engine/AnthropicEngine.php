@@ -30,7 +30,7 @@ class AnthropicEngine extends OpenAiCompatibleEngine
             }
 
             $response = $client->post($apiUrl, [
-                'headers' => $this->anthropicHeaders($apiToken),
+                'headers' => $this->anthropicHeaders($apiToken, $options),
                 'json' => $payload,
             ]);
 
@@ -79,7 +79,7 @@ class AnthropicEngine extends OpenAiCompatibleEngine
             }
 
             $response = $client->post($apiUrl, [
-                'headers' => $this->anthropicHeaders($apiToken),
+                'headers' => $this->anthropicHeaders($apiToken, $options),
                 'json' => $payload,
                 'stream' => true,
             ]);
@@ -140,11 +140,11 @@ class AnthropicEngine extends OpenAiCompatibleEngine
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private function anthropicHeaders(string $apiToken): array
+    private function anthropicHeaders(string $apiToken, array $options = []): array
     {
         return [
             'x-api-key' => $apiToken,
-            'anthropic-version' => '2023-06-01',
+            'anthropic-version' => $options['anthropic_version'] ?? '2023-06-01',
             'Content-Type' => 'application/json',
             'Accept' => 'application/json',
         ];

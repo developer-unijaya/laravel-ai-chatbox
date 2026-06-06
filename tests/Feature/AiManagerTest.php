@@ -3,6 +3,8 @@ namespace SyafiqUnijaya\AiChatbox\Tests\Feature;
 
 use SyafiqUnijaya\AiChatbox\AiManager;
 use SyafiqUnijaya\AiChatbox\Engine\AiProvider;
+use SyafiqUnijaya\AiChatbox\Engine\AnthropicEngine;
+use SyafiqUnijaya\AiChatbox\Engine\OpenAiCompatibleEngine;
 use SyafiqUnijaya\AiChatbox\Tests\TestCase;
 
 class AiManagerTest extends TestCase
@@ -172,6 +174,49 @@ class AiManagerTest extends TestCase
 
         $this->assertSame('http://global.example.com/v1/embeddings', $config['rag_embedding_url']);
         $this->assertSame('global-embed', $config['rag_embedding_model']);
+    }
+
+    // ── resolveEngine ─────────────────────────────────────────────────────────
+
+    public function test_resolve_engine_returns_anthropic_engine_for_anthropic_url(): void
+    {
+        $manager = $this->app->make(AiManager::class);
+
+        $engine = $manager->resolveEngine(['api_url' => 'https://api.anthropic.com/v1/messages']);
+
+        $this->assertInstanceOf(AnthropicEngine::class, $engine);
+    }
+
+    public function test_resolve_engine_returns_anthropic_engine_for_any_anthropic_subdomain(): void
+    {
+        $manager = $this->app->make(AiManager::class);
+
+        $engine = $manager->resolveEngine(['api_url' => 'https://custom.anthropic.com/v1/messages']);
+
+        $this->assertInstanceOf(AnthropicEngine::class, $engine);
+    }
+
+    public function test_resolve_engine_returns_anthropic_engine_when_engine_key_is_set(): void
+    {
+        $manager = $this->app->make(AiManager::class);
+
+        // Proxy URL — would not match by URL alone; engine key forces AnthropicEngine
+        $engine = $manager->resolveEngine([
+            'api_url' => 'https://my-proxy.example.com/v1/messages',
+            'engine' => 'anthropic',
+        ]);
+
+        $this->assertInstanceOf(AnthropicEngine::class, $engine);
+    }
+
+    public function test_resolve_engine_returns_openai_engine_for_non_anthropic_url(): void
+    {
+        $manager = $this->app->make(AiManager::class);
+
+        $engine = $manager->resolveEngine(['api_url' => 'https://api.openai.com/v1/chat/completions']);
+
+        $this->assertInstanceOf(OpenAiCompatibleEngine::class, $engine);
+        $this->assertNotInstanceOf(AnthropicEngine::class, $engine);
     }
 
     // ── __call delegation ─────────────────────────────────────────────────────

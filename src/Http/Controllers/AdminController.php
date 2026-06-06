@@ -210,12 +210,15 @@ class AdminController extends Controller
         return [
             'AI API' => [
                 'active_provider' => $cfg['active_provider'] ?? 'default',
+                'engine' => $cfg['engine'] ?? null,
                 'api_url' => $cfg['api_url'] ?? null,
                 'api_token' => $cfg['api_token'] ?? null,
                 'api_model' => $cfg['api_model'] ?? null,
+                'anthropic_version' => $cfg['anthropic_version'] ?? null,
                 'timeout' => $cfg['timeout'] ?? null,
                 'rag_embedding_url' => $cfg['rag_embedding_url'] ?? null,
                 'rag_embedding_model' => $cfg['rag_embedding_model'] ?? null,
+                'rag_embedding_token' => $cfg['rag_embedding_token'] ?? null,
             ],
             'Response' => [
                 'language' => $cfg['language'] ?? null,
@@ -255,6 +258,7 @@ class AdminController extends Controller
             ],
             'RAG' => [
                 'rag_enabled' => $cfg['rag_enabled'] ?? null,
+                'rag_keyword_fallback' => $cfg['rag_keyword_fallback'] ?? null,
                 'rag_embedding_url' => $cfg['rag_embedding_url'] ?? null,
                 'rag_embedding_model' => $cfg['rag_embedding_model'] ?? null,
                 'rag_top_k' => $cfg['rag_top_k'] ?? null,
@@ -563,22 +567,32 @@ class AdminController extends Controller
 
     private function checkRag(array &$diagnostics, array $cfg, ?array $ragStats, bool $ragEnabled): void
     {
-        // Embedding config is always validated — needed for upload/reprocess even when RAG chat is off
         $embeddingUrl = $cfg['rag_embedding_url'] ?? '';
+        $keywordFallback = (bool) ($cfg['rag_keyword_fallback'] ?? config('ai-chatbox.rag_keyword_fallback', true));
+
         if (empty($embeddingUrl)) {
-            $diagnostics[] = ['level' => 'error', 'group' => 'RAG', 'message' =>
-                'rag_embedding_url is not set. Document upload and reprocessing will fail. Set AI_CHATBOX_EMBEDDING_URL (or the provider-specific variant, e.g. LMSTUDIO_EMBEDDING_URL).'];
+            if ($keywordFallback) {
+                $diagnostics[] = ['level' => 'info', 'group' => 'RAG', 'message' =>
+                    'rag_embedding_url is not set — running in keyword-only mode. Documents are stored and searched by keyword. '
+                    . 'Set a provider-specific embedding URL (e.g. LMSTUDIO_EMBEDDING_URL) to enable semantic vector search.'];
+            } else {
+                $diagnostics[] = ['level' => 'warning', 'group' => 'RAG', 'message' =>
+                    'rag_embedding_url is not set and rag_keyword_fallback is disabled. RAG will return no context on every request. '
+                    . 'Either set an embedding URL or enable AI_CHATBOX_RAG_KEYWORD_FALLBACK=true.'];
+            }
         } else {
             $embHost = parse_url($embeddingUrl, PHP_URL_HOST);
             if ($this->isLocalHost((string) $embHost) && ($cfg['ssrf_protection'] ?? true)) {
                 $diagnostics[] = ['level' => 'warning', 'group' => 'RAG', 'message' =>
                     "rag_embedding_url points to a local address ({$embHost}) but ssrf_protection is enabled — embedding requests will be blocked. Set AI_CHATBOX_SSRF_PROTECTION=false for local embedding services."];
             }
-        }
 
-        if (empty($cfg['rag_embedding_model'])) {
-            $diagnostics[] = ['level' => 'error', 'group' => 'RAG', 'message' =>
-                'rag_embedding_model is not set. Document upload and reprocessing will fail. Set AI_CHATBOX_EMBEDDING_MODEL (or the provider-specific variant, e.g. LMSTUDIO_EMBEDDING_MODEL).'];
+            // Embedding model is only required when an embedding URL is configured.
+            if (empty($cfg['rag_embedding_model'])) {
+                $diagnostics[] = ['level' => 'error', 'group' => 'RAG', 'message' =>
+                    'rag_embedding_url is set but rag_embedding_model is empty. Document upload and reprocessing will fail. '
+                    . 'Set the provider-specific model env var (e.g. LMSTUDIO_EMBEDDING_MODEL, OPENAI_EMBEDDING_MODEL).'];
+            }
         }
 
         if (!$ragEnabled) {
@@ -632,10 +646,18 @@ class AdminController extends Controller
 
         if (isset($ragStats['null_chunks']) && $ragStats['null_chunks'] > 0) {
             $pct = $ragStats['total_chunks'] > 0
-            ? round($ragStats['null_chunks'] / $ragStats['total_chunks'] * 100)
-            : 0;
-            $diagnostics[] = ['level' => 'warning', 'group' => 'RAG', 'message' =>
-                "{$ragStats['null_chunks']} chunk(s) ({$pct}%) have no stored embedding. The AI cannot see that content. Check your embedding URL and reprocess affected documents."];
+                ? round($ragStats['null_chunks'] / $ragStats['total_chunks'] * 100)
+                : 0;
+
+            if ($keywordFallback) {
+                $diagnostics[] = ['level' => 'info', 'group' => 'RAG', 'message' =>
+                    "{$ragStats['null_chunks']} chunk(s) ({$pct}%) have no stored embedding — keyword search is used as fallback for these chunks. "
+                    . 'To enable vector similarity search, set an embedding URL and reprocess the affected documents.'];
+            } else {
+                $diagnostics[] = ['level' => 'warning', 'group' => 'RAG', 'message' =>
+                    "{$ragStats['null_chunks']} chunk(s) ({$pct}%) have no stored embedding and rag_keyword_fallback is disabled — the AI cannot see that content. "
+                    . 'Check your embedding URL and reprocess affected documents, or enable AI_CHATBOX_RAG_KEYWORD_FALLBACK=true.'];
+            }
         }
 
         if (isset($ragStats['documents_failed']) && $ragStats['documents_failed'] > 0) {

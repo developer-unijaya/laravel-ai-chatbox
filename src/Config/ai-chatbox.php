@@ -332,6 +332,10 @@ return [
     'rag_chunk_size' => 500,
     'rag_chunk_overlap' => 50,
     'rag_similarity_threshold' => 0.2,
+    // When true (default), RAG falls back to a simple keyword search when the
+    // embedding service is unavailable or rag_embedding_url is not configured.
+    // Set to false to return no context instead of the keyword fallback.
+    'rag_keyword_fallback' => env('AI_CHATBOX_RAG_KEYWORD_FALLBACK', true),
     'rag_admin_middleware' => ['web', 'auth'],
     'admin_middleware' => null, // null = inherit rag_admin_middleware
 
@@ -476,11 +480,18 @@ return [
         ],
 
         'anthropic' => [
+            'engine' => 'anthropic', // required — selects AnthropicEngine regardless of api_url
             'api_url' => env('ANTH_URL', 'https://api.anthropic.com/v1/messages'),
             'api_token' => env('ANTH_API_KEY', ''),
             'api_model' => env('ANTH_MODEL', 'claude-sonnet-4-6'),
+            'anthropic_version' => env('ANTH_VERSION', '2023-06-01'),
+            // Anthropic does not offer a public embedding API.
+            // Point rag_embedding_url at an OpenAI-compatible embedding service
+            // (e.g. OpenAI, LM Studio, or Ollama /v1/embeddings) and supply its
+            // own token via rag_embedding_token when it differs from api_token.
             'rag_embedding_url' => env('ANTH_EMBEDDING_URL', ''),
             'rag_embedding_model' => env('ANTH_EMBEDDING_MODEL', ''),
+            'rag_embedding_token' => env('ANTH_EMBEDDING_TOKEN', ''),
         ],
     ],
 

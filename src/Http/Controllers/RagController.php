@@ -27,12 +27,20 @@ class RagController extends Controller
         $embeddingUrl = $cfg['rag_embedding_url'] ?? '';
         $embeddingModel = $cfg['rag_embedding_model'] ?? '';
 
+        $embeddingConfigured = !empty($embeddingUrl) && !empty($embeddingModel);
+        // URL absent → keyword-only mode: uploads work, no vectors generated.
+        // URL present but model absent → broken config: uploads disabled.
+        $keywordOnlyMode = empty($embeddingUrl);
+        $uploadEnabled   = $embeddingConfigured || $keywordOnlyMode;
+
         return view('ai-chatbox::rag', [
             'documents' => $documents,
             'ragEnabled' => (bool) ($cfg['rag_enabled'] ?? false),
             'embeddingUrl' => $embeddingUrl,
             'embeddingModel' => $embeddingModel,
-            'embeddingConfigured' => !empty($embeddingUrl) && !empty($embeddingModel),
+            'embeddingConfigured' => $embeddingConfigured,
+            'keywordOnlyMode' => $keywordOnlyMode,
+            'uploadEnabled' => $uploadEnabled,
             'themeColor' => config('ai-chatbox.theme_color', '#4f46e5'),
             'colorScheme' => config('ai-chatbox.color_scheme', 'auto'),
         ]);
@@ -133,13 +141,10 @@ class RagController extends Controller
         set_time_limit((int) config('ai-chatbox.rag_processing_timeout', 0));
 
         $cfg = $this->effectiveConfig();
+        $embeddingUrl = $cfg['rag_embedding_url'] ?? '';
+        $skipEmbedding = empty($embeddingUrl);
+
         $chunker = new DocumentChunker();
-        $embedSvc = new EmbeddingService(
-            $cfg['rag_embedding_url'] ?? null,
-            $cfg['rag_embedding_model'] ?? null,
-            $cfg['api_token'] ?? null,
-            (int) ($cfg['rag_embedding_timeout'] ?? 10),
-        );
         $chunkSize = (int) ($cfg['rag_chunk_size'] ?? 500);
         $overlap = (int) ($cfg['rag_chunk_overlap'] ?? 50);
 
@@ -150,18 +155,33 @@ class RagController extends Controller
 
         $count = 0;
         $embedFailed = 0;
+        $embedSvc = null;
+
+        if (!$skipEmbedding) {
+            $embeddingToken = ($cfg['rag_embedding_token'] ?? '') ?: ($cfg['api_token'] ?? null);
+            $embedSvc = new EmbeddingService(
+                $embeddingUrl,
+                $cfg['rag_embedding_model'] ?? null,
+                $embeddingToken,
+                (int) ($cfg['rag_embedding_timeout'] ?? 10),
+            );
+        }
 
         foreach ($textChunks as $i => $chunkText) {
-            $embedding = $embedSvc->embed($chunkText);
+            $embedding = null;
 
-            if ($embedding === null) {
-                $embedFailed++;
-                \Illuminate\Support\Facades\Log::warning('AI Chatbox RAG: Chunk embedding failed — chunk will be stored without a vector and skipped during retrieval.', [
-                    'document_id' => $document->id,
-                    'chunk_index' => $i,
-                    'embedding_url' => $cfg['rag_embedding_url'] ?? '',
-                    'embedding_model' => $cfg['rag_embedding_model'] ?? '',
-                ]);
+            if (!$skipEmbedding) {
+                $embedding = $embedSvc->embed($chunkText);
+
+                if ($embedding === null) {
+                    $embedFailed++;
+                    \Illuminate\Support\Facades\Log::warning('AI Chatbox RAG: Chunk embedding failed — chunk stored without a vector.', [
+                        'document_id' => $document->id,
+                        'chunk_index' => $i,
+                        'embedding_url' => $embeddingUrl,
+                        'embedding_model' => $cfg['rag_embedding_model'] ?? '',
+                    ]);
+                }
             }
 
             RagChunk::create([
@@ -173,26 +193,36 @@ class RagController extends Controller
             $count++;
         }
 
+        // No embedding URL configured — stored for keyword-only retrieval.
+        if ($skipEmbedding) {
+            $document->update([
+                'status' => 'ready',
+                'chunk_count' => $count,
+                'error_message' => null,
+            ]);
+            return;
+        }
+
         if ($embedFailed === $count) {
-            // Every embedding failed — document is unusable for retrieval
+            // Embedding URL was set but every call failed — document is unusable for vector retrieval.
             $document->update([
                 'status' => 'failed',
                 'chunk_count' => $count,
                 'error_message' => "Embedding failed for all {$count} chunks. Check embedding URL ("
-                . ($cfg['rag_embedding_url'] ?? '') . ') and embedding model ('
+                . $embeddingUrl . ') and embedding model ('
                 . ($cfg['rag_embedding_model'] ?? '') . ').',
             ]);
             \Illuminate\Support\Facades\Log::error('AI Chatbox RAG: All chunk embeddings failed — document marked as failed.', [
                 'document_id' => $document->id,
                 'title' => $document->title,
-                'embedding_url' => $cfg['rag_embedding_url'] ?? '',
+                'embedding_url' => $embeddingUrl,
             ]);
             return;
         }
 
         $errorMessage = $embedFailed > 0
-        ? "{$embedFailed} of {$count} chunks failed to embed and will be skipped during retrieval."
-        : null;
+            ? "{$embedFailed} of {$count} chunks failed to embed and will be skipped during vector retrieval."
+            : null;
 
         $document->update([
             'status' => 'ready',

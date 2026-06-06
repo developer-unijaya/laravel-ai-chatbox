@@ -139,7 +139,7 @@ class AdminDiagnosticsTest extends TestCase
             ->assertSee('rag_embedding_url is not set');
     }
 
-    public function test_embedding_model_error_shown_even_when_rag_disabled(): void
+    public function test_embedding_model_error_shown_when_url_is_set_but_model_is_missing(): void
     {
         $this->app['config']->set('ai-chatbox.rag_enabled', false);
         $this->app['config']->set('ai-chatbox.rag_embedding_url', 'http://embed.example.com/v1/embeddings');
@@ -147,7 +147,30 @@ class AdminDiagnosticsTest extends TestCase
 
         $this->get('/ai-chatbox/admin')
             ->assertOk()
-            ->assertSee('rag_embedding_model is not set');
+            ->assertSee('rag_embedding_url is set but rag_embedding_model is empty');
+    }
+
+    public function test_no_embedding_model_error_when_url_is_also_missing(): void
+    {
+        // No URL → keyword-only mode → model error is irrelevant, should not appear.
+        $this->app['config']->set('ai-chatbox.rag_enabled', false);
+        $this->app['config']->set('ai-chatbox.rag_embedding_url', '');
+        $this->app['config']->set('ai-chatbox.rag_embedding_model', '');
+
+        $this->get('/ai-chatbox/admin')
+            ->assertOk()
+            ->assertDontSee('rag_embedding_url is set but rag_embedding_model is empty');
+    }
+
+    public function test_keyword_only_mode_shows_info_not_error_when_url_missing(): void
+    {
+        $this->app['config']->set('ai-chatbox.rag_enabled', false);
+        $this->app['config']->set('ai-chatbox.rag_embedding_url', '');
+        $this->app['config']->set('ai-chatbox.rag_keyword_fallback', true);
+
+        $this->get('/ai-chatbox/admin')
+            ->assertOk()
+            ->assertSee('keyword-only mode');
     }
 
     public function test_no_embedding_error_when_url_and_model_are_set(): void

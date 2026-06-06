@@ -30,6 +30,13 @@ class RagRetriever
         $queryEmbedding = $this->embedder->embed($query);
 
         if ($queryEmbedding === null) {
+            if (config('ai-chatbox.rag_keyword_fallback', true)) {
+                Log::info('AI Chatbox RAG: embedding unavailable — falling back to keyword search.', [
+                    'embedding_url' => $this->embedder->resolvedUrl(),
+                ]);
+                return $this->keywordSearch($query, $topK);
+            }
+
             Log::warning('AI Chatbox RAG: Query embedding failed — RAG context will not be injected for this message.', [
                 'embedding_url' => $this->embedder->resolvedUrl(),
                 'embedding_model' => $this->embedder->resolvedModel(),
@@ -99,6 +106,37 @@ class RagRetriever
         usort($scored, fn($a, $b) => $b['score'] <=> $a['score']);
 
         return array_column(array_slice($scored, 0, $topK), 'content');
+    }
+
+    /**
+     * Simple keyword fallback used when the embedding service is unavailable.
+     *
+     * Splits the query into words (3+ characters), returns chunks from ready
+     * documents whose content contains any of those words. No threshold is
+     * applied — any match is included up to $topK results.
+     *
+     * @return string[]
+     */
+    private function keywordSearch(string $query, int $topK): array
+    {
+        $words = array_values(array_unique(array_filter(
+            preg_split('/\s+/', $query),
+            fn($w) => mb_strlen($w) >= 3
+        )));
+
+        if (empty($words)) {
+            return [];
+        }
+
+        return RagChunk::whereHas('document', fn($q) => $q->where('status', 'ready'))
+            ->where(function ($q) use ($words) {
+                foreach ($words as $word) {
+                    $q->orWhere('content', 'like', '%' . $word . '%');
+                }
+            })
+            ->limit($topK)
+            ->pluck('content')
+            ->toArray();
     }
 
     /**

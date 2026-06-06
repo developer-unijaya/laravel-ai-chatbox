@@ -78,10 +78,11 @@ class PromptBuilder
         }
 
         try {
+            $embeddingToken = ($cfg['rag_embedding_token'] ?? '') ?: ($cfg['api_token'] ?? null);
             $retriever = new RagRetriever(new EmbeddingService(
                 $cfg['rag_embedding_url'] ?? null,
                 $cfg['rag_embedding_model'] ?? null,
-                $cfg['api_token'] ?? null,
+                $embeddingToken,
                 (int) ($cfg['rag_embedding_timeout'] ?? 10),
             ));
             $chunks = $retriever->retrieve($query);

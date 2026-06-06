@@ -81,8 +81,16 @@
         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-4 max-w-xs w-full mx-4 text-center">
             <div class="spinner spinner-lg" style="color:var(--theme)"></div>
             <div>
-                <p id="overlay-title" class="font-semibold text-gray-800 dark:text-gray-100 text-base">Uploading &amp; Indexing…</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Chunking and embedding document.<br>This may take a moment for large files.</p>
+                <p id="overlay-title" class="font-semibold text-gray-800 dark:text-gray-100 text-base">
+                    @if($keywordOnlyMode) Saving &amp; Chunking… @else Uploading &amp; Indexing… @endif
+                </p>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    @if($keywordOnlyMode)
+                        Chunking document and saving to database.<br>Keyword search will be available immediately.
+                    @else
+                        Chunking and embedding document.<br>This may take a moment for large files.
+                    @endif
+                </p>
             </div>
             <div class="progress-bar w-full"><div class="progress-bar-inner"></div></div>
             <p class="text-xs text-gray-400 dark:text-gray-500">Please don't close this tab.</p>
@@ -109,28 +117,43 @@
     @endif
 
     {{-- ── Embedding config warning ─────────────────────────────────────────── --}}
-    @if(!$embeddingConfigured)
+    @if($keywordOnlyMode)
+    {{-- No embedding URL → keyword-only mode. Upload is still allowed. --}}
+    <div class="mb-6 flex items-start gap-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-5 py-4 text-sm text-amber-800 dark:text-amber-300">
+        <svg class="mt-0.5 h-5 w-5 shrink-0 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+        </svg>
+        <div>
+            <p class="font-semibold">No embedding URL — keyword search mode</p>
+            <p class="mt-1 text-amber-700 dark:text-amber-400">
+                <code class="bg-amber-100 dark:bg-amber-900/50 px-1 rounded">rag_embedding_url</code> is not set.
+                Files can still be uploaded and chunked — text is saved to the database and retrieved by keyword matching.
+                Vector (semantic) search is disabled until you configure a provider-specific embedding URL
+                (e.g. <code class="bg-amber-100 dark:bg-amber-900/50 px-1 rounded">LMSTUDIO_EMBEDDING_URL</code> +
+                <code class="bg-amber-100 dark:bg-amber-900/50 px-1 rounded">LMSTUDIO_EMBEDDING_MODEL</code>).
+            </p>
+        </div>
+    </div>
+    @elseif(!$embeddingConfigured)
+    {{-- URL is set but model is missing → broken config, uploads disabled. --}}
     <div class="mb-6 flex items-start gap-3 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-5 py-4 text-sm text-red-800 dark:text-red-300">
         <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-500" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
         </svg>
         <div>
-            <p class="font-semibold">Embedding not configured — upload and reprocess are disabled</p>
+            <p class="font-semibold">Embedding misconfigured — upload and reprocess are disabled</p>
             <p class="mt-1 text-red-700 dark:text-red-400">
-                @if(empty($embeddingUrl))
-                    <code class="bg-red-100 dark:bg-red-900/50 px-1 rounded">rag_embedding_url</code> is not set.
-                @endif
-                @if(empty($embeddingModel))
-                    <code class="bg-red-100 dark:bg-red-900/50 px-1 rounded">rag_embedding_model</code> is not set.
-                @endif
-                Set the provider-specific env var (e.g. <code class="bg-red-100 dark:bg-red-900/50 px-1 rounded">LMSTUDIO_EMBEDDING_URL</code> + <code class="bg-red-100 dark:bg-red-900/50 px-1 rounded">LMSTUDIO_EMBEDDING_MODEL</code>) or the global <code class="bg-red-100 dark:bg-red-900/50 px-1 rounded">AI_CHATBOX_EMBEDDING_URL</code> + <code class="bg-red-100 dark:bg-red-900/50 px-1 rounded">AI_CHATBOX_EMBEDDING_MODEL</code>.
+                <code class="bg-red-100 dark:bg-red-900/50 px-1 rounded">rag_embedding_url</code> is set but
+                <code class="bg-red-100 dark:bg-red-900/50 px-1 rounded">rag_embedding_model</code> is missing.
+                Set the model env var (e.g. <code class="bg-red-100 dark:bg-red-900/50 px-1 rounded">LMSTUDIO_EMBEDDING_MODEL</code>)
+                or remove the URL to fall back to keyword-only mode.
             </p>
         </div>
     </div>
     @endif
 
     {{-- ── Upload form ──────────────────────────────────────────────────────── --}}
-    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm mb-6 {{ !$embeddingConfigured ? 'opacity-60' : '' }}">
+    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm mb-6 {{ !$uploadEnabled ? 'opacity-60' : '' }}">
         <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
             <h2 class="text-sm font-semibold text-gray-800 dark:text-gray-200 uppercase tracking-wide">Upload Document</h2>
         </div>
@@ -141,24 +164,30 @@
                     <label for="rag-file" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                         File <span class="text-red-500">*</span>
                     </label>
-                    <input id="rag-file" name="file" type="file" accept=".md,.txt" required {{ !$embeddingConfigured ? 'disabled' : '' }} class="file-btn block w-full text-sm text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-1.5 {{ !$embeddingConfigured ? 'cursor-not-allowed' : 'cursor-pointer' }} focus-theme">
+                    <input id="rag-file" name="file" type="file" accept=".md,.txt" required {{ !$uploadEnabled ? 'disabled' : '' }} class="file-btn block w-full text-sm text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-1.5 {{ !$uploadEnabled ? 'cursor-not-allowed' : 'cursor-pointer' }} focus-theme">
                     <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">Accepted: .md, .txt &mdash; Max 10 MB</p>
                 </div>
                 <div>
                     <label for="rag-title" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                         Display Title <span class="text-gray-400 font-normal text-xs">(optional)</span>
                     </label>
-                    <input id="rag-title" name="title" type="text" placeholder="Leave blank to use filename" value="{{ old('title') }}" {{ !$embeddingConfigured ? 'disabled' : '' }} class="focus-theme block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 px-3 py-2 text-sm">
+                    <input id="rag-title" name="title" type="text" placeholder="Leave blank to use filename" value="{{ old('title') }}" {{ !$uploadEnabled ? 'disabled' : '' }} class="focus-theme block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 px-3 py-2 text-sm">
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <button id="upload-btn" type="submit" class="btn-primary" {{ !$embeddingConfigured ? 'disabled' : '' }}>
+                <button id="upload-btn" type="submit" class="btn-primary" {{ !$uploadEnabled ? 'disabled' : '' }}>
                     <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
                     </svg>
-                    Upload &amp; Index
+                    @if($keywordOnlyMode) Save &amp; Chunk @else Upload &amp; Index @endif
                 </button>
-                <p class="text-xs text-gray-400 dark:text-gray-500">File is chunked and embedded immediately. Large documents may take a minute.</p>
+                <p class="text-xs text-gray-400 dark:text-gray-500">
+                    @if($keywordOnlyMode)
+                        File is chunked and saved for keyword search. Configure an embedding URL to enable semantic search.
+                    @else
+                        File is chunked and embedded immediately. Large documents may take a minute.
+                    @endif
+                </p>
             </div>
         </form>
     </div>
@@ -247,7 +276,7 @@
                                 <div class="flex items-center justify-end gap-2" id="actions-{{ $doc->id }}">
                                     <form action="{{ route('ai-chatbox.rag.reprocess', $doc->id) }}" method="POST" class="reprocess-form" data-doc-id="{{ $doc->id }}" data-doc-title="{{ $doc->title }}">
                                         @csrf
-                                        <button type="submit" class="btn-reprocess" {{ !$embeddingConfigured ? 'disabled title="Configure embedding URL and model first"' : '' }}>
+                                        <button type="submit" class="btn-reprocess" {{ !$uploadEnabled ? 'disabled title="Configure embedding model first"' : '' }}>
                                             <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                                                 <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
                                             </svg>

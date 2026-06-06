@@ -268,6 +268,7 @@ Then edit `config/ai-chatbox.php` directly.
 |---|---|---|---|
 | `rag_enabled` | `AI_CHATBOX_RAG` | `false` | Master switch — enable RAG context injection |
 | `rag_embedding_timeout` | `AI_CHATBOX_EMBEDDING_TIMEOUT` | `10` | Timeout in seconds for every embedding HTTP request — applies to all providers |
+| `rag_keyword_fallback` | `AI_CHATBOX_RAG_KEYWORD_FALLBACK` | `true` | When the embedding URL is absent or the embedding call fails, fall back to SQL keyword search instead of injecting the no-context guard. Words shorter than 3 characters are ignored. Set `false` to disable |
 | `rag_top_k` | - | `3` | Number of chunks retrieved per query |
 | `rag_chunk_size` | - | `500` | Target chunk size in tokens (~4 chars/token) |
 | `rag_chunk_overlap` | - | `50` | Overlap between consecutive chunks in tokens |
@@ -276,7 +277,7 @@ Then edit `config/ai-chatbox.php` directly.
 | `rag_no_context_prompt` | - | *(see below)* | Grounding guard injected when RAG is on but **no** chunk matches — keeps the model from answering off-context. Empty string disables it |
 | `rag_processing_timeout` | `AI_CHATBOX_RAG_PROCESSING_TIMEOUT` | `0` | Max seconds for a single upload or reprocess — `0` = no limit |
 
-> `rag_embedding_url` and `rag_embedding_model` are per-provider settings defined inside the `providers` block and resolved through the active named provider. See [AI Providers](#ai-providers).
+> `rag_embedding_url`, `rag_embedding_model`, and `rag_embedding_token` are per-provider settings defined inside the `providers` block and resolved through the active named provider. See [AI Providers](#ai-providers).
 
 ---
 
@@ -313,29 +314,34 @@ Named providers are defined under the `providers` key in `config/ai-chatbox.php`
         'rag_embedding_model' => env('LMSTUDIO_EMBEDDING_MODEL', 'text-embedding-nomic-embed-text-v1.5'),
     ],
     'anthropic' => [
+        'engine'              => 'anthropic',                    // explicit engine selection
         'api_url'             => env('ANTH_URL',                 'https://api.anthropic.com/v1/messages'),
-        'api_token'           => env('ANTH_API_KEY',            ''),
+        'api_token'           => env('ANTH_API_KEY',             ''),
         'api_model'           => env('ANTH_MODEL',               'claude-sonnet-4-6'),
+        'anthropic_version'   => env('ANTH_VERSION',             '2023-06-01'),
         'rag_embedding_url'   => env('ANTH_EMBEDDING_URL',       ''),
         'rag_embedding_model' => env('ANTH_EMBEDDING_MODEL',     ''),
+        'rag_embedding_token' => env('ANTH_EMBEDDING_TOKEN',     ''), // separate token for the embedding service
     ],
 ],
 ```
 
 > `groq` and other providers are not in the default config — add them as custom entries after publishing (see [OpenRouter example](#openrouter-custom-provider) below for the pattern).
 
-> **Anthropic is not OpenAI-compatible.** When a provider's `api_url` contains `api.anthropic.com`, the package automatically uses the dedicated `AnthropicEngine` (native Messages API) instead of the OpenAI-compatible engine — no extra configuration is needed. Anthropic has no embeddings endpoint, so leave `ANTH_EMBEDDING_*` empty and use a different provider for RAG embeddings if needed.
+> **Anthropic is not OpenAI-compatible.** The package selects `AnthropicEngine` when a provider has `engine: 'anthropic'` **or** its `api_url` contains `anthropic.com` — no manual binding required. Anthropic has no embeddings endpoint; set `ANTH_EMBEDDING_URL` and `ANTH_EMBEDDING_TOKEN` to point at a separate OpenAI-compatible embeddings service (Ollama, LM Studio, OpenAI), or leave them empty to use keyword-only RAG retrieval.
 
 **Env var reference per provider:**
 
-| Provider | URL | Token | Model | Embedding URL | Embedding model |
-|---|---|---|---|---|---|
-| `ollama` | `OLLAMA_URL` | `OLLAMA_TOKEN` | `OLLAMA_MODEL` | `OLLAMA_EMBEDDING_URL` | `OLLAMA_EMBEDDING_MODEL` |
-| `openai` | `OPENAI_URL` | `OPENAI_API_KEY` | `OPENAI_MODEL` | `OPENAI_EMBEDDING_URL` | `OPENAI_EMBEDDING_MODEL` |
-| `lmstudio` | `LMSTUDIO_URL` | `LMSTUDIO_TOKEN` | `LMSTUDIO_MODEL` | `LMSTUDIO_EMBEDDING_URL` | `LMSTUDIO_EMBEDDING_MODEL` |
-| `anthropic` | `ANTH_URL` | `ANTH_API_KEY` | `ANTH_MODEL` | `ANTH_EMBEDDING_URL` | `ANTH_EMBEDDING_MODEL` |
+| Provider | URL | Token | Model | Embedding URL | Embedding model | Embedding token |
+|---|---|---|---|---|---|---|
+| `ollama` | `OLLAMA_URL` | `OLLAMA_TOKEN` | `OLLAMA_MODEL` | `OLLAMA_EMBEDDING_URL` | `OLLAMA_EMBEDDING_MODEL` | — |
+| `openai` | `OPENAI_URL` | `OPENAI_API_KEY` | `OPENAI_MODEL` | `OPENAI_EMBEDDING_URL` | `OPENAI_EMBEDDING_MODEL` | — |
+| `lmstudio` | `LMSTUDIO_URL` | `LMSTUDIO_TOKEN` | `LMSTUDIO_MODEL` | `LMSTUDIO_EMBEDDING_URL` | `LMSTUDIO_EMBEDDING_MODEL` | — |
+| `anthropic` | `ANTH_URL` | `ANTH_API_KEY` | `ANTH_MODEL` | `ANTH_EMBEDDING_URL` | `ANTH_EMBEDDING_MODEL` | `ANTH_EMBEDDING_TOKEN` |
 
 > `rag_embedding_timeout` (`AI_CHATBOX_EMBEDDING_TIMEOUT`) is a universal setting — it applies to all providers and is not overridable per provider. Configure it once in the RAG section.
+
+> **`rag_embedding_token`** — only needed when the embedding service uses a different API key than the chat provider. Useful for Anthropic users who point `ANTH_EMBEDDING_URL` at OpenAI or another separate service.
 
 > The chatbox widget and the `AI` facade both resolve through the same named provider. `AI_CHATBOX_ACTIVE_PROVIDER` controls which provider is active for both.
 
@@ -373,16 +379,29 @@ OPENAI_MODEL=gpt-4o
 
 #### Anthropic (Claude)
 
-Anthropic uses its own Messages API, not the OpenAI-compatible format. The package detects `api.anthropic.com` in the URL and switches to the native `AnthropicEngine` automatically — chat and streaming both work out of the box.
+Anthropic uses its own Messages API, not the OpenAI-compatible format. The package detects `anthropic.com` in the URL (or the explicit `engine: 'anthropic'` key) and switches to the native `AnthropicEngine` automatically — chat and streaming both work out of the box.
 
 ```env
 AI_CHATBOX_ACTIVE_PROVIDER=anthropic
 ANTH_URL=https://api.anthropic.com/v1/messages
 ANTH_API_KEY=sk-ant-...
 ANTH_MODEL=claude-sonnet-4-6
+# Optional: pin the API version header (default 2023-06-01)
+ANTH_VERSION=2023-06-01
 ```
 
-> Anthropic does not expose an embeddings endpoint, so RAG embeddings must come from a different provider. Set `AI_CHATBOX_ACTIVE_PROVIDER=anthropic` for chat and configure embeddings separately if you use RAG.
+Anthropic does not expose an embeddings endpoint. RAG still works in **keyword-only mode** (no extra configuration needed). To enable vector/semantic search, point the embedding vars at a compatible service and provide its token separately:
+
+```env
+# RAG via a separate OpenAI-compatible embedding service
+ANTH_EMBEDDING_URL=https://api.openai.com/v1/embeddings
+ANTH_EMBEDDING_MODEL=text-embedding-3-small
+ANTH_EMBEDDING_TOKEN=sk-openai-key-here
+```
+
+Or use a local model (Ollama, LM Studio) — just set `ANTH_EMBEDDING_TOKEN` to whatever token that service expects (or leave it empty for Ollama).
+
+> When `ANTH_EMBEDDING_URL` is empty, the chatbox falls back to keyword search automatically (controlled by `AI_CHATBOX_RAG_KEYWORD_FALLBACK`). Documents can be uploaded and searched by keyword without any embedding service configured.
 
 #### Groq (custom provider)
 
@@ -879,16 +898,24 @@ Every subsequent chat message will automatically retrieve and inject relevant co
 
 RAG uses a **separate embedding API** — distinct from the chat API. Any provider with an `/embeddings` endpoint works.
 
-Embedding settings are configured **per named provider** via `rag_embedding_url`, `rag_embedding_model`, and `rag_embedding_timeout`. They are resolved through the active provider — there are no global embedding env vars.
+Embedding settings are configured **per named provider** via `rag_embedding_url`, `rag_embedding_model`, and optionally `rag_embedding_token`. They are resolved through the active provider.
 
-| Provider | Env var | Example value |
+> **No embedding URL?** RAG still works. When `rag_embedding_url` is not set, the package falls back to keyword search automatically (see [`rag_keyword_fallback`](#rag) in the config reference). You can upload documents and retrieve relevant chunks by keyword matching — no embedding service required.
+
+| Provider | URL env var | Model env var | Token env var |
+|---|---|---|---|
+| Ollama | `OLLAMA_EMBEDDING_URL` | `OLLAMA_EMBEDDING_MODEL` | — |
+| LM Studio | `LMSTUDIO_EMBEDDING_URL` | `LMSTUDIO_EMBEDDING_MODEL` | — |
+| OpenAI | `OPENAI_EMBEDDING_URL` | `OPENAI_EMBEDDING_MODEL` | — |
+| Anthropic (via OpenAI) | `ANTH_EMBEDDING_URL` | `ANTH_EMBEDDING_MODEL` | `ANTH_EMBEDDING_TOKEN` |
+
+| Provider | Example URL | Example model |
 |---|---|---|
-| Ollama | `OLLAMA_EMBEDDING_URL` | `http://localhost:11434/v1/embeddings` |
-| Ollama | `OLLAMA_EMBEDDING_MODEL` | `nomic-embed-text` or `mxbai-embed-large` |
-| LM Studio | `LMSTUDIO_EMBEDDING_URL` | `http://127.0.0.1:1234/v1/embeddings` |
-| LM Studio | `LMSTUDIO_EMBEDDING_MODEL` | your loaded embedding model name |
-| OpenAI | `OPENAI_EMBEDDING_URL` | `https://api.openai.com/v1/embeddings` |
-| OpenAI | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` or `text-embedding-3-large` |
+| Ollama | `http://localhost:11434/v1/embeddings` | `nomic-embed-text`, `mxbai-embed-large` |
+| LM Studio | `http://127.0.0.1:1234/v1/embeddings` | your loaded embedding model name |
+| OpenAI | `https://api.openai.com/v1/embeddings` | `text-embedding-3-small`, `text-embedding-3-large` |
+
+> **`rag_embedding_token`** — only set this when the embedding service requires a different API key from the chat provider (e.g. Anthropic chat + OpenAI embeddings). For Ollama/LM Studio this can be left empty.
 
 > **Ollama:** Pull the embedding model first:
 > ```bash
@@ -929,12 +956,14 @@ The chunker:
 
 On every chat message:
 
-1. The user's message is embedded using the same embedding model
-2. Cosine similarity is computed **in PHP** against every stored chunk
-3. Chunks below `rag_similarity_threshold` (default `0.2`) are discarded
+1. The user's message is embedded using the configured embedding model — **or**, when no embedding URL is set, the package skips embedding and goes straight to step 3
+2. Cosine similarity is computed **in PHP** against every stored chunk; chunks below `rag_similarity_threshold` (default `0.2`) are discarded
+3. **Keyword fallback** (when `rag_keyword_fallback` is `true`, which is the default) — if embedding returned no results (no URL configured, or the embedding call failed), the user's message is split into words ≥ 3 characters and a SQL `LIKE` search is run across all chunks from `ready` documents
 4. The top `rag_top_k` (default `3`) chunks are injected as a system message using `rag_context_prompt`, replacing the `{chunks}` placeholder
 
 The default prompt instructs the model to answer **only** from the retrieved chunks and say "I don't have that information in my knowledge base" if the answer is not found there. Edit `rag_context_prompt` in the published config to customise it (use `{chunks}` as the placeholder for the retrieved text).
+
+**Keyword-only mode** — if neither vector nor keyword search finds any results, `rag_no_context_prompt` is injected instead (see [Grounding when nothing matches](#grounding-when-nothing-matches) below). Keyword retrieval is less precise than vector search but requires no embedding service and works immediately after upload.
 
 #### Grounding when nothing matches
 
@@ -962,11 +991,19 @@ Visit **`/ai-chatbox/rag`** (authenticated users only).
 
 | Action | Description |
 |---|---|
-| **Upload** | Select a `.md` or `.txt` file, optionally set a title, click *Upload & Index* |
+| **Upload** | Select a `.md` or `.txt` file, optionally set a title, click *Upload & Index* (or *Save & Chunk* in keyword-only mode) |
 | **Reprocess** | Re-chunk and re-embed an existing document after changing chunk or embedding settings |
 | **Delete** | Remove the document and all its chunks permanently (confirmation required) |
 
 Each document shows its status (`Pending` → `Processing` → `Ready` / `Failed`), chunk count, and expandable error details on failure.
+
+**Banners:**
+
+| Condition | Banner |
+|---|---|
+| Embedding URL and model are both set | No banner — full vector search mode |
+| Embedding URL is **not** set | Amber warning — keyword-only mode; uploads are still enabled |
+| Embedding URL is set but model is **missing** | Red error — misconfigured; uploads are disabled until corrected |
 
 ---
 
@@ -1336,7 +1373,7 @@ If the widget shows an offline toast or requests fail, check `storage/logs/larav
 composer test
 ```
 
-The test suite covers: controller responses, error classification, session history, conversation thread isolation, token-based context trimming, SSE streaming, RAG document upload/delete/reprocess, RAG context injection, CORS middleware, SSRF protection, health check logic, `AiManager` named provider resolution, `AiProvider` fluent modifiers and immutability, the `AI` facade, and the `ai-chatbox:prune-conversations` command (pre-flight checks, deletion, boundary conditions, cascade, `--dry-run`, `--force`, config key precedence) — using PHPUnit 11 and Orchestra Testbench.
+The test suite covers: controller responses, error classification, session history, conversation thread isolation, token-based context trimming, SSE streaming, RAG document upload/delete/reprocess, RAG context injection (vector and keyword fallback), CORS middleware, SSRF protection, health check logic, `AiManager` named provider resolution and engine selection, `AiProvider` fluent modifiers and immutability, the `AI` facade, the `AnthropicEngine` (complete/stream/headers/system message extraction), admin diagnostics (all config groups, keyword-only mode notices), and the `ai-chatbox:prune-conversations` command (pre-flight checks, deletion, boundary conditions, cascade, `--dry-run`, `--force`, config key precedence) — using PHPUnit 11 and Orchestra Testbench.
 
 ---
 
@@ -1382,8 +1419,9 @@ AI_CHATBOX_MEMORY_DRIVER=session  # session | database
 # Embedding URL and model are per-provider — set them in the provider block below.
 # Tuning values (top_k, chunk_size, etc.) are set in the published config file.
 AI_CHATBOX_RAG=false
-AI_CHATBOX_EMBEDDING_TIMEOUT=10      # universal — applies to all providers
+AI_CHATBOX_EMBEDDING_TIMEOUT=10       # universal — applies to all providers
 AI_CHATBOX_RAG_PROCESSING_TIMEOUT=0  # 0 = no limit
+AI_CHATBOX_RAG_KEYWORD_FALLBACK=true  # keyword search when embedding URL is absent
 
 # ── Named Provider Credentials ────────────────────────────────────────────────
 # The chatbox widget and AI facade both resolve through these env vars.
@@ -1410,13 +1448,16 @@ OPENAI_MODEL=gpt-4o
 OPENAI_EMBEDDING_URL=https://api.openai.com/v1/embeddings
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 
-# Anthropic (Claude) — native Messages API, auto-detected via api.anthropic.com
+# Anthropic (Claude) — native Messages API, auto-detected via anthropic.com in URL
 ANTH_URL=https://api.anthropic.com/v1/messages
 ANTH_API_KEY=
 ANTH_MODEL=claude-sonnet-4-6
-# Anthropic has no embeddings endpoint — leave these empty and use another provider for RAG
+ANTH_VERSION=2023-06-01              # anthropic-version header; update when Anthropic releases a new version
+# Anthropic has no embeddings endpoint.
+# Leave empty for keyword-only RAG, or point at a compatible service (OpenAI, Ollama, LM Studio):
 ANTH_EMBEDDING_URL=
 ANTH_EMBEDDING_MODEL=
+ANTH_EMBEDDING_TOKEN=                # separate token for the embedding service (if different from ANTH_API_KEY)
 
 # Groq / OpenRouter / custom providers — add a 'providers' entry in config/ai-chatbox.php
 # (see Provider examples in the docs above)
