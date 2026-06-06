@@ -111,32 +111,55 @@ class RagRetriever
     /**
      * Simple keyword fallback used when the embedding service is unavailable.
      *
-     * Splits the query into words (3+ characters), returns chunks from ready
-     * documents whose content contains any of those words. No threshold is
-     * applied — any match is included up to $topK results.
+     * Strips punctuation, removes common stop words, then returns chunks from
+     * ready documents whose content contains any of the remaining terms.
+     * Results are ordered by the number of matching terms (most relevant first).
      *
      * @return string[]
      */
     private function keywordSearch(string $query, int $topK): array
     {
+        static $stopWords = [
+            'what', 'which', 'where', 'when', 'how', 'why', 'who',
+            'the', 'this', 'that', 'these', 'those',
+            'are', 'was', 'were', 'will', 'would', 'can', 'could',
+            'should', 'shall', 'may', 'might', 'must',
+            'have', 'has', 'had', 'does', 'did',
+            'for', 'and', 'but', 'not', 'you', 'your',
+        ];
+
+        $rawTokens = preg_split('/\s+/', mb_strtolower(trim($query))) ?: [];
+
         $words = array_values(array_unique(array_filter(
-            preg_split('/\s+/', $query),
-            fn($w) => mb_strlen($w) >= 3
+            array_map(fn($w) => preg_replace('/[^\p{L}\p{N}]/u', '', $w), $rawTokens),
+            fn($w) => mb_strlen($w) >= 3 && !in_array($w, $stopWords, true)
         )));
 
         if (empty($words)) {
             return [];
         }
 
-        return RagChunk::whereHas('document', fn($q) => $q->where('status', 'ready'))
+        // Score each matching chunk by how many search terms it contains,
+        // so the most relevant chunks surface first instead of earliest by id.
+        $chunks = RagChunk::whereHas('document', fn($q) => $q->where('status', 'ready'))
             ->where(function ($q) use ($words) {
                 foreach ($words as $word) {
                     $q->orWhere('content', 'like', '%' . $word . '%');
                 }
             })
-            ->limit($topK)
-            ->pluck('content')
-            ->toArray();
+            ->get(['id', 'content']);
+
+        if ($chunks->isEmpty()) {
+            return [];
+        }
+
+        $scored = $chunks->map(function ($chunk) use ($words) {
+            $lower = mb_strtolower($chunk->content);
+            $hits = array_sum(array_map(fn($w) => substr_count($lower, $w), $words));
+            return ['content' => $chunk->content, 'hits' => $hits];
+        })->sortByDesc('hits')->take($topK);
+
+        return $scored->pluck('content')->toArray();
     }
 
     /**
