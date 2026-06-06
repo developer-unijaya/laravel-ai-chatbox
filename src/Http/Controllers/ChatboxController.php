@@ -72,10 +72,13 @@ class ChatboxController extends Controller
         // Persist the AI reply and trim history to the configured limit
         if ($cfg['history_enabled'] ?? true) {
             try {
+                $historyLimit = (int) ($cfg['history_limit'] ?? 50);
                 $fullHistory[] = ['role' => 'user', 'content' => $userMsg];
                 $fullHistory[] = ['role' => 'assistant', 'content' => $reply];
                 $this->repository->saveHistory($threadId, $fullHistory);
-                $this->repository->trimToLimit($threadId, (int) ($cfg['history_limit'] ?? 50));
+                if (count($fullHistory) > $historyLimit * 2) {
+                    $this->repository->trimToLimit($threadId, $historyLimit);
+                }
             } catch (Throwable $e) {
                 Log::error('AI Chatbox: failed to save AI reply', [
                     'thread_id' => $threadId,
@@ -153,7 +156,9 @@ class ChatboxController extends Controller
                         $fullHistory[] = ['role' => 'user', 'content' => $userMsg];
                         $fullHistory[] = ['role' => 'assistant', 'content' => $fullReply];
                         $this->repository->saveHistory($threadId, $fullHistory);
-                        $this->repository->trimToLimit($threadId, $historyLimit);
+                        if (count($fullHistory) > $historyLimit * 2) {
+                            $this->repository->trimToLimit($threadId, $historyLimit);
+                        }
                         session()->save(); // required because the response has already started
                     } catch (Throwable $e) {
                         Log::error('AI Chatbox: failed to save AI reply', [

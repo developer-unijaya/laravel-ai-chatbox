@@ -67,7 +67,7 @@ Connect to any **OpenAI-compatible API** including Ollama, OpenAI, Groq, LM Stud
 **RAG — Retrieval-Augmented Generation**
 - Upload `.md` and `.txt` documents; the chatbox retrieves relevant context automatically
 - Document chunking with configurable size and overlap; per-provider embedding configuration
-- Cosine similarity search computed in PHP — no external vector database required
+- **Two retrieval modes:** vector search (cosine similarity in PHP, no external vector database) and keyword search (SQL `LIKE`, no embedding service required) — either alone or as automatic fallback
 - Knowledge Base UI at `/ai-chatbox/rag` with upload, reprocess, and delete actions
 
 **Admin & Operations**
@@ -953,18 +953,39 @@ The chunker:
 
 ---
 
+### Retrieval modes
+
+The package supports two retrieval strategies. They work together: vector search runs first when an embedding URL is configured, and keyword search runs as an automatic fallback when it is not — or when the embedding call fails.
+
+| | Vector search | Keyword search |
+|---|---|---|
+| **Requires** | Embedding URL + model configured for the active provider | Nothing — works with any provider |
+| **How it works** | The user's query is embedded; cosine similarity is computed in PHP against every stored chunk | The query is split into words ≥ 3 characters; a SQL `LIKE` search finds chunks containing any of those words, ranked by hit count |
+| **Precision** | High — finds semantically related content even when exact words differ | Moderate — matches on exact words only |
+| **Setup** | Set `rag_embedding_url` and `rag_embedding_model` on the active provider | No extra setup — enabled by default via `rag_keyword_fallback=true` |
+
+**Which mode runs on each request:**
+
+| Condition | Mode used |
+|---|---|
+| Embedding URL is configured and the call succeeds | Vector search |
+| Embedding URL is absent **and** `rag_keyword_fallback=true` (default) | Keyword-only |
+| Embedding URL is configured but the call fails **and** `rag_keyword_fallback=true` | Keyword fallback |
+| No embedding available **and** `rag_keyword_fallback=false` | No context — `rag_no_context_prompt` guard fires instead |
+
+> **Keyword mode is not a degraded fallback — it is a fully usable mode.** Documents uploaded without an embedding URL are indexed for keyword retrieval immediately after chunking. The Knowledge Base UI at `/ai-chatbox/rag` labels which mode is active and what is needed to upgrade to vector search.
+
+---
+
 ### How retrieval works
 
 On every chat message:
 
-1. The user's message is embedded using the configured embedding model — **or**, when no embedding URL is set, the package skips embedding and goes straight to step 3
-2. Cosine similarity is computed **in PHP** against every stored chunk; chunks below `rag_similarity_threshold` (default `0.2`) are discarded
-3. **Keyword fallback** (when `rag_keyword_fallback` is `true`, which is the default) — if embedding returned no results (no URL configured, or the embedding call failed), the user's message is split into words ≥ 3 characters and a SQL `LIKE` search is run across all chunks from `ready` documents
-4. The top `rag_top_k` (default `10`) chunks are injected as a system message using `rag_context_prompt`, replacing the `{chunks}` placeholder
+1. **Vector path** — the user's query is embedded using the configured model; cosine similarity is computed in PHP against all stored chunks; chunks below `rag_similarity_threshold` (default `0.2`) are discarded
+2. **Keyword path** (when `rag_keyword_fallback=true` and step 1 produced no results) — the query is split into words ≥ 3 characters; a SQL `LIKE` search is run across all chunks from `ready` documents; results are ranked by number of matching terms
+3. The top `rag_top_k` (default `10`) chunks from whichever path ran are injected as a system message using `rag_context_prompt`, replacing the `{chunks}` placeholder
 
-The default prompt instructs the model to answer **only** from the retrieved chunks and say "I don't have that information in my knowledge base" if the answer is not found there. Edit `rag_context_prompt` in the published config to customise it (use `{chunks}` as the placeholder for the retrieved text).
-
-**Keyword-only mode** — if neither vector nor keyword search finds any results, `rag_no_context_prompt` is injected instead (see [Grounding when nothing matches](#grounding-when-nothing-matches) below). Keyword retrieval is less precise than vector search but requires no embedding service and works immediately after upload.
+The default prompt instructs the model to answer **only** from the retrieved chunks and reply "I don't have that information in my knowledge base" when the answer is not found there. Edit `rag_context_prompt` in the published config to customise it.
 
 #### Grounding when nothing matches
 

@@ -45,10 +45,14 @@ class ContextManager
         ? $userMessage . "\n\n[Important: Reply in {$language} only.]"
         : $userMessage;
 
-        while (count($history) >= 2) {
-            $all = array_merge($systemMessages, $history, [['role' => 'user', 'content' => $apiMessage]]);
+        // Pre-compute the token cost of the static parts (system + current user message)
+        // so the loop only needs to re-estimate the shrinking history portion each iteration.
+        $fixedTokens = $this->estimateTokens(
+            array_merge($systemMessages, [['role' => 'user', 'content' => $apiMessage]])
+        );
 
-            if ($this->estimateTokens($all) <= $effectiveLimit) {
+        while (count($history) >= 2) {
+            if ($fixedTokens + $this->estimateTokens($history) <= $effectiveLimit) {
                 break;
             }
 

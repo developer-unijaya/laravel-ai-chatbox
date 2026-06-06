@@ -44,11 +44,12 @@ class RagRetriever
             return [];
         }
 
-        // Load all chunks that belong to ready documents
+        // Load only id + embedding for scoring — content is fetched below for top-K only.
+        // This avoids transferring chunk text (~500 chars each) for every chunk in the corpus.
         $chunks = RagChunk::whereHas(
             'document',
             fn($q) => $q->where('status', 'ready')
-        )->get(['id', 'content', 'embedding']);
+        )->get(['id', 'embedding']);
 
         if ($chunks->isEmpty()) {
             return [];
@@ -79,7 +80,7 @@ class RagRetriever
             $score = $this->cosineSimilarity($queryEmbedding, $embedding);
 
             if ($score >= $threshold) {
-                $scored[] = ['content' => $chunk->content, 'score' => $score];
+                $scored[] = ['id' => $chunk->id, 'score' => $score];
             } else {
                 $belowThreshold++;
             }
@@ -105,7 +106,10 @@ class RagRetriever
 
         usort($scored, fn($a, $b) => $b['score'] <=> $a['score']);
 
-        return array_column(array_slice($scored, 0, $topK), 'content');
+        $topIds = array_column(array_slice($scored, 0, $topK), 'id');
+        $contentMap = RagChunk::whereIn('id', $topIds)->pluck('content', 'id');
+
+        return array_map(fn($id) => $contentMap[$id] ?? '', $topIds);
     }
 
     /**
