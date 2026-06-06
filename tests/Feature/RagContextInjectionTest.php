@@ -215,16 +215,44 @@ class RagContextInjectionTest extends TestCase
         $this->assertStringNotContainsString('Widgets ship', $injected);
     }
 
-    public function test_keyword_fallback_skips_non_ready_documents(): void
+    public function test_keyword_fallback_skips_documents_with_no_chunks(): void
     {
+        // A still-processing document has chunk_count=0 — should not appear in results.
+        config(['ai-chatbox.rag_enabled' => true, 'ai-chatbox.rag_keyword_fallback' => true]);
+
+        RagDocument::create([
+            'title' => 'Processing Doc',
+            'original_filename' => 'processing.txt',
+            'file_type' => 'txt',
+            'status' => 'processing',
+            'chunk_count' => 0,
+            'content' => 'Widgets ship within three business days.',
+        ]);
+
+        $messages = $this->builder->build(
+            'When do widgets ship?',
+            [],
+            $this->cfg(['rag_embedding_url' => '', 'api_token' => 'tok'])
+        );
+
+        $injected = $this->ragSystemMessage($messages);
+        $this->assertStringContainsString('NO_CONTEXT_GUARD', $injected);
+        $this->assertStringNotContainsString('Widgets ship', $injected);
+    }
+
+    public function test_keyword_fallback_includes_failed_documents_that_have_chunks(): void
+    {
+        // A document whose embedding failed (status='failed') but whose text was chunked
+        // should still be searchable via keyword retrieval in the live chatbox.
         config(['ai-chatbox.rag_enabled' => true, 'ai-chatbox.rag_keyword_fallback' => true]);
 
         $doc = RagDocument::create([
-            'title' => 'Pending Doc',
-            'original_filename' => 'pending.txt',
+            'title' => 'Embed Failed Doc',
+            'original_filename' => 'failed.txt',
             'file_type' => 'txt',
-            'status' => 'pending',
+            'status' => 'failed',
             'chunk_count' => 1,
+            'error_message' => 'Embedding failed for all 1 chunks.',
             'content' => 'Widgets ship within three business days.',
         ]);
 
@@ -242,8 +270,9 @@ class RagContextInjectionTest extends TestCase
         );
 
         $injected = $this->ragSystemMessage($messages);
-        $this->assertStringContainsString('NO_CONTEXT_GUARD', $injected);
-        $this->assertStringNotContainsString('Widgets ship', $injected);
+        $this->assertNotNull($injected);
+        $this->assertStringContainsString('Widgets ship within three business days.', $injected);
+        $this->assertStringNotContainsString('NO_CONTEXT_GUARD', $injected);
     }
 
     // ── Match → strict context prompt ─────────────────────────────────────────

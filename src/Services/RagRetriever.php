@@ -46,9 +46,11 @@ class RagRetriever
 
         // Load only id + embedding for scoring — content is fetched below for top-K only.
         // This avoids transferring chunk text (~500 chars each) for every chunk in the corpus.
+        // Use chunk_count > 0 (not status = 'ready') so documents whose embedding failed
+        // but whose text was chunked successfully remain searchable via keyword fallback.
         $chunks = RagChunk::whereHas(
             'document',
-            fn($q) => $q->where('status', 'ready')
+            fn($q) => $q->where('chunk_count', '>', 0)
         )->get(['id', 'embedding']);
 
         if ($chunks->isEmpty()) {
@@ -145,7 +147,7 @@ class RagRetriever
 
         // Score each matching chunk by how many search terms it contains,
         // so the most relevant chunks surface first instead of earliest by id.
-        $chunks = RagChunk::whereHas('document', fn($q) => $q->where('status', 'ready'))
+        $chunks = RagChunk::whereHas('document', fn($q) => $q->where('chunk_count', '>', 0))
             ->where(function ($q) use ($words) {
                 foreach ($words as $word) {
                     $q->orWhere('content', 'like', '%' . $word . '%');
