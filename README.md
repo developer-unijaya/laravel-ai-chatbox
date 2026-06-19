@@ -65,7 +65,7 @@ Connect to any **OpenAI-compatible API** including Ollama, OpenAI, Groq, LM Stud
 - Isolated conversation threads with UUID thread IDs; start a new thread without losing others
 
 **RAG — Retrieval-Augmented Generation**
-- Upload `.md` and `.txt` documents; the chatbox retrieves relevant context automatically
+- Upload `.md`, `.txt`, `.pdf`, and `.docx` documents; the chatbox retrieves relevant context automatically
 - Document chunking with configurable size and overlap; per-provider embedding configuration
 - Cosine similarity search computed in PHP — no external vector database required
 - Knowledge Base UI at `/ai-chatbox/rag` with upload, reprocess, and delete actions
@@ -268,6 +268,7 @@ Then edit `config/ai-chatbox.php` directly.
 |---|---|---|---|
 | `rag_enabled` | `AI_CHATBOX_RAG` | `false` | Master switch — enable RAG context injection |
 | `rag_embedding_timeout` | `AI_CHATBOX_EMBEDDING_TIMEOUT` | `10` | Timeout in seconds for every embedding HTTP request — applies to all providers |
+| `rag_embedding_provider` | `AI_CHATBOX_EMBEDDING_PROVIDER` | `null` | Name of a provider to source embeddings (URL, model, **and its own token**) from, independent of the chat provider. Use when the chat provider has no embeddings API (e.g. Anthropic). `null` = use the active provider's own embedding settings |
 | `rag_top_k` | - | `3` | Number of chunks retrieved per query |
 | `rag_chunk_size` | - | `500` | Target chunk size in tokens (~4 chars/token) |
 | `rag_chunk_overlap` | - | `50` | Overlap between consecutive chunks in tokens |
@@ -324,7 +325,7 @@ Named providers are defined under the `providers` key in `config/ai-chatbox.php`
 
 > `groq` and other providers are not in the default config — add them as custom entries after publishing (see [OpenRouter example](#openrouter-custom-provider) below for the pattern).
 
-> **Anthropic is not OpenAI-compatible.** When a provider's `api_url` contains `api.anthropic.com`, the package automatically uses the dedicated `AnthropicEngine` (native Messages API) instead of the OpenAI-compatible engine — no extra configuration is needed. Anthropic has no embeddings endpoint, so leave `ANTH_EMBEDDING_*` empty and use a different provider for RAG embeddings if needed.
+> **Anthropic is not OpenAI-compatible.** When a provider's `api_url` contains `api.anthropic.com`, the package automatically uses the dedicated `AnthropicEngine` (native Messages API) instead of the OpenAI-compatible engine — no extra configuration is needed. Anthropic has no embeddings endpoint, so for RAG set `rag_embedding_provider` to a provider that can embed (see [Using a different provider for embeddings](#using-a-different-provider-for-embeddings)).
 
 **Env var reference per provider:**
 
@@ -382,7 +383,7 @@ ANTH_API_KEY=sk-ant-...
 ANTH_MODEL=claude-sonnet-4-6
 ```
 
-> Anthropic does not expose an embeddings endpoint, so RAG embeddings must come from a different provider. Set `AI_CHATBOX_ACTIVE_PROVIDER=anthropic` for chat and configure embeddings separately if you use RAG.
+> Anthropic does not expose an embeddings endpoint. To use RAG with Claude, set `AI_CHATBOX_EMBEDDING_PROVIDER` to a provider that can embed (Ollama or OpenAI) — see [Using a different provider for embeddings](#using-a-different-provider-for-embeddings).
 
 #### Groq (custom provider)
 
@@ -879,7 +880,36 @@ Every subsequent chat message will automatically retrieve and inject relevant co
 
 RAG uses a **separate embedding API** — distinct from the chat API. Any provider with an `/embeddings` endpoint works.
 
-Embedding settings are configured **per named provider** via `rag_embedding_url`, `rag_embedding_model`, and `rag_embedding_timeout`. They are resolved through the active provider — there are no global embedding env vars.
+Embedding settings are configured **per named provider** via `rag_embedding_url`, `rag_embedding_model`, and `rag_embedding_timeout`. By default they are resolved through the active provider.
+
+#### Using a different provider for embeddings
+
+Some chat providers have **no embeddings API at all** — most notably **Anthropic (Claude)**. If your active chat provider can't embed, point RAG at a provider that can, via `rag_embedding_provider`:
+
+```env
+# Chat with Claude, but embed with local Ollama
+AI_CHATBOX_ACTIVE_PROVIDER=anthropic
+ANTH_API_KEY=sk-ant-...
+
+AI_CHATBOX_EMBEDDING_PROVIDER=ollama
+OLLAMA_EMBEDDING_URL=http://localhost:11434/v1/embeddings
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+```
+
+```env
+# Chat with Claude, but embed with OpenAI
+AI_CHATBOX_ACTIVE_PROVIDER=anthropic
+ANTH_API_KEY=sk-ant-...
+
+AI_CHATBOX_EMBEDDING_PROVIDER=openai
+OPENAI_API_KEY=sk-...                    # used as the Bearer token for the embedding call
+OPENAI_EMBEDDING_URL=https://api.openai.com/v1/embeddings
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+```
+
+When `rag_embedding_provider` is set, the embedding URL, model, **and the API token** all come from that named provider — so the embedding call authenticates with the *right* key (e.g. your OpenAI key), not the chat provider's. Leave it unset (`null`) to use the active provider's own embedding settings.
+
+> **Index and query must use the same embedding model.** Embeddings are dimension-matched, so if you change `rag_embedding_provider` or the embedding model after indexing, **reprocess your documents** (`/ai-chatbox/rag` → Reprocess) — chunks embedded with a different model are skipped during retrieval.
 
 | Provider | Env var | Example value |
 |---|---|---|
@@ -903,8 +933,18 @@ Embedding settings are configured **per named provider** via `rag_embedding_url`
 |---|---|---|
 | Plain text | `.txt` | Chunked directly |
 | Markdown | `.md` | Heading structure is preserved across chunks |
+| PDF | `.pdf` | Text extracted via `smalot/pdfparser` (optional dependency — see below) |
+| Word | `.docx` | Text extracted from `word/document.xml` via the bundled PHP `zip` extension |
 
-Maximum upload size: **10 MB** per file.
+Maximum upload size: **10 MB** per file. Text is extracted once at upload and stored, so reprocessing never re-parses the original binary.
+
+> **PDF support is optional.** PDF extraction needs the `smalot/pdfparser` package, which is **not** installed by default. Add it only if you want to index PDFs:
+> ```bash
+> composer require smalot/pdfparser
+> ```
+> Without it, `.txt`, `.md`, and `.docx` still work; attempting to upload a PDF returns a clear "install smalot/pdfparser" error. DOCX support needs PHP's `zip` extension (`ext-zip`), which is bundled with most PHP builds.
+
+> **PDF caveats:** only text-based PDFs are extractable — **scanned/image-only PDFs yield no text** (OCR is out of scope). Complex multi-column layouts may extract in an unexpected reading order. If a PDF indexes with `0` chunks or `Failed`, it likely has no embedded text layer.
 
 ---
 
@@ -962,7 +1002,7 @@ Visit **`/ai-chatbox/rag`** (authenticated users only).
 
 | Action | Description |
 |---|---|
-| **Upload** | Select a `.md` or `.txt` file, optionally set a title, click *Upload & Index* |
+| **Upload** | Select a `.md`, `.txt`, `.pdf`, or `.docx` file, optionally set a title, click *Upload & Index* |
 | **Reprocess** | Re-chunk and re-embed an existing document after changing chunk or embedding settings |
 | **Delete** | Remove the document and all its chunks permanently (confirmation required) |
 
@@ -1209,7 +1249,8 @@ src/
 ├── Services/
 │   ├── RagRetriever.php
 │   ├── EmbeddingService.php
-│   └── DocumentChunker.php
+│   ├── DocumentChunker.php
+│   └── DocumentTextExtractor.php    # .txt/.md/.pdf/.docx → plain text
 ├── resources/
 │   └── views/
 │       ├── chatbox.blade.php
@@ -1336,7 +1377,7 @@ If the widget shows an offline toast or requests fail, check `storage/logs/larav
 composer test
 ```
 
-The test suite covers: controller responses, error classification, session history, conversation thread isolation, token-based context trimming, SSE streaming, RAG document upload/delete/reprocess, RAG context injection, CORS middleware, SSRF protection, health check logic, `AiManager` named provider resolution, `AiProvider` fluent modifiers and immutability, the `AI` facade, and the `ai-chatbox:prune-conversations` command (pre-flight checks, deletion, boundary conditions, cascade, `--dry-run`, `--force`, config key precedence) — using PHPUnit 11 and Orchestra Testbench.
+The test suite covers: controller responses, error classification, session history, conversation thread isolation, token-based context trimming, SSE streaming, RAG document upload/delete/reprocess, PDF/DOCX text extraction, RAG context injection and grounding guard, dedicated embedding-provider resolution, CORS middleware, SSRF protection, health check logic, `AiManager` named provider resolution, `AiProvider` fluent modifiers and immutability, the `AI` facade, and the `ai-chatbox:prune-conversations` command (pre-flight checks, deletion, boundary conditions, cascade, `--dry-run`, `--force`, config key precedence) — using PHPUnit 11 and Orchestra Testbench.
 
 ---
 
@@ -1384,6 +1425,9 @@ AI_CHATBOX_MEMORY_DRIVER=session  # session | database
 AI_CHATBOX_RAG=false
 AI_CHATBOX_EMBEDDING_TIMEOUT=10      # universal — applies to all providers
 AI_CHATBOX_RAG_PROCESSING_TIMEOUT=0  # 0 = no limit
+# Embed via a different provider than the chat provider (e.g. chat=anthropic, embed=ollama/openai).
+# Unset = use the active provider's own embedding settings.
+AI_CHATBOX_EMBEDDING_PROVIDER=
 
 # ── Named Provider Credentials ────────────────────────────────────────────────
 # The chatbox widget and AI facade both resolve through these env vars.
@@ -1414,7 +1458,8 @@ OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 ANTH_URL=https://api.anthropic.com/v1/messages
 ANTH_API_KEY=
 ANTH_MODEL=claude-sonnet-4-6
-# Anthropic has no embeddings endpoint — leave these empty and use another provider for RAG
+# Anthropic has no embeddings endpoint — leave these empty and set
+# AI_CHATBOX_EMBEDDING_PROVIDER=ollama (or openai) to do RAG with Claude.
 ANTH_EMBEDDING_URL=
 ANTH_EMBEDDING_MODEL=
 

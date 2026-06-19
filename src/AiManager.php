@@ -63,6 +63,41 @@ class AiManager
         : app(AiEngineInterface::class);
     }
 
+    /**
+     * Resolve the embedding endpoint settings for a given (active) provider config.
+     *
+     * RAG embeddings may come from a provider different to the chat provider —
+     * essential when the chat provider has no embeddings API (e.g. Anthropic).
+     * When 'rag_embedding_provider' names another provider, that provider's
+     * embedding URL, model, AND api_token are used; otherwise the active
+     * provider's own embedding settings apply. The embedding timeout is a
+     * universal global setting, never per-provider.
+     *
+     * @param  array<string, mixed>  $cfg  The active/effective provider config.
+     * @return array{url: ?string, model: ?string, token: ?string, timeout: int}
+     */
+    public function embeddingConfig(array $cfg): array
+    {
+        $source = $cfg;
+        $providerName = $cfg['rag_embedding_provider'] ?? null;
+
+        if (is_string($providerName) && $providerName !== '') {
+            try {
+                $source = $this->resolveConfig($providerName);
+            } catch (\InvalidArgumentException) {
+                // Named embedding provider is misconfigured — fall back to the
+                // active provider's own embedding settings rather than failing.
+            }
+        }
+
+        return [
+            'url' => $source['rag_embedding_url'] ?? null,
+            'model' => $source['rag_embedding_model'] ?? null,
+            'token' => $source['api_token'] ?? null,
+            'timeout' => (int) ($cfg['rag_embedding_timeout'] ?? 10),
+        ];
+    }
+
     // ── Internals ─────────────────────────────────────────────────────────────
 
     public function resolveConfig(string $name): array

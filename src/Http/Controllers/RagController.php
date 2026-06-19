@@ -9,13 +9,16 @@ use SyafiqUnijaya\AiChatbox\AiManager;
 use SyafiqUnijaya\AiChatbox\Models\RagChunk;
 use SyafiqUnijaya\AiChatbox\Models\RagDocument;
 use SyafiqUnijaya\AiChatbox\Services\DocumentChunker;
+use SyafiqUnijaya\AiChatbox\Services\DocumentTextExtractor;
 use SyafiqUnijaya\AiChatbox\Services\EmbeddingService;
 use Throwable;
 
 class RagController extends Controller
 {
-    public function __construct(private readonly AiManager $aiManager)
-    {}
+    public function __construct(
+        private readonly AiManager $aiManager,
+        private readonly DocumentTextExtractor $extractor,
+    ) {}
 
     // ── List ─────────────────────────────────────────────────────────────────
 
@@ -24,8 +27,9 @@ class RagController extends Controller
         $documents = RagDocument::withCount('chunks')->latest()->get();
         $cfg = $this->effectiveConfig();
 
-        $embeddingUrl = $cfg['rag_embedding_url'] ?? '';
-        $embeddingModel = $cfg['rag_embedding_model'] ?? '';
+        $emb = $this->aiManager->embeddingConfig($cfg);
+        $embeddingUrl = $emb['url'] ?? '';
+        $embeddingModel = $emb['model'] ?? '';
 
         return view('ai-chatbox::rag', [
             'documents' => $documents,
@@ -43,7 +47,7 @@ class RagController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
-            'file' => ['required', 'file', 'mimes:txt,md', 'max:10240'],
+            'file' => ['required', 'file', 'max:10240'],
             'title' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -51,10 +55,22 @@ class RagController extends Controller
         $title = $request->input('title') ?: pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
         $type = strtolower($file->getClientOriginalExtension() ?: 'txt');
 
-        $content = file_get_contents($file->getRealPath());
+        // Whitelist by extension (reliable across formats — DOCX in particular is
+        // a zip and is frequently mis-detected by content-based MIME guessing).
+        if (!in_array($type, DocumentTextExtractor::SUPPORTED, true)) {
+            return back()->withErrors([
+                'file' => 'Unsupported file type. Accepted: ' . implode(', ', DocumentTextExtractor::SUPPORTED) . '.',
+            ]);
+        }
 
-        if ($content === false || trim($content) === '') {
-            return back()->withErrors(['file' => 'The uploaded file is empty or unreadable.']);
+        try {
+            $content = $this->extractor->extract($file->getRealPath(), $type);
+        } catch (Throwable $e) {
+            return back()->withErrors(['file' => $e->getMessage()]);
+        }
+
+        if (trim($content) === '') {
+            return back()->withErrors(['file' => 'No readable text could be extracted from the file.']);
         }
 
         $document = RagDocument::create([
@@ -133,12 +149,13 @@ class RagController extends Controller
         set_time_limit((int) config('ai-chatbox.rag_processing_timeout', 0));
 
         $cfg = $this->effectiveConfig();
+        $emb = $this->aiManager->embeddingConfig($cfg);
         $chunker = new DocumentChunker();
         $embedSvc = new EmbeddingService(
-            $cfg['rag_embedding_url'] ?? null,
-            $cfg['rag_embedding_model'] ?? null,
-            $cfg['api_token'] ?? null,
-            (int) ($cfg['rag_embedding_timeout'] ?? 10),
+            $emb['url'],
+            $emb['model'],
+            $emb['token'],
+            $emb['timeout'],
         );
         $chunkSize = (int) ($cfg['rag_chunk_size'] ?? 500);
         $overlap = (int) ($cfg['rag_chunk_overlap'] ?? 50);
@@ -159,8 +176,8 @@ class RagController extends Controller
                 \Illuminate\Support\Facades\Log::warning('AI Chatbox RAG: Chunk embedding failed — chunk will be stored without a vector and skipped during retrieval.', [
                     'document_id' => $document->id,
                     'chunk_index' => $i,
-                    'embedding_url' => $cfg['rag_embedding_url'] ?? '',
-                    'embedding_model' => $cfg['rag_embedding_model'] ?? '',
+                    'embedding_url' => $emb['url'] ?? '',
+                    'embedding_model' => $emb['model'] ?? '',
                 ]);
             }
 
@@ -179,13 +196,13 @@ class RagController extends Controller
                 'status' => 'failed',
                 'chunk_count' => $count,
                 'error_message' => "Embedding failed for all {$count} chunks. Check embedding URL ("
-                . ($cfg['rag_embedding_url'] ?? '') . ') and embedding model ('
-                . ($cfg['rag_embedding_model'] ?? '') . ').',
+                . ($emb['url'] ?? '') . ') and embedding model ('
+                . ($emb['model'] ?? '') . ').',
             ]);
             \Illuminate\Support\Facades\Log::error('AI Chatbox RAG: All chunk embeddings failed — document marked as failed.', [
                 'document_id' => $document->id,
                 'title' => $document->title,
-                'embedding_url' => $cfg['rag_embedding_url'] ?? '',
+                'embedding_url' => $emb['url'] ?? '',
             ]);
             return;
         }

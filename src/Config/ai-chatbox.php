@@ -312,6 +312,12 @@ return [
 | 'rag_enabled'              — master switch (default: false)
 | 'rag_embedding_timeout'    — timeout in seconds for every embedding HTTP request (default: 10).
 |                              Applies to all providers. Env: AI_CHATBOX_EMBEDDING_TIMEOUT
+| 'rag_embedding_provider'   — name of the provider to source embedding settings from (URL, model,
+|                              AND its own api_token), independent of the active chat provider.
+|                              Use this when your chat provider has no embeddings API (e.g.
+|                              Anthropic): set the chat provider to 'anthropic' and point embeddings
+|                              at 'ollama' or 'openai'. null/empty = use the active provider's own
+|                              rag_embedding_* settings (default). Env: AI_CHATBOX_EMBEDDING_PROVIDER
 | 'rag_top_k'                — number of chunks to retrieve per query (default: 3)
 | 'rag_chunk_size'           — target chunk size in tokens (~4 chars/token, default: 500)
 | 'rag_chunk_overlap'        — overlap between chunks in tokens (default: 50)
@@ -328,6 +334,7 @@ return [
 
     'rag_enabled' => env('AI_CHATBOX_RAG', false),
     'rag_embedding_timeout' => (int) env('AI_CHATBOX_EMBEDDING_TIMEOUT', 10),
+    'rag_embedding_provider' => env('AI_CHATBOX_EMBEDDING_PROVIDER'),
     'rag_top_k' => 3,
     'rag_chunk_size' => 500,
     'rag_chunk_overlap' => 50,

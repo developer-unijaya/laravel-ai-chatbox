@@ -2,6 +2,7 @@
 namespace SyafiqUnijaya\AiChatbox\Engine;
 
 use Illuminate\Support\Facades\Log;
+use SyafiqUnijaya\AiChatbox\AiManager;
 use SyafiqUnijaya\AiChatbox\Services\EmbeddingService;
 use SyafiqUnijaya\AiChatbox\Services\RagRetriever;
 
@@ -78,11 +79,12 @@ class PromptBuilder
         }
 
         try {
+            $emb = app(AiManager::class)->embeddingConfig($cfg);
             $retriever = new RagRetriever(new EmbeddingService(
-                $cfg['rag_embedding_url'] ?? null,
-                $cfg['rag_embedding_model'] ?? null,
-                $cfg['api_token'] ?? null,
-                (int) ($cfg['rag_embedding_timeout'] ?? 10),
+                $emb['url'],
+                $emb['model'],
+                $emb['token'],
+                $emb['timeout'],
             ));
             $chunks = $retriever->retrieve($query);
         } catch (\Throwable $e) {

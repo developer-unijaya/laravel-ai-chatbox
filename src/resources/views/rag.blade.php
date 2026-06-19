@@ -91,8 +91,10 @@
 
     {{-- Page subtitle --}}
     <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
-        Upload <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">.md</code> or
-        <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">.txt</code> files.
+        Upload <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">.md</code>,
+        <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">.txt</code>,
+        <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">.pdf</code> or
+        <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">.docx</code> files.
         Relevant chunks are automatically injected into every AI request.
         <span class="text-gray-400 dark:text-gray-500 ml-1">Endpoint: {{ $embeddingUrl ?: '—' }}</span>
     </p>
@@ -141,8 +143,8 @@
                     <label for="rag-file" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                         File <span class="text-red-500">*</span>
                     </label>
-                    <input id="rag-file" name="file" type="file" accept=".md,.txt" required {{ !$embeddingConfigured ? 'disabled' : '' }} class="file-btn block w-full text-sm text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-1.5 {{ !$embeddingConfigured ? 'cursor-not-allowed' : 'cursor-pointer' }} focus-theme">
-                    <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">Accepted: .md, .txt &mdash; Max 10 MB</p>
+                    <input id="rag-file" name="file" type="file" accept=".md,.txt,.pdf,.docx" required {{ !$embeddingConfigured ? 'disabled' : '' }} class="file-btn block w-full text-sm text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-1.5 {{ !$embeddingConfigured ? 'cursor-not-allowed' : 'cursor-pointer' }} focus-theme">
+                    <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">Accepted: .md, .txt, .pdf, .docx &mdash; Max 10 MB</p>
                 </div>
                 <div>
                     <label for="rag-title" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">

@@ -80,7 +80,12 @@
     },
     "require-dev": {
         "phpunit/phpunit": "^11.5",
-        "orchestra/testbench": "^10.0"
+        "orchestra/testbench": "^10.0",
+        "smalot/pdfparser": "^2.0"
+    },
+    "suggest": {
+        "smalot/pdfparser": "Required to index PDF documents in the RAG knowledge base (composer require smalot/pdfparser)",
+        "ext-zip": "Required to index DOCX documents in the RAG knowledge base"
     },
     "scripts": {
         "test": "phpunit --testdox"
