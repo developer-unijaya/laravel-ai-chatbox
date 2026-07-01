@@ -118,7 +118,7 @@ If you plan to use **RAG** or the **database memory driver**, run the migrations
 
 Publish the migration files
 ```bash
-php artisan vendor:publish --tag=ai-chatbox-migrations && 
+php artisan vendor:publish --tag=ai-chatbox-migrations &&   
 php artisan migrate
 ```
 
@@ -1026,6 +1026,40 @@ Each document shows its status (`Pending` → `Processing` → `Ready` / `Failed
 | Embedding URL and model are both set | No banner — full vector search mode |
 | Embedding URL is **not** set | Amber warning — keyword-only mode; uploads are still enabled |
 | Embedding URL is set but model is **missing** | Red error — misconfigured; uploads are disabled until corrected |
+
+---
+
+### Rebuilding the Knowledge Base from a graphify knowledge graph
+
+Instead of uploading files by hand, you can populate the knowledge base directly from your codebase using [graphify](https://github.com/safishamsi/graphify) — a tool that turns a codebase, docs, and media into a queryable knowledge graph and exports it as markdown.
+
+The intended workflow is **generate once, commit, rebuild anywhere**:
+
+1. **Generate the graph** (once, by a developer) — run graphify against your application and commit the resulting `graphify-out/` folder to your repository:
+
+   ```bash
+   graphify . --wiki      # code structure via tree-sitter (no LLM cost); --wiki adds one article per community
+   ```
+
+   graphify always writes `GRAPH_REPORT.md`; `--wiki` and `--obsidian` add per-community articles that make richer RAG context.
+
+2. **Rebuild the knowledge base** (on any machine where the app runs):
+
+   ```bash
+   php artisan ai-chatbox:graphify
+   ```
+
+   This reads every markdown file under `graphify-out/` (recursively) and imports each as a knowledge-base document through the same chunking pipeline as manual uploads. With no embedding endpoint configured (e.g. the Anthropic provider) the documents are indexed for keyword retrieval; with an embedding endpoint they are embedded for vector search.
+
+| Option | Description |
+|---|---|
+| `--path=<dir>` | Import from a directory other than `base_path('graphify-out')` |
+| `--dry-run` | List the markdown files that would be imported without writing anything |
+| `--keep` | Append to the knowledge base instead of replacing previously imported graphify documents |
+
+Each run **replaces** the documents it imported previously (matched by the `graphify-out/` marker), so the knowledge base always mirrors the committed graph. Documents you uploaded manually through the Knowledge Base UI are never touched.
+
+> graphify is only needed on the machine that **generates** the graph. Rebuilding the knowledge base from a committed `graphify-out/` folder needs nothing but PHP — no Python and no graphify install on your app servers.
 
 ---
 

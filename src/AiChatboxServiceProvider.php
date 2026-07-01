@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use DeveloperUnijaya\AiChatbox\Console\Commands\GraphifyImport;
 use DeveloperUnijaya\AiChatbox\Console\Commands\PruneConversations;
 use DeveloperUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
 use DeveloperUnijaya\AiChatbox\Engine\OpenAiCompatibleEngine;
@@ -205,6 +206,7 @@ class AiChatboxServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 PruneConversations::class,
+                GraphifyImport::class,
             ]);
         }
     }
