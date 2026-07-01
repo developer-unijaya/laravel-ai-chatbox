@@ -1,12 +1,12 @@
 # laravel-ai-chatbox
 
-[![Tests](https://github.com/syafiq-unijaya/laravel-ai-chatbox/actions/workflows/tests.yml/badge.svg)](https://github.com/syafiq-unijaya/laravel-ai-chatbox/actions/workflows/tests.yml)
-[![Latest Version](https://img.shields.io/packagist/v/syafiq-unijaya/laravel-ai-chatbox.svg?label=packagist)](https://packagist.org/packages/syafiq-unijaya/laravel-ai-chatbox)
-[![Total Downloads](https://img.shields.io/packagist/dt/syafiq-unijaya/laravel-ai-chatbox.svg)](https://packagist.org/packages/syafiq-unijaya/laravel-ai-chatbox)
-[![PHP](https://img.shields.io/packagist/php-v/syafiq-unijaya/laravel-ai-chatbox.svg)](https://packagist.org/packages/syafiq-unijaya/laravel-ai-chatbox)
+[![Tests](https://github.com/developer-unijaya/laravel-ai-chatbox/actions/workflows/tests.yml/badge.svg)](https://github.com/developer-unijaya/laravel-ai-chatbox/actions/workflows/tests.yml)
+[![Latest Version](https://img.shields.io/packagist/v/developer-unijaya/laravel-ai-chatbox.svg?label=packagist)](https://packagist.org/packages/developer-unijaya/laravel-ai-chatbox)
+[![Total Downloads](https://img.shields.io/packagist/dt/developer-unijaya/laravel-ai-chatbox.svg)](https://packagist.org/packages/developer-unijaya/laravel-ai-chatbox)
+[![PHP](https://img.shields.io/packagist/php-v/developer-unijaya/laravel-ai-chatbox.svg)](https://packagist.org/packages/developer-unijaya/laravel-ai-chatbox)
 [![Laravel](https://img.shields.io/badge/Laravel-10%20|%2011%20|%2012-FF2D20?logo=laravel&logoColor=white)](https://laravel.com)
 [![Vue.js](https://img.shields.io/badge/Vue.js-3-42b883?logo=vue.js&logoColor=white)](https://vuejs.org)
-[![License](https://img.shields.io/packagist/l/syafiq-unijaya/laravel-ai-chatbox.svg)](LICENSE)
+[![License](https://img.shields.io/packagist/l/developer-unijaya/laravel-ai-chatbox.svg)](LICENSE)
 
 A drop-in AI chatbox widget for Laravel. One Blade directive — no build tools required in your application.
 
@@ -97,7 +97,7 @@ Connect to any **OpenAI-compatible API** including Ollama, OpenAI, Groq, LM Stud
 **From Packagist:**
 
 ```bash
-composer require syafiq-unijaya/laravel-ai-chatbox
+composer require developer-unijaya/laravel-ai-chatbox
 ```
 
 ---
@@ -573,7 +573,7 @@ The `AI` facade lets you call any configured AI provider directly from controlle
 ### Basic usage
 
 ```php
-use SyafiqUnijaya\AiChatbox\AI;
+use DeveloperUnijaya\AiChatbox\AI;
 
 // Use the active provider (resolves to AI_CHATBOX_ACTIVE_PROVIDER)
 $reply = AI::chat('Summarise this document: ...');
@@ -1295,8 +1295,8 @@ src/
 Implement `AiEngineInterface` to support a provider that is not OpenAI-compatible (Gemini, Cohere, etc.):
 
 ```php
-use SyafiqUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
-use SyafiqUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
+use DeveloperUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
+use DeveloperUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
 
 class AnthropicEngine implements AiEngineInterface
 {
@@ -1332,7 +1332,7 @@ class AnthropicEngine implements AiEngineInterface
 Bind in a service provider:
 
 ```php
-use SyafiqUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
+use DeveloperUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
 
 $this->app->bind(AiEngineInterface::class, AnthropicEngine::class);
 ```
@@ -1344,7 +1344,7 @@ $this->app->bind(AiEngineInterface::class, AnthropicEngine::class);
 Implement `ConversationRepositoryInterface` to store history in Redis, MongoDB, or any other backend:
 
 ```php
-use SyafiqUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
+use DeveloperUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
 
 class RedisConversationRepository implements ConversationRepositoryInterface
 {
@@ -1374,7 +1374,7 @@ class RedisConversationRepository implements ConversationRepositoryInterface
 Bind in a service provider:
 
 ```php
-use SyafiqUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
+use DeveloperUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
 
 $this->app->bind(ConversationRepositoryInterface::class, RedisConversationRepository::class);
 ```

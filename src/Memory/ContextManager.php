@@ -1,5 +1,5 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Memory;
+namespace DeveloperUnijaya\AiChatbox\Memory;
 
 /**
  * Trims conversation history to fit within both message-count and token-count

@@ -1,8 +1,8 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox;
+namespace DeveloperUnijaya\AiChatbox;
 
 use Illuminate\Support\Facades\Facade;
-use SyafiqUnijaya\AiChatbox\Engine\AiProvider;
+use DeveloperUnijaya\AiChatbox\Engine\AiProvider;
 
 /**
  * Facade for the AiManager.
@@ -16,7 +16,7 @@ use SyafiqUnijaya\AiChatbox\Engine\AiProvider;
  * @method static string     chat(string $prompt, array $history = [])
  * @method static \Closure   stream(string $prompt, array $history = [])
  *
- * @see \SyafiqUnijaya\AiChatbox\AiManager
+ * @see \DeveloperUnijaya\AiChatbox\AiManager
  */
 class AI extends Facade
 {

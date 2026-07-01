@@ -1,9 +1,9 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Tests\Feature;
+namespace DeveloperUnijaya\AiChatbox\Tests\Feature;
 
 use GuzzleHttp\Psr7\Response;
-use SyafiqUnijaya\AiChatbox\Services\EmbeddingService;
-use SyafiqUnijaya\AiChatbox\Tests\TestCase;
+use DeveloperUnijaya\AiChatbox\Services\EmbeddingService;
+use DeveloperUnijaya\AiChatbox\Tests\TestCase;
 
 class EmbeddingServiceTest extends TestCase
 {

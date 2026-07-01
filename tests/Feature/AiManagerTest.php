@@ -1,11 +1,11 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Tests\Feature;
+namespace DeveloperUnijaya\AiChatbox\Tests\Feature;
 
-use SyafiqUnijaya\AiChatbox\AiManager;
-use SyafiqUnijaya\AiChatbox\Engine\AiProvider;
-use SyafiqUnijaya\AiChatbox\Engine\AnthropicEngine;
-use SyafiqUnijaya\AiChatbox\Engine\OpenAiCompatibleEngine;
-use SyafiqUnijaya\AiChatbox\Tests\TestCase;
+use DeveloperUnijaya\AiChatbox\AiManager;
+use DeveloperUnijaya\AiChatbox\Engine\AiProvider;
+use DeveloperUnijaya\AiChatbox\Engine\AnthropicEngine;
+use DeveloperUnijaya\AiChatbox\Engine\OpenAiCompatibleEngine;
+use DeveloperUnijaya\AiChatbox\Tests\TestCase;
 
 class AiManagerTest extends TestCase
 {

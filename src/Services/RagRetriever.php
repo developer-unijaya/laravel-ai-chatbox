@@ -1,8 +1,8 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Services;
+namespace DeveloperUnijaya\AiChatbox\Services;
 
 use Illuminate\Support\Facades\Log;
-use SyafiqUnijaya\AiChatbox\Models\RagChunk;
+use DeveloperUnijaya\AiChatbox\Models\RagChunk;
 
 class RagRetriever
 {

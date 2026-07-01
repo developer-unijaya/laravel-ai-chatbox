@@ -1,10 +1,10 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Tests\Unit;
+namespace DeveloperUnijaya\AiChatbox\Tests\Unit;
 
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Psr7\Request;
 use PHPUnit\Framework\TestCase;
-use SyafiqUnijaya\AiChatbox\Engine\OpenAiCompatibleEngine;
+use DeveloperUnijaya\AiChatbox\Engine\OpenAiCompatibleEngine;
 
 class ErrorClassificationTest extends TestCase
 {

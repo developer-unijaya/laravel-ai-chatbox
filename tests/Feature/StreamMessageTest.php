@@ -1,11 +1,11 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Tests\Feature;
+namespace DeveloperUnijaya\AiChatbox\Tests\Feature;
 
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\Utils;
-use SyafiqUnijaya\AiChatbox\Tests\TestCase;
+use DeveloperUnijaya\AiChatbox\Tests\TestCase;
 
 class StreamMessageTest extends TestCase
 {

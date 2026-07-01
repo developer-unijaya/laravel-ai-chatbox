@@ -1,5 +1,5 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox;
+namespace DeveloperUnijaya\AiChatbox;
 
 use GuzzleHttp\Client;
 use Illuminate\Foundation\AliasLoader;
@@ -8,13 +8,13 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
-use SyafiqUnijaya\AiChatbox\Console\Commands\PruneConversations;
-use SyafiqUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
-use SyafiqUnijaya\AiChatbox\Engine\OpenAiCompatibleEngine;
-use SyafiqUnijaya\AiChatbox\Http\Middleware\CorsMiddleware;
-use SyafiqUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
-use SyafiqUnijaya\AiChatbox\Memory\DatabaseConversationRepository;
-use SyafiqUnijaya\AiChatbox\Memory\SessionConversationRepository;
+use DeveloperUnijaya\AiChatbox\Console\Commands\PruneConversations;
+use DeveloperUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
+use DeveloperUnijaya\AiChatbox\Engine\OpenAiCompatibleEngine;
+use DeveloperUnijaya\AiChatbox\Http\Middleware\CorsMiddleware;
+use DeveloperUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
+use DeveloperUnijaya\AiChatbox\Memory\DatabaseConversationRepository;
+use DeveloperUnijaya\AiChatbox\Memory\SessionConversationRepository;
 
 class AiChatboxServiceProvider extends ServiceProvider
 {
@@ -196,7 +196,7 @@ class AiChatboxServiceProvider extends ServiceProvider
     protected function registerLivewireComponent(): void
     {
         if (class_exists(\Livewire\Livewire::class)) {
-            \Livewire\Livewire::component('ai-chatbox', \SyafiqUnijaya\AiChatbox\Livewire\AiChatbox::class);
+            \Livewire\Livewire::component('ai-chatbox', \DeveloperUnijaya\AiChatbox\Livewire\AiChatbox::class);
         }
     }
 

@@ -1,7 +1,7 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Memory;
+namespace DeveloperUnijaya\AiChatbox\Memory;
 
-use SyafiqUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
+use DeveloperUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
 
 /**
  * Stores conversation history in the PHP session.

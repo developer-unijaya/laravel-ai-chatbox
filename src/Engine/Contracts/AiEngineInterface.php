@@ -1,7 +1,7 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Engine\Contracts;
+namespace DeveloperUnijaya\AiChatbox\Engine\Contracts;
 
-use SyafiqUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
+use DeveloperUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
 
 interface AiEngineInterface
 {

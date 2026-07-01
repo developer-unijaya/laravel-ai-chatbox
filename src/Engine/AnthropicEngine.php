@@ -1,10 +1,10 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Engine;
+namespace DeveloperUnijaya\AiChatbox\Engine;
 
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\TooManyRedirectsException;
-use SyafiqUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
+use DeveloperUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
 
 class AnthropicEngine extends OpenAiCompatibleEngine
 {

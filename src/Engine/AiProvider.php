@@ -1,8 +1,8 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Engine;
+namespace DeveloperUnijaya\AiChatbox\Engine;
 
-use SyafiqUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
-use SyafiqUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
+use DeveloperUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
+use DeveloperUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
 
 /**
  * Fluent wrapper around an AiEngineInterface instance + a resolved config set.

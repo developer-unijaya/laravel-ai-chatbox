@@ -1,16 +1,16 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Http\Controllers;
+namespace DeveloperUnijaya\AiChatbox\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
-use SyafiqUnijaya\AiChatbox\AiManager;
-use SyafiqUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
-use SyafiqUnijaya\AiChatbox\Engine\HealthChecker;
-use SyafiqUnijaya\AiChatbox\Engine\PromptBuilder;
-use SyafiqUnijaya\AiChatbox\Memory\ContextManager;
-use SyafiqUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
+use DeveloperUnijaya\AiChatbox\AiManager;
+use DeveloperUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
+use DeveloperUnijaya\AiChatbox\Engine\HealthChecker;
+use DeveloperUnijaya\AiChatbox\Engine\PromptBuilder;
+use DeveloperUnijaya\AiChatbox\Memory\ContextManager;
+use DeveloperUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 

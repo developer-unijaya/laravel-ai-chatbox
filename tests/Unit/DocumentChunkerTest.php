@@ -1,8 +1,8 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Tests\Unit;
+namespace DeveloperUnijaya\AiChatbox\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
-use SyafiqUnijaya\AiChatbox\Services\DocumentChunker;
+use DeveloperUnijaya\AiChatbox\Services\DocumentChunker;
 
 class DocumentChunkerTest extends TestCase
 {

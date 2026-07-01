@@ -1,10 +1,10 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox;
+namespace DeveloperUnijaya\AiChatbox;
 
-use SyafiqUnijaya\AiChatbox\Engine\AiProvider;
-use SyafiqUnijaya\AiChatbox\Engine\AnthropicEngine;
-use SyafiqUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
-use SyafiqUnijaya\AiChatbox\Engine\PromptBuilder;
+use DeveloperUnijaya\AiChatbox\Engine\AiProvider;
+use DeveloperUnijaya\AiChatbox\Engine\AnthropicEngine;
+use DeveloperUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
+use DeveloperUnijaya\AiChatbox\Engine\PromptBuilder;
 
 /**
  * Resolves named AI providers from config and returns an AiProvider instance.
@@ -20,8 +20,8 @@ use SyafiqUnijaya\AiChatbox\Engine\PromptBuilder;
  * Calling methods directly on the facade (e.g. AI::chat(...)) is delegated
  * to the 'default' provider via __call().
  *
- * @see \SyafiqUnijaya\AiChatbox\AI
- * @see \SyafiqUnijaya\AiChatbox\Engine\AiProvider
+ * @see \DeveloperUnijaya\AiChatbox\AI
+ * @see \DeveloperUnijaya\AiChatbox\Engine\AiProvider
  */
 class AiManager
 {

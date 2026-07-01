@@ -1,17 +1,17 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Http\Controllers;
+namespace DeveloperUnijaya\AiChatbox\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\View\View;
-use SyafiqUnijaya\AiChatbox\AiManager;
-use SyafiqUnijaya\AiChatbox\Engine\PromptBuilder;
-use SyafiqUnijaya\AiChatbox\Models\RagChunk;
-use SyafiqUnijaya\AiChatbox\Models\RagDocument;
-use SyafiqUnijaya\AiChatbox\Services\DocumentChunker;
-use SyafiqUnijaya\AiChatbox\Services\EmbeddingService;
+use DeveloperUnijaya\AiChatbox\AiManager;
+use DeveloperUnijaya\AiChatbox\Engine\PromptBuilder;
+use DeveloperUnijaya\AiChatbox\Models\RagChunk;
+use DeveloperUnijaya\AiChatbox\Models\RagDocument;
+use DeveloperUnijaya\AiChatbox\Services\DocumentChunker;
+use DeveloperUnijaya\AiChatbox\Services\EmbeddingService;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 

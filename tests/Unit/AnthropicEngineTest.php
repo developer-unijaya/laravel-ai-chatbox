@@ -1,11 +1,11 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Tests\Unit;
+namespace DeveloperUnijaya\AiChatbox\Tests\Unit;
 
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\Utils;
-use SyafiqUnijaya\AiChatbox\Engine\AnthropicEngine;
-use SyafiqUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
-use SyafiqUnijaya\AiChatbox\Tests\TestCase;
+use DeveloperUnijaya\AiChatbox\Engine\AnthropicEngine;
+use DeveloperUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
+use DeveloperUnijaya\AiChatbox\Tests\TestCase;
 
 class AnthropicEngineTest extends TestCase
 {

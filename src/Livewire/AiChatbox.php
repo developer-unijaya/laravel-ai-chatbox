@@ -1,5 +1,5 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Livewire;
+namespace DeveloperUnijaya\AiChatbox\Livewire;
 
 use Illuminate\View\View;
 use Livewire\Component;

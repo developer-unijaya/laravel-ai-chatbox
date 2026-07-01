@@ -1,11 +1,11 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Tests\Feature;
+namespace DeveloperUnijaya\AiChatbox\Tests\Feature;
 
 use GuzzleHttp\Psr7\Response;
-use SyafiqUnijaya\AiChatbox\AI;
-use SyafiqUnijaya\AiChatbox\AiManager;
-use SyafiqUnijaya\AiChatbox\Engine\AiProvider;
-use SyafiqUnijaya\AiChatbox\Tests\TestCase;
+use DeveloperUnijaya\AiChatbox\AI;
+use DeveloperUnijaya\AiChatbox\AiManager;
+use DeveloperUnijaya\AiChatbox\Engine\AiProvider;
+use DeveloperUnijaya\AiChatbox\Tests\TestCase;
 
 class AiFacadeTest extends TestCase
 {

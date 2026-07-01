@@ -1,14 +1,14 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Tests\Feature;
+namespace DeveloperUnijaya\AiChatbox\Tests\Feature;
 
 use Illuminate\Console\Command;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use SyafiqUnijaya\AiChatbox\Memory\DatabaseConversationRepository;
-use SyafiqUnijaya\AiChatbox\Memory\Models\Conversation;
-use SyafiqUnijaya\AiChatbox\Tests\TestCase;
+use DeveloperUnijaya\AiChatbox\Memory\DatabaseConversationRepository;
+use DeveloperUnijaya\AiChatbox\Memory\Models\Conversation;
+use DeveloperUnijaya\AiChatbox\Tests\TestCase;
 
 /**
  * Tests for the ai-chatbox:prune-conversations Artisan command.

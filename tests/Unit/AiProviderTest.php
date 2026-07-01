@@ -1,10 +1,10 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Tests\Unit;
+namespace DeveloperUnijaya\AiChatbox\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
-use SyafiqUnijaya\AiChatbox\Engine\AiProvider;
-use SyafiqUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
-use SyafiqUnijaya\AiChatbox\Engine\PromptBuilder;
+use DeveloperUnijaya\AiChatbox\Engine\AiProvider;
+use DeveloperUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
+use DeveloperUnijaya\AiChatbox\Engine\PromptBuilder;
 
 class AiProviderTest extends TestCase
 {

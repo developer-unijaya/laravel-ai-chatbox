@@ -209,7 +209,7 @@
         <footer class="px-5 py-3 border-t border-gray-100 dark:border-gray-700/50 shrink-0">
             <p class="text-[0.7rem] text-gray-400 dark:text-gray-600 text-center">
                 AI Chatbox Admin &mdash;
-                <a href="https://github.com/syafiq-unijaya/laravel-ai-chatbox" class="underline hover:text-gray-600 dark:hover:text-gray-400 transition-colors" target="_blank" rel="noopener noreferrer">syafiq-unijaya/laravel-ai-chatbox</a>
+                <a href="https://github.com/developer-unijaya/laravel-ai-chatbox" class="underline hover:text-gray-600 dark:hover:text-gray-400 transition-colors" target="_blank" rel="noopener noreferrer">developer-unijaya/laravel-ai-chatbox</a>
             </p>
         </footer>
 

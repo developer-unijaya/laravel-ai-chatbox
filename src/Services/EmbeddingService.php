@@ -1,5 +1,5 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Services;
+namespace DeveloperUnijaya\AiChatbox\Services;
 
 use Illuminate\Support\Facades\Log;
 

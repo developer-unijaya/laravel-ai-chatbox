@@ -1,5 +1,5 @@
 {
-    "name": "syafiq-unijaya/laravel-ai-chatbox",
+    "name": "developer-unijaya/laravel-ai-chatbox",
     "description": "Drop-in AI chatbox widget for Laravel with RAG, streaming, Vue 3 frontend, and support for Ollama, OpenAI, Groq, and any OpenAI-compatible API.",
     "type": "library",
     "keywords": [
@@ -47,7 +47,7 @@
         "chat",
         "widget"
     ],
-    "homepage": "https://github.com/syafiq-unijaya/laravel-ai-chatbox",
+    "homepage": "https://github.com/developer-unijaya/laravel-ai-chatbox",
     "license": "MIT",
     "authors": [
         {
@@ -58,8 +58,8 @@
         }
     ],
     "support": {
-        "issues": "https://github.com/syafiq-unijaya/laravel-ai-chatbox/issues",
-        "source": "https://github.com/syafiq-unijaya/laravel-ai-chatbox"
+        "issues": "https://github.com/developer-unijaya/laravel-ai-chatbox/issues",
+        "source": "https://github.com/developer-unijaya/laravel-ai-chatbox"
     },
     "require": {
         "php": "^8.2",
@@ -70,12 +70,12 @@
     },
     "autoload": {
         "psr-4": {
-            "SyafiqUnijaya\\AiChatbox\\": "src/"
+            "DeveloperUnijaya\\AiChatbox\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "SyafiqUnijaya\\AiChatbox\\Tests\\": "tests/"
+            "DeveloperUnijaya\\AiChatbox\\Tests\\": "tests/"
         }
     },
     "require-dev": {
@@ -88,10 +88,10 @@
     "extra": {
         "laravel": {
             "providers": [
-                "SyafiqUnijaya\\AiChatbox\\AiChatboxServiceProvider"
+                "DeveloperUnijaya\\AiChatbox\\AiChatboxServiceProvider"
             ],
             "aliases": {
-                "AI": "SyafiqUnijaya\\AiChatbox\\AI"
+                "AI": "DeveloperUnijaya\\AiChatbox\\AI"
             }
         }
     },

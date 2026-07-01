@@ -1,7 +1,7 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Tests\Feature;
+namespace DeveloperUnijaya\AiChatbox\Tests\Feature;
 
-use SyafiqUnijaya\AiChatbox\Tests\TestCase;
+use DeveloperUnijaya\AiChatbox\Tests\TestCase;
 
 /**
  * Tests for the diagnostics panel rendered on the /ai-chatbox/admin dashboard.

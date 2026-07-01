@@ -1,5 +1,5 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Http\Controllers;
+namespace DeveloperUnijaya\AiChatbox\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -7,11 +7,11 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
-use SyafiqUnijaya\AiChatbox\AiManager;
-use SyafiqUnijaya\AiChatbox\Memory\Models\Conversation;
-use SyafiqUnijaya\AiChatbox\Memory\Models\Message;
-use SyafiqUnijaya\AiChatbox\Models\RagChunk;
-use SyafiqUnijaya\AiChatbox\Models\RagDocument;
+use DeveloperUnijaya\AiChatbox\AiManager;
+use DeveloperUnijaya\AiChatbox\Memory\Models\Conversation;
+use DeveloperUnijaya\AiChatbox\Memory\Models\Message;
+use DeveloperUnijaya\AiChatbox\Models\RagChunk;
+use DeveloperUnijaya\AiChatbox\Models\RagDocument;
 use Throwable;
 
 class AdminController extends Controller
@@ -875,7 +875,7 @@ class AdminController extends Controller
         $version = 'dev';
         try {
             if (class_exists(\Composer\InstalledVersions::class)) {
-                $v = \Composer\InstalledVersions::getVersion('syafiq-unijaya/laravel-ai-chatbox');
+                $v = \Composer\InstalledVersions::getVersion('developer-unijaya/laravel-ai-chatbox');
                 if ($v) {
                     $version = ltrim($v, 'v');
                 }

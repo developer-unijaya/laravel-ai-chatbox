@@ -1,9 +1,9 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Memory;
+namespace DeveloperUnijaya\AiChatbox\Memory;
 
-use SyafiqUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
-use SyafiqUnijaya\AiChatbox\Memory\Models\Conversation;
-use SyafiqUnijaya\AiChatbox\Memory\Models\Message;
+use DeveloperUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
+use DeveloperUnijaya\AiChatbox\Memory\Models\Conversation;
+use DeveloperUnijaya\AiChatbox\Memory\Models\Message;
 
 /**
  * Stores conversation history in the database.

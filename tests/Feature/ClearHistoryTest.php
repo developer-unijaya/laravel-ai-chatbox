@@ -1,8 +1,8 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Tests\Feature;
+namespace DeveloperUnijaya\AiChatbox\Tests\Feature;
 
-use SyafiqUnijaya\AiChatbox\Memory\DatabaseConversationRepository;
-use SyafiqUnijaya\AiChatbox\Tests\TestCase;
+use DeveloperUnijaya\AiChatbox\Memory\DatabaseConversationRepository;
+use DeveloperUnijaya\AiChatbox\Tests\TestCase;
 
 class ClearHistoryTest extends TestCase
 {

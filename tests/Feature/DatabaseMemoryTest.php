@@ -1,11 +1,11 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Tests\Feature;
+namespace DeveloperUnijaya\AiChatbox\Tests\Feature;
 
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use SyafiqUnijaya\AiChatbox\Memory\DatabaseConversationRepository;
-use SyafiqUnijaya\AiChatbox\Memory\Models\Conversation;
-use SyafiqUnijaya\AiChatbox\Tests\TestCase;
+use DeveloperUnijaya\AiChatbox\Memory\DatabaseConversationRepository;
+use DeveloperUnijaya\AiChatbox\Memory\Models\Conversation;
+use DeveloperUnijaya\AiChatbox\Tests\TestCase;
 
 /**
  * Tests the database memory driver end-to-end:

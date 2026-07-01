@@ -1,5 +1,5 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Engine\Exceptions;
+namespace DeveloperUnijaya\AiChatbox\Engine\Exceptions;
 
 class AiEngineException extends \RuntimeException
 {

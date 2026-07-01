@@ -1,12 +1,12 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Tests;
+namespace DeveloperUnijaya\AiChatbox\Tests;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Handler\MockHandler;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Orchestra\Testbench\TestCase as Orchestra;
-use SyafiqUnijaya\AiChatbox\AiChatboxServiceProvider;
+use DeveloperUnijaya\AiChatbox\AiChatboxServiceProvider;
 
 abstract class TestCase extends Orchestra
 {
@@ -62,8 +62,8 @@ abstract class TestCase extends Orchestra
 
         // Re-bind the repository now that the config key has changed
         $this->app->bind(
-            \SyafiqUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface::class,
-            \SyafiqUnijaya\AiChatbox\Memory\DatabaseConversationRepository::class
+            \DeveloperUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface::class,
+            \DeveloperUnijaya\AiChatbox\Memory\DatabaseConversationRepository::class
         );
 
         $this->artisan('migrate');

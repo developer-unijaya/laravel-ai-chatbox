@@ -1,5 +1,5 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Memory\Contracts;
+namespace DeveloperUnijaya\AiChatbox\Memory\Contracts;
 
 interface ConversationRepositoryInterface
 {

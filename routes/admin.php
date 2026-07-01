@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use SyafiqUnijaya\AiChatbox\Http\Controllers\AdminController;
+use DeveloperUnijaya\AiChatbox\Http\Controllers\AdminController;
 
 Route::get('/', [AdminController::class, 'index'])->name('ai-chatbox.admin.index');
 Route::get('conversations', [AdminController::class, 'conversations'])->name('ai-chatbox.admin.conversations');

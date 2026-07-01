@@ -1,5 +1,5 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Http\Middleware;
+namespace DeveloperUnijaya\AiChatbox\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;

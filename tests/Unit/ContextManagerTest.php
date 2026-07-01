@@ -1,8 +1,8 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Tests\Unit;
+namespace DeveloperUnijaya\AiChatbox\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
-use SyafiqUnijaya\AiChatbox\Memory\ContextManager;
+use DeveloperUnijaya\AiChatbox\Memory\ContextManager;
 
 class ContextManagerTest extends TestCase
 {

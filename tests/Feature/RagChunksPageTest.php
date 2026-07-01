@@ -1,14 +1,14 @@
 <?php
-namespace SyafiqUnijaya\AiChatbox\Tests\Feature;
+namespace DeveloperUnijaya\AiChatbox\Tests\Feature;
 
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\Utils;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use SyafiqUnijaya\AiChatbox\Models\RagChunk;
-use SyafiqUnijaya\AiChatbox\Models\RagDocument;
-use SyafiqUnijaya\AiChatbox\Tests\TestCase;
+use DeveloperUnijaya\AiChatbox\Models\RagChunk;
+use DeveloperUnijaya\AiChatbox\Models\RagDocument;
+use DeveloperUnijaya\AiChatbox\Tests\TestCase;
 
 /**
  * Covers RagController::chunks() (GET /{id}/chunks) and
