@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased]
+
+### Added
+- **`ai-chatbox:graphify` Artisan command** — rebuilds the RAG knowledge base from a [graphify](https://github.com/safishamsi/graphify) knowledge graph. Reads the markdown graphify writes to `graphify-out/` (`GRAPH_REPORT.md`, plus the per-community `--wiki` / `--obsidian` articles) recursively, and imports each file as a `RagDocument` via the shared chunking pipeline so the assistant can answer questions about the system it is embedded in. Options: `--path` (defaults to `base_path('graphify-out')`), `--dry-run` (preview only), `--keep` (append instead of replace). Each run replaces the documents it previously imported — matched by the `graphify-out/` `original_filename` prefix — so the knowledge base always mirrors the committed graph; documents from other sources (manual uploads) are never touched
+- **`RagIngestor` service** — the chunk-and-embed ingestion core, extracted from `RagController::processDocument()` so the upload flow and the new `ai-chatbox:graphify` command share a single code path (embeds when `rag_embedding_url` is configured, keyword-only otherwise)
+- **`GraphifyImportTest`** — feature tests covering missing-directory and no-markdown failures, recursive import into `RagDocument`, the `graphify-out/` marker prefix, `--dry-run` preview, rebuild replacement (no duplication), `--keep` append, and non-graphify documents being preserved across a rebuild
+
+### Changed
+- **`RagController::processDocument()`** now delegates to the new `RagIngestor` service — behaviour is unchanged
+
+---
+
 ## [0.4.0] — 2026-06-06
 
 ### Added
