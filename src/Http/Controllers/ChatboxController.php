@@ -1,10 +1,6 @@
 <?php
 namespace DeveloperUnijaya\AiChatbox\Http\Controllers;
 
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Log;
 use DeveloperUnijaya\AiChatbox\AiManager;
 use DeveloperUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
 use DeveloperUnijaya\AiChatbox\Engine\HealthChecker;
@@ -13,6 +9,10 @@ use DeveloperUnijaya\AiChatbox\Memory\ContextManager;
 use DeveloperUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
 use DeveloperUnijaya\AiChatbox\Orchestration\Exceptions\OrchestrationException;
 use DeveloperUnijaya\AiChatbox\Orchestration\Orchestrator;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
@@ -73,8 +73,9 @@ class ChatboxController extends Controller
             return $this->orchestrationError($e);
         }
 
-        // Persist the AI reply and trim history to the configured limit
-        if ($cfg['history_enabled'] ?? true) {
+        // Persist the AI reply and trim history to the configured limit.
+        // Guard on a non-empty reply so an empty assistant turn is never stored.
+        if (($cfg['history_enabled'] ?? true) && $reply !== '') {
             try {
                 $historyLimit = (int) ($cfg['history_limit'] ?? 50);
                 $fullHistory[] = ['role' => 'user', 'content' => $userMsg];

@@ -30,29 +30,25 @@ class DatabaseConversationRepository implements ConversationRepositoryInterface
 
     public function saveMessage(string $threadId, string $role, string $content): void
     {
-        $userId = auth()->id();
-        $lookup = ['thread_id' => $threadId];
+        $conversation = $this->resolveForWrite($threadId);
 
-        if ($userId !== null) {
-            $lookup['user_id'] = $userId;
+        // Null means the thread is owned by someone else — never write into it.
+        if ($conversation === null) {
+            return;
         }
 
-        $conversation = Conversation::firstOrCreate($lookup, ['user_id' => $userId]);
         $conversation->messages()->create(['role' => $role, 'content' => $content]);
         $conversation->touch();
     }
 
     public function saveHistory(string $threadId, array $history): void
     {
-        $userId = auth()->id();
-        $lookup = ['thread_id' => $threadId];
+        $conversation = $this->resolveForWrite($threadId);
 
-        // Scope to user when authenticated so one user cannot write into another's thread
-        if ($userId !== null) {
-            $lookup['user_id'] = $userId;
+        // Null means the thread is owned by someone else — never write into it.
+        if ($conversation === null) {
+            return;
         }
-
-        $conversation = Conversation::firstOrCreate($lookup, ['user_id' => $userId]);
 
         // Count only "active" messages (after the last clear point) to determine
         // which entries in $history are already persisted vs. need inserting.
@@ -107,19 +103,41 @@ class DatabaseConversationRepository implements ConversationRepositoryInterface
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
-     * Find a conversation scoped to the current user when authenticated.
-     * Falls back to thread_id-only lookup for unauthenticated (guest) users.
+     * Find a conversation the current requester is allowed to READ.
+     *
+     * A thread_id is globally unique, so ownership is decided by user_id:
+     *  - authenticated requester → the row's user_id must equal theirs;
+     *  - guest requester (null)  → the row must be unowned (user_id === null).
+     * Any mismatch returns null, so a guest can never read an owned thread and
+     * an authenticated user can never read a guest/other-user thread (IDOR guard).
      */
     private function findConversation(string $threadId): ?Conversation
     {
-        $userId = auth()->id();
-        $query = Conversation::where('thread_id', $threadId);
+        $conversation = Conversation::where('thread_id', $threadId)->first();
 
-        if ($userId !== null) {
-            $query->where('user_id', $userId);
+        if ($conversation === null) {
+            return null;
         }
 
-        return $query->first();
+        return $conversation->user_id === auth()->id() ? $conversation : null;
+    }
+
+    /**
+     * Resolve the conversation the current requester is allowed to WRITE, creating
+     * it on first use. Returns null when the thread_id already exists but is owned
+     * by someone else — the caller must then NOT write (never poison another's thread,
+     * and never trip the unique(thread_id) constraint by attempting an insert).
+     */
+    private function resolveForWrite(string $threadId): ?Conversation
+    {
+        $userId = auth()->id();
+        $existing = Conversation::where('thread_id', $threadId)->first();
+
+        if ($existing !== null) {
+            return $existing->user_id === $userId ? $existing : null;
+        }
+
+        return Conversation::create(['thread_id' => $threadId, 'user_id' => $userId]);
     }
 
     private function activeMessages(Conversation $conversation)

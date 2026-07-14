@@ -1,14 +1,14 @@
 <?php
 namespace DeveloperUnijaya\AiChatbox\Engine;
 
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\ConnectException;
-use GuzzleHttp\Exception\RequestException;
-use GuzzleHttp\Exception\TooManyRedirectsException;
 use DeveloperUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
 use DeveloperUnijaya\AiChatbox\Engine\Contracts\SupportsToolCalling;
 use DeveloperUnijaya\AiChatbox\Engine\EngineResult;
 use DeveloperUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Exception\TooManyRedirectsException;
 
 class OpenAiCompatibleEngine implements AiEngineInterface, SupportsToolCalling
 {
@@ -206,7 +206,10 @@ class OpenAiCompatibleEngine implements AiEngineInterface, SupportsToolCalling
         $model = $options['api_model'] ?? '';
         $timeout = $options['timeout'] ?? 30;
         $temp = (float) ($options['temperature'] ?? 0.7);
-        $maxTokens = $options['max_tokens'] ?? null;
+        // Agentic turns need more room than the chat default (which may be as low as
+        // 300) — a truncated tool_calls response yields incomplete argument JSON. Use
+        // orchestrator_max_tokens when set, otherwise at least 1024.
+        $maxTokens = (int) ($options['orchestrator_max_tokens'] ?? max((int) ($options['max_tokens'] ?? 0), 1024));
 
         $this->assertConfig($apiUrl, $apiToken, $model);
 

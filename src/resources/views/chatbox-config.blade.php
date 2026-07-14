@@ -1,7 +1,7 @@
 @php
     $title       = config('ai-chatbox.title', 'AI Assistant');
     $placeholder = config('ai-chatbox.placeholder', 'Type your message...');
-    $themeColor  = config('ai-chatbox.theme_color', '#4f46e5');
+    $themeColor  = config('ai-chatbox.theme_color', '#0dad35');
     $greeting    = config('ai-chatbox.greeting', '');
     $position    = config('ai-chatbox.position', 'bottom-right');
     $markdown    = config('ai-chatbox.markdown', true);

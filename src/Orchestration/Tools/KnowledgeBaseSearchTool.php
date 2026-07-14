@@ -1,12 +1,12 @@
 <?php
 namespace DeveloperUnijaya\AiChatbox\Orchestration\Tools;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use DeveloperUnijaya\AiChatbox\AiManager;
 use DeveloperUnijaya\AiChatbox\Orchestration\Contracts\ToolInterface;
 use DeveloperUnijaya\AiChatbox\Services\EmbeddingService;
 use DeveloperUnijaya\AiChatbox\Services\RagRetriever;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Lets the model search the RAG knowledge base on demand (vector or keyword,
@@ -18,7 +18,8 @@ use DeveloperUnijaya\AiChatbox\Services\RagRetriever;
  */
 class KnowledgeBaseSearchTool implements ToolInterface
 {
-    public function __construct(private readonly AiManager $aiManager) {}
+    public function __construct(private readonly AiManager $aiManager)
+    {}
 
     public function name(): string
     {

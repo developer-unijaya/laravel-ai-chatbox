@@ -361,6 +361,12 @@ return [
     'rag_admin_middleware' => ['web', 'auth'],
     'admin_middleware' => null, // null = inherit rag_admin_middleware
 
+    // Rate limit for the RAG routes (upload, reprocess, and the test-chat endpoint,
+    // which each hit the live AI/embedding provider). Applied on top of the
+    // rag_admin_middleware above. Tune down for shared/multi-user deployments.
+    'rag_rate_limit' => (int) env('AI_CHATBOX_RAG_RATE_LIMIT', 30),
+    'rag_rate_window' => (int) env('AI_CHATBOX_RAG_RATE_WINDOW', 1),
+
 /*
 |--------------------------------------------------------------------------
 | RAG Context Prompt
@@ -468,8 +474,11 @@ return [
 | the chatbox behaves exactly as before: a single model call per message.
 |
 | 'orchestrator_enabled'   — master switch. Env: AI_CHATBOX_ORCHESTRATOR
-| 'orchestrator_max_steps' — hard cap on tool-call loop iterations (runaway guard)
-| 'orchestrator_timeout'   — wall-clock seconds for the whole run
+| 'orchestrator_max_steps'  — hard cap on tool-call loop iterations (runaway guard)
+| 'orchestrator_timeout'    — wall-clock seconds for the whole run
+| 'orchestrator_max_tokens' — token cap for agentic (tool-calling) turns. Kept
+|                             separate from (and >= 1024, regardless of) the chat
+|                             'max_tokens' so tool-call argument JSON is never truncated
 | 'orchestrator_tools'     — allow-list of ToolInterface class names the model may
 |                            use. Empty = no tools (safe default). A tool runs only
 |                            if it is listed here AND its authorize() returns true.
@@ -483,6 +492,7 @@ return [
     'orchestrator_enabled' => env('AI_CHATBOX_ORCHESTRATOR', false),
     'orchestrator_max_steps' => (int) env('AI_CHATBOX_ORCHESTRATOR_MAX_STEPS', 5),
     'orchestrator_timeout' => (int) env('AI_CHATBOX_ORCHESTRATOR_TIMEOUT', 60),
+    'orchestrator_max_tokens' => (int) env('AI_CHATBOX_ORCHESTRATOR_MAX_TOKENS', 1024),
     'orchestrator_tools' => [
         // Built-in demo tools (safe, read-only) — uncomment to enable:
         // \DeveloperUnijaya\AiChatbox\Orchestration\Tools\CurrentDateTimeTool::class,

@@ -1,9 +1,9 @@
 <?php
 namespace DeveloperUnijaya\AiChatbox\Orchestration;
 
+use DeveloperUnijaya\AiChatbox\Orchestration\Contracts\ToolInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use DeveloperUnijaya\AiChatbox\Orchestration\Contracts\ToolInterface;
 
 /**
  * Holds the tools available to the orchestrator. Registered as a singleton so tools

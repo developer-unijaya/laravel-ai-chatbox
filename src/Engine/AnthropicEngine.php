@@ -1,10 +1,10 @@
 <?php
 namespace DeveloperUnijaya\AiChatbox\Engine;
 
+use DeveloperUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\TooManyRedirectsException;
-use DeveloperUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
 
 class AnthropicEngine extends OpenAiCompatibleEngine
 {
@@ -150,8 +150,10 @@ class AnthropicEngine extends OpenAiCompatibleEngine
         $timeout = $options['timeout'] ?? 30;
         $temp = (float) ($options['temperature'] ?? 0.5);
         // Anthropic requires a positive integer. Agentic turns need more room than
-        // the 300-token chat default, so fall back to 1024 when unset.
-        $maxTokens = ($options['max_tokens'] ?? null) !== null ? (int) $options['max_tokens'] : 1024;
+        // the chat default (which may be as low as 300) — a truncated tool_use turn
+        // yields incomplete argument JSON. Use orchestrator_max_tokens when set,
+        // otherwise at least 1024.
+        $maxTokens = (int) ($options['orchestrator_max_tokens'] ?? max((int) ($options['max_tokens'] ?? 0), 1024));
 
         $this->assertConfig($apiUrl, $apiToken, $model);
 

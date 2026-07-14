@@ -1,17 +1,17 @@
 <?php
 namespace DeveloperUnijaya\AiChatbox\Http\Controllers;
 
+use DeveloperUnijaya\AiChatbox\AiManager;
+use DeveloperUnijaya\AiChatbox\Memory\Models\Conversation;
+use DeveloperUnijaya\AiChatbox\Memory\Models\Message;
+use DeveloperUnijaya\AiChatbox\Models\RagChunk;
+use DeveloperUnijaya\AiChatbox\Models\RagDocument;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
-use DeveloperUnijaya\AiChatbox\AiManager;
-use DeveloperUnijaya\AiChatbox\Memory\Models\Conversation;
-use DeveloperUnijaya\AiChatbox\Memory\Models\Message;
-use DeveloperUnijaya\AiChatbox\Models\RagChunk;
-use DeveloperUnijaya\AiChatbox\Models\RagDocument;
 use Throwable;
 
 class AdminController extends Controller
@@ -51,7 +51,7 @@ class AdminController extends Controller
             'env' => $this->collectEnv(),
             'diagnostics' => $this->buildDiagnostics($cfg, $ragStats, $ragEnabled),
             'diagCheckedAt' => now()->format('H:i:s'),
-            'themeColor' => $cfg['theme_color'] ?? '#4f46e5',
+            'themeColor' => $cfg['theme_color'] ?? '#0dad35',
             'colorScheme' => $cfg['color_scheme'] ?? 'auto',
             'ragEnabled' => $ragEnabled,
             'frontend' => $cfg['frontend'] ?? 'vue',
@@ -69,7 +69,7 @@ class AdminController extends Controller
     public function conversations(): View
     {
         return view('ai-chatbox::admin-conversations', [
-            'themeColor' => config('ai-chatbox.theme_color', '#4f46e5'),
+            'themeColor' => config('ai-chatbox.theme_color', '#0dad35'),
             'colorScheme' => config('ai-chatbox.color_scheme', 'auto'),
             'dataUrl' => route('ai-chatbox.admin.conversations.data'),
             'messagesUrl' => rtrim(route('ai-chatbox.admin.conversations'), '/') . '/__id__/messages',

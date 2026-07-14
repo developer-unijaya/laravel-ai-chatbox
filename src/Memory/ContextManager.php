@@ -36,8 +36,12 @@ class ContextManager
             return $history;
         }
 
-        // Reserve headroom for RAG chunks injected after trimming by PromptBuilder
-        $effectiveLimit = max(0, $contextTokenLimit - $ragBudget);
+        // Reserve headroom for RAG chunks injected after trimming by PromptBuilder,
+        // but never let the reserve consume the whole window — always keep at least
+        // half the token budget for recent history. Otherwise a large RAG budget
+        // (e.g. rag_top_k * rag_chunk_size > context_token_limit) would drive the
+        // effective limit to 0 and silently strip ALL conversation memory.
+        $effectiveLimit = max((int) floor($contextTokenLimit / 2), $contextTokenLimit - $ragBudget);
 
         // 2. Trim by estimated token count (~4 chars per token)
         //    The language reminder is part of the API payload but not stored in history.

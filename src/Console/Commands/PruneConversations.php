@@ -1,9 +1,9 @@
 <?php
 namespace DeveloperUnijaya\AiChatbox\Console\Commands;
 
+use DeveloperUnijaya\AiChatbox\Memory\Models\Conversation;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Schema;
-use DeveloperUnijaya\AiChatbox\Memory\Models\Conversation;
 
 class PruneConversations extends Command
 {

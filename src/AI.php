@@ -1,8 +1,8 @@
 <?php
 namespace DeveloperUnijaya\AiChatbox;
 
-use Illuminate\Support\Facades\Facade;
 use DeveloperUnijaya\AiChatbox\Engine\AiProvider;
+use Illuminate\Support\Facades\Facade;
 
 /**
  * Facade for the AiManager.

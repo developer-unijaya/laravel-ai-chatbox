@@ -1,12 +1,13 @@
 <?php
 namespace DeveloperUnijaya\AiChatbox\Orchestration;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use DeveloperUnijaya\AiChatbox\AiManager;
 use DeveloperUnijaya\AiChatbox\Engine\Contracts\SupportsToolCalling;
+use DeveloperUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
 use DeveloperUnijaya\AiChatbox\Engine\PromptBuilder;
 use DeveloperUnijaya\AiChatbox\Orchestration\Exceptions\OrchestrationException;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Layer 1.5 — Orchestration.
@@ -74,7 +75,16 @@ class Orchestrator
             $result = $engine->completeWithTools($messages, $schemas, $cfg);
 
             if ($result->isText()) {
-                return OrchestratorResult::text((string) $result->text, $steps);
+                $text = trim((string) $result->text);
+
+                // Match the plain complete() contract: an empty final answer is an
+                // error (E18), not a valid ""-reply that would be returned with 200
+                // and persisted as an empty assistant turn.
+                if ($text === '') {
+                    throw new AiEngineException('E18', 'Unable to reach AI service. Please try again later.', 502);
+                }
+
+                return OrchestratorResult::text($text, $steps);
             }
 
             // The model requested one or more tools — execute each, collect results.

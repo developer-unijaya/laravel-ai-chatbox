@@ -141,11 +141,34 @@ class MakeAiTool extends GeneratorCommand
         $exclude = ['created_at', 'updated_at', 'deleted_at'];
         $usable = array_values(array_diff($columns, $exclude));
 
-        $this->returnColumns = $this->columnList('columns') ?? $usable;
+        $this->returnColumns = $this->sanitizeIdentifiers($this->columnList('columns') ?? $usable);
 
         // Default filters: everything usable except the primary key.
-        $this->filterCols = $this->columnList('filterable')
-            ?? array_values(array_filter($usable, fn($c) => $c !== 'id'));
+        $this->filterCols = $this->sanitizeIdentifiers($this->columnList('filterable') ?? array_values(array_filter($usable, fn($c) => $c !== 'id')));
+    }
+
+    /**
+     * Keep only valid identifiers ([A-Za-z_][A-Za-z0-9_]*). Anything else — a crafted
+     * --columns / --filterable value containing quotes or expressions — is dropped with
+     * a warning, so it can never break out of the single-quoted string literals in the
+     * generated tool into arbitrary PHP. Real DB column names always pass.
+     *
+     * @param  array<int, string>  $cols
+     * @return array<int, string>
+     */
+    protected function sanitizeIdentifiers(array $cols): array
+    {
+        $safe = [];
+
+        foreach ($cols as $col) {
+            if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', (string) $col)) {
+                $safe[] = $col;
+            } else {
+                $this->warn("Skipping invalid column identifier: '{$col}'");
+            }
+        }
+
+        return $safe;
     }
 
     protected function resolveModelClass(string $model): ?string
@@ -210,8 +233,8 @@ class MakeAiTool extends GeneratorCommand
         }
 
         $properties = $props === []
-            ? "                // no filterable columns"
-            : implode("\n", $props);
+        ? "                // no filterable columns"
+        : implode("\n", $props);
 
         return "            'type' => 'object',\n"
             . "            'properties' => [\n"

@@ -1,9 +1,9 @@
 <?php
 namespace DeveloperUnijaya\AiChatbox\Engine;
 
-use Illuminate\Support\Facades\Log;
 use DeveloperUnijaya\AiChatbox\Services\EmbeddingService;
 use DeveloperUnijaya\AiChatbox\Services\RagRetriever;
+use Illuminate\Support\Facades\Log;
 
 class PromptBuilder
 {

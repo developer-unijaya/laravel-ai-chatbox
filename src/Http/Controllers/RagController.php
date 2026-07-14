@@ -1,17 +1,15 @@
 <?php
 namespace DeveloperUnijaya\AiChatbox\Http\Controllers;
 
+use DeveloperUnijaya\AiChatbox\AiManager;
+use DeveloperUnijaya\AiChatbox\Engine\PromptBuilder;
+use DeveloperUnijaya\AiChatbox\Models\RagDocument;
+use DeveloperUnijaya\AiChatbox\Services\EmbeddingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\View\View;
-use DeveloperUnijaya\AiChatbox\AiManager;
-use DeveloperUnijaya\AiChatbox\Engine\PromptBuilder;
-use DeveloperUnijaya\AiChatbox\Models\RagChunk;
-use DeveloperUnijaya\AiChatbox\Models\RagDocument;
-use DeveloperUnijaya\AiChatbox\Services\DocumentChunker;
-use DeveloperUnijaya\AiChatbox\Services\EmbeddingService;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
@@ -49,7 +47,7 @@ class RagController extends Controller
             'embeddingConfigured' => $embeddingConfigured,
             'keywordOnlyMode' => $keywordOnlyMode,
             'uploadEnabled' => $uploadEnabled,
-            'themeColor' => config('ai-chatbox.theme_color', '#4f46e5'),
+            'themeColor' => config('ai-chatbox.theme_color', '#0dad35'),
             'colorScheme' => config('ai-chatbox.color_scheme', 'auto'),
         ]);
     }
@@ -157,7 +155,7 @@ class RagController extends Controller
             'providerConfigured' => $providerConfigured,
             'providerIssue' => $providerIssue,
             'streamEnabled' => (bool) ($cfg['stream'] ?? false),
-            'themeColor' => config('ai-chatbox.theme_color', '#4f46e5'),
+            'themeColor' => config('ai-chatbox.theme_color', '#0dad35'),
             'colorScheme' => config('ai-chatbox.color_scheme', 'auto'),
         ]);
     }
@@ -247,7 +245,7 @@ class RagController extends Controller
 
     private function retrieveContext($chunks, string $query, array $cfg): array
     {
-        $topK = max(1, (int) ($cfg['rag_top_k'] ?? 5));
+        $topK = max(1, (int) ($cfg['rag_top_k'] ?? 10));
         $threshold = (float) ($cfg['rag_similarity_threshold'] ?? 0.2);
 
         $embeddableChunks = $chunks->filter(

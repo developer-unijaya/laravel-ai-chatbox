@@ -1,13 +1,6 @@
 <?php
 namespace DeveloperUnijaya\AiChatbox;
 
-use GuzzleHttp\Client;
-use Illuminate\Foundation\AliasLoader;
-use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\View;
-use Illuminate\Support\ServiceProvider;
 use DeveloperUnijaya\AiChatbox\Console\Commands\GraphifyImport;
 use DeveloperUnijaya\AiChatbox\Console\Commands\MakeAiTool;
 use DeveloperUnijaya\AiChatbox\Console\Commands\PruneConversations;
@@ -17,6 +10,13 @@ use DeveloperUnijaya\AiChatbox\Http\Middleware\CorsMiddleware;
 use DeveloperUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
 use DeveloperUnijaya\AiChatbox\Memory\DatabaseConversationRepository;
 use DeveloperUnijaya\AiChatbox\Memory\SessionConversationRepository;
+use GuzzleHttp\Client;
+use Illuminate\Foundation\AliasLoader;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\ServiceProvider;
 
 class AiChatboxServiceProvider extends ServiceProvider
 {
@@ -146,9 +146,17 @@ class AiChatboxServiceProvider extends ServiceProvider
 
     protected function ragRouteConfiguration(): array
     {
+        $middleware = config('ai-chatbox.rag_admin_middleware', ['web', 'auth']);
+
+        // Throttle the RAG endpoints — upload, reprocess, and test-chat each call the
+        // live AI/embedding provider, so they need a rate cap independent of the widget.
+        $limit = (int) config('ai-chatbox.rag_rate_limit', 30);
+        $window = (int) config('ai-chatbox.rag_rate_window', 1);
+        $middleware = array_merge((array) $middleware, ["throttle:{$limit},{$window}"]);
+
         return [
             'prefix' => config('ai-chatbox.route_prefix') . '/rag',
-            'middleware' => config('ai-chatbox.rag_admin_middleware', ['web', 'auth']),
+            'middleware' => $middleware,
         ];
     }
 

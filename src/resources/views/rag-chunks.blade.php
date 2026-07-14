@@ -1,7 +1,8 @@
 @extends('ai-chatbox::admin-layout')
 
 @push('head')
-<script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@13.0.3/marked.min.js" integrity="sha384-YTBHtsL8yVTHcLakYNyrOfK3K+QQcXiECuaALJ+3j7Mo681Rtzadt8NR6WrZH+eQ" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.2/dist/purify.min.js" integrity="sha384-AX0sZ/phUL4R6LAFP+mob0mJIWg2c3PX8wPn48ctytOl7XKfRQHbakBt5/QID7uh" crossorigin="anonymous"></script>
 @endpush
 
 @section('title', $document->title . ' — Chunks')
@@ -303,8 +304,8 @@
     }
 
     function renderMarkdown(text) {
-        if (typeof marked !== 'undefined') {
-            return marked.parse(text);
+        if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+            return DOMPurify.sanitize(marked.parse(text));
         }
         return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
     }

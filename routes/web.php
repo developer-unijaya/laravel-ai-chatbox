@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use DeveloperUnijaya\AiChatbox\Http\Controllers\ChatboxController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('health', [ChatboxController::class, 'healthCheck'])->name('ai-chatbox.health');
 Route::post('message', [ChatboxController::class, 'sendMessage'])->name('ai-chatbox.message');
