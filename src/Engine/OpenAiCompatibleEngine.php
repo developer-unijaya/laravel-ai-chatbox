@@ -6,9 +6,11 @@ use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\TooManyRedirectsException;
 use DeveloperUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
+use DeveloperUnijaya\AiChatbox\Engine\Contracts\SupportsToolCalling;
+use DeveloperUnijaya\AiChatbox\Engine\EngineResult;
 use DeveloperUnijaya\AiChatbox\Engine\Exceptions\AiEngineException;
 
-class OpenAiCompatibleEngine implements AiEngineInterface
+class OpenAiCompatibleEngine implements AiEngineInterface, SupportsToolCalling
 {
     // ── Error codes ───────────────────────────────────────────────────────────
 
@@ -193,6 +195,120 @@ class OpenAiCompatibleEngine implements AiEngineInterface
 
             return $fullReply;
         };
+    }
+
+    // ── SupportsToolCalling ───────────────────────────────────────────────────
+
+    public function completeWithTools(array $messages, array $tools, array $options = []): EngineResult
+    {
+        $apiUrl = $options['api_url'] ?? '';
+        $apiToken = $options['api_token'] ?? '';
+        $model = $options['api_model'] ?? '';
+        $timeout = $options['timeout'] ?? 30;
+        $temp = (float) ($options['temperature'] ?? 0.7);
+        $maxTokens = $options['max_tokens'] ?? null;
+
+        $this->assertConfig($apiUrl, $apiToken, $model);
+
+        try {
+            $client = $this->makeClient(['timeout' => $timeout]);
+
+            $payload = array_filter([
+                'model' => $model,
+                'messages' => $messages,
+                'temperature' => $temp,
+                'max_tokens' => $maxTokens,
+                'stream' => false,
+            ], fn($v) => $v !== null);
+
+            // OpenAI-compatible tool schema: [{type:function, function:{name, description, parameters}}]
+            if (!empty($tools)) {
+                $payload['tools'] = array_map(fn($t) => [
+                    'type' => 'function',
+                    'function' => array_filter([
+                        'name' => $t['name'],
+                        'description' => $t['description'] ?? '',
+                        'parameters' => $t['parameters'] ?? ['type' => 'object', 'properties' => (object) []],
+                    ], fn($v) => $v !== null),
+                ], $tools);
+            }
+
+            $response = $client->post($apiUrl, [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $apiToken,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
+                ],
+                'json' => $payload,
+            ]);
+
+            $data = json_decode($response->getBody()->getContents(), true);
+            $message = $data['choices'][0]['message'] ?? null;
+
+            if (!is_array($message)) {
+                throw new AiEngineException(self::E18, 'Unable to reach AI service. Please try again later.', 502);
+            }
+
+            $toolCalls = $message['tool_calls'] ?? [];
+            if (!empty($toolCalls)) {
+                return EngineResult::toolCalls($this->normalizeToolCalls($toolCalls), $message);
+            }
+
+            return EngineResult::text(trim((string) ($message['content'] ?? '')));
+
+        } catch (AiEngineException $e) {
+            throw $e;
+        } catch (TooManyRedirectsException $e) {
+            throw new AiEngineException(self::E10, 'Unable to reach AI service. Please try again later.', 502, $e);
+        } catch (ConnectException $e) {
+            throw new AiEngineException($this->classifyConnectException($e), 'Unable to reach AI service. Please try again later.', 503, $e);
+        } catch (RequestException $e) {
+            $status = $e->hasResponse() ? $e->getResponse()->getStatusCode() : 500;
+            throw new AiEngineException($this->classifyHttpStatus($status), 'Unable to reach AI service. Please try again later.', $status, $e);
+        } catch (\Throwable $e) {
+            throw new AiEngineException(self::E19, 'Unable to reach AI service. Please try again later.', 500, $e);
+        }
+    }
+
+    public function toolResultMessages(EngineResult $result, array $toolResults): array
+    {
+        // Assistant turn carrying the tool_calls, then one role:tool message per result.
+        $messages = [$result->rawAssistantMessage];
+
+        foreach ($toolResults as $tr) {
+            $messages[] = [
+                'role' => 'tool',
+                'tool_call_id' => $tr['id'],
+                'content' => $tr['content'],
+            ];
+        }
+
+        return $messages;
+    }
+
+    /**
+     * Normalize OpenAI-compatible tool_calls into [{id, name, arguments(array)}].
+     * OpenAI returns function.arguments as a JSON *string*.
+     *
+     * @param  array<int, mixed>  $toolCalls
+     * @return array<int, array{id: string, name: string, arguments: array}>
+     */
+    protected function normalizeToolCalls(array $toolCalls): array
+    {
+        $normalized = [];
+
+        foreach ($toolCalls as $i => $call) {
+            $rawArgs = $call['function']['arguments'] ?? '{}';
+            $args = is_array($rawArgs) ? $rawArgs : (json_decode((string) $rawArgs, true) ?: []);
+
+            $normalized[] = [
+                'id' => $call['id'] ?? ('call_' . $i),
+                'name' => $call['function']['name'] ?? '',
+                'arguments' => is_array($args) ? $args : [],
+            ];
+        }
+
+        return $normalized;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

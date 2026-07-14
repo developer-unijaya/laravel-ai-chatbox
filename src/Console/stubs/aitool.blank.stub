@@ -1,0 +1,42 @@
+<?php
+
+namespace {{ namespace }};
+
+use DeveloperUnijaya\AiChatbox\Orchestration\Contracts\ToolInterface;
+use Illuminate\Http\Request;
+
+class {{ class }} implements ToolInterface
+{
+    public function name(): string
+    {
+        return '{{ toolName }}';
+    }
+
+    public function description(): string
+    {
+        return '{{ description }}';
+    }
+
+    public function parameters(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                // 'example' => ['type' => 'string', 'description' => 'An example argument.'],
+            ],
+            'required' => [],
+        ];
+    }
+
+    public function authorize(?Request $request = null): bool
+    {
+        // TODO: tighten this to your needs. Defaults to authenticated users only.
+        return $request?->user() !== null;
+    }
+
+    public function handle(array $arguments): mixed
+    {
+        // TODO: implement your tool logic and return a JSON-serialisable value (array|scalar).
+        return ['message' => 'Not implemented yet.'];
+    }
+}

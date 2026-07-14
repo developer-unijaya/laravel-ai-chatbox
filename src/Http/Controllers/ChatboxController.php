@@ -11,6 +11,8 @@ use DeveloperUnijaya\AiChatbox\Engine\HealthChecker;
 use DeveloperUnijaya\AiChatbox\Engine\PromptBuilder;
 use DeveloperUnijaya\AiChatbox\Memory\ContextManager;
 use DeveloperUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
+use DeveloperUnijaya\AiChatbox\Orchestration\Exceptions\OrchestrationException;
+use DeveloperUnijaya\AiChatbox\Orchestration\Orchestrator;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
@@ -28,6 +30,7 @@ class ChatboxController extends Controller
         private readonly PromptBuilder $promptBuilder,
         private readonly ContextManager $contextManager,
         private readonly HealthChecker $healthChecker,
+        private readonly Orchestrator $orchestrator,
     ) {}
 
     // ── Endpoints ─────────────────────────────────────────────────────────────
@@ -60,13 +63,14 @@ class ChatboxController extends Controller
             }
         }
 
-        // Engine layer: build prompt and call AI
-        $messages = $this->promptBuilder->build($userMsg, $contextHistory, $cfg);
-
+        // Orchestration layer: single call when disabled, agentic tool loop when enabled.
+        // (Prompt assembly, incl. RAG injection, happens inside the orchestrator.)
         try {
-            $reply = $this->aiManager->resolveEngine($cfg)->complete($messages, $cfg);
+            $reply = $this->orchestrator->run($userMsg, $contextHistory, $cfg, $request)->reply;
         } catch (AiEngineException $e) {
             return $this->engineError($e);
+        } catch (OrchestrationException $e) {
+            return $this->orchestrationError($e);
         }
 
         // Persist the AI reply and trim history to the configured limit
@@ -106,7 +110,6 @@ class ChatboxController extends Controller
         $system = $this->promptBuilder->systemMessages($cfg);
         $contextHistory = $this->contextManager->trim($fullHistory, $system, $userMsg, $cfg, $this->ragBudget($cfg));
 
-        $messages = $this->promptBuilder->build($userMsg, $contextHistory, $cfg);
         $useHistory = $cfg['history_enabled'] ?? true;
         $historyLimit = (int) ($cfg['history_limit'] ?? 50);
 
@@ -121,6 +124,23 @@ class ChatboxController extends Controller
                 ]);
             }
         }
+
+        // Orchestrator enabled: run the (possibly multi-step) tool loop to completion,
+        // then stream the final answer text. Tool turns are not token-streamed in v1.
+        if ($cfg['orchestrator_enabled'] ?? false) {
+            try {
+                $reply = $this->orchestrator->run($userMsg, $contextHistory, $cfg, $request)->reply;
+            } catch (AiEngineException $e) {
+                return $this->engineError($e);
+            } catch (OrchestrationException $e) {
+                return $this->orchestrationError($e);
+            }
+
+            return $this->streamPlainText($reply, $threadId, $userMsg, $fullHistory, $useHistory, $historyLimit);
+        }
+
+        // Disabled path: true token-by-token streaming via beginStream.
+        $messages = $this->promptBuilder->build($userMsg, $contextHistory, $cfg);
 
         // Establish the AI connection before starting the HTTP stream response.
         // This ensures connection / config errors can still return proper JSON (non-200).
@@ -254,5 +274,76 @@ class ChatboxController extends Controller
             'error' => $e->getMessage(),
             'code' => $e->errorCode,
         ], $e->getHttpStatus());
+    }
+
+    private function orchestrationError(OrchestrationException $e): JsonResponse
+    {
+        Log::error('AI Chatbox orchestration error', [
+            'code' => $e->errorCode,
+            'message' => $e->getMessage(),
+        ]);
+
+        return response()->json([
+            'error' => 'The assistant could not complete this request. Please try again.',
+            'code' => $e->errorCode,
+        ], 500);
+    }
+
+    /**
+     * Stream an already-assembled reply over SSE, preserving whitespace so the
+     * concatenated tokens reproduce the text exactly. Used for the orchestrated
+     * path, where the tool loop runs to completion before the answer is known.
+     */
+    private function streamPlainText(
+        string $reply,
+        string $threadId,
+        string $userMsg,
+        array $fullHistory,
+        bool $useHistory,
+        int $historyLimit,
+    ): StreamedResponse {
+        return response()->stream(
+            function () use ($reply, $threadId, $userMsg, $fullHistory, $useHistory, $historyLimit) {
+                // Split into words + whitespace runs so concatenation is lossless.
+                $pieces = preg_split('/(\s+)/', $reply, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) ?: [];
+                foreach ($pieces as $piece) {
+                    echo 'data: ' . json_encode(['token' => $piece]) . "\n\n";
+                    if (ob_get_level() > 0) {
+                        ob_flush();
+                    }
+                    flush();
+                }
+
+                if ($useHistory && $reply !== '') {
+                    try {
+                        $fullHistory[] = ['role' => 'user', 'content' => $userMsg];
+                        $fullHistory[] = ['role' => 'assistant', 'content' => $reply];
+                        $this->repository->saveHistory($threadId, $fullHistory);
+                        if (count($fullHistory) > $historyLimit * 2) {
+                            $this->repository->trimToLimit($threadId, $historyLimit);
+                        }
+                        session()->save();
+                    } catch (Throwable $e) {
+                        Log::error('AI Chatbox: failed to save AI reply', [
+                            'thread_id' => $threadId,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
+                echo "data: [DONE]\n\n";
+                if (ob_get_level() > 0) {
+                    ob_flush();
+                }
+                flush();
+            },
+            200,
+            [
+                'Content-Type' => 'text/event-stream',
+                'Cache-Control' => 'no-cache',
+                'X-Accel-Buffering' => 'no',
+                'Connection' => 'keep-alive',
+            ]
+        );
     }
 }

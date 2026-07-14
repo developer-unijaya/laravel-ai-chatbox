@@ -28,6 +28,7 @@ Connect to any **OpenAI-compatible API** including Ollama, OpenAI, Groq, LM Stud
 - [Token Control](#token-control)
 - [Real-Time Streaming](#real-time-streaming)
 - [RAG — Retrieval-Augmented Generation](#rag--retrieval-augmented-generation)
+- [AI Orchestrator (Tools & Agents)](#ai-orchestrator-tools--agents)
 - [Admin Dashboard](#admin-dashboard)
 - [Security](#security)
 - [Dark Mode](#dark-mode)
@@ -69,6 +70,13 @@ Connect to any **OpenAI-compatible API** including Ollama, OpenAI, Groq, LM Stud
 - Document chunking with configurable size and overlap; per-provider embedding configuration
 - **Two retrieval modes:** vector search (cosine similarity in PHP, no external vector database) and keyword search (SQL `LIKE`, no embedding service required) — either alone or as automatic fallback
 - Knowledge Base UI at `/ai-chatbox/rag` with upload, reprocess, and delete actions
+
+**AI Orchestrator (agentic tool calling)**
+- Give the chatbox real abilities: the model can call **tools** you define — query a table, look up a record, hit an internal API — then answer from the result
+- Works with OpenAI-compatible **and** Anthropic (Claude) providers; tool calling built into both engines
+- Explicit allow-list, per-request authorization, step/time caps — off by default, safe by design
+- Two safe read-only demo tools included (`current_datetime`, `knowledge_base_search`)
+- Scaffold tools from a model in one command: `php artisan ai-chatbox:make-tool --model=Car`
 
 **Admin & Operations**
 - Admin dashboard at `/ai-chatbox/admin` with config diagnostics, live error/warning/notice checks, and provider details
@@ -1063,6 +1071,199 @@ Each run **replaces** the documents it imported previously (matched by the `grap
 
 ---
 
+## AI Orchestrator (Tools & Agents)
+
+The orchestrator turns the chatbox from a single *"prompt in → text out"* call into a multi-step **agent**. Instead of only talking, the model can call **tools** you define — look up a record, query a table, hit an internal API — and use the results to answer.
+
+It is **off by default**. When disabled, every message is a single model call exactly as before — no behaviour change, no new tables, no new dependencies.
+
+> **Provider support.** Tool calling requires a provider that supports it: any OpenAI-compatible endpoint (OpenAI, Groq, LM Studio, …) **or** Anthropic (Claude). Both engines ship with tool-calling built in. If the active provider's engine cannot do tool calling, the orchestrator transparently falls back to a single plain completion.
+
+### How it works
+
+```
+1. Your message is sent to the model together with the list of allow-listed tools.
+2. The model either answers directly (done), or asks to call one or more tools.
+3. The orchestrator authorizes + validates + runs each tool, and feeds the result back.
+4. Steps 2–3 repeat until the model produces a final answer — or a safety limit trips.
+```
+
+The orchestrator owns the loop: it enforces the step limit, the wall-clock timeout, per-tool authorization, argument validation, and error handling, so a runaway model can neither loop forever nor call something it shouldn't.
+
+### Enabling
+
+```env
+AI_CHATBOX_ORCHESTRATOR=true
+```
+
+| Key | Env var | Default | Description |
+|---|---|---|---|
+| `orchestrator_enabled` | `AI_CHATBOX_ORCHESTRATOR` | `false` | Master switch |
+| `orchestrator_max_steps` | `AI_CHATBOX_ORCHESTRATOR_MAX_STEPS` | `5` | Max tool-call loop iterations (runaway guard) |
+| `orchestrator_timeout` | `AI_CHATBOX_ORCHESTRATOR_TIMEOUT` | `60` | Wall-clock seconds for the whole run |
+| `orchestrator_tools` | — | `[]` | Allow-list of tool class names the model may use |
+
+> A tool runs **only** if its class is in `orchestrator_tools` **and** its `authorize()` returns true for the current request. An empty list means no tools — the safe default.
+
+### Writing a tool
+
+Implement `ToolInterface` — the same "implement an interface, register it" pattern used for [custom engines](#custom-ai-engine) and [custom memory drivers](#custom-memory-driver):
+
+```php
+use DeveloperUnijaya\AiChatbox\Orchestration\Contracts\ToolInterface;
+use Illuminate\Http\Request;
+
+class GetOrderStatusTool implements ToolInterface
+{
+    public function name(): string
+    {
+        return 'get_order_status';
+    }
+
+    public function description(): string
+    {
+        return 'Look up the current status of a customer order by its order number.';
+    }
+
+    public function parameters(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'order_id' => ['type' => 'string', 'description' => 'The order number, e.g. "A-10234".'],
+            ],
+            'required' => ['order_id'],
+        ];
+    }
+
+    public function authorize(?Request $request = null): bool
+    {
+        return $request?->user() !== null;   // logged-in users only
+    }
+
+    public function handle(array $arguments): mixed
+    {
+        $order = \App\Models\Order::where('number', $arguments['order_id'])
+            ->where('user_id', auth()->id())        // scope to the caller — never trust the model
+            ->first();
+
+        return $order
+            ? ['status' => $order->status, 'eta' => $order->eta?->toDateString()]
+            : ['error' => 'Order not found'];
+    }
+}
+```
+
+| Method | Purpose |
+|---|---|
+| `name()` | Unique tool name the model calls (`[a-zA-Z0-9_-]`) |
+| `description()` | One line the model reads to decide *when* to use the tool |
+| `parameters()` | JSON-Schema object describing the arguments |
+| `authorize(?Request)` | Return `false` to hide/deny the tool for this request |
+| `handle(array $arguments)` | Execute and return any JSON-serialisable value |
+
+Then allow-list it:
+
+```php
+// config/ai-chatbox.php
+'orchestrator_enabled' => true,
+'orchestrator_tools'   => [
+    \App\AiTools\GetOrderStatusTool::class,
+],
+```
+
+Now the chatbox can act on it:
+
+> **User:** "Where's my order A-10234?"
+> *(model calls `get_order_status({order_id: "A-10234"})` → `{status: "shipped", eta: "2026-07-20"}`)*
+> **Assistant:** "Your order A-10234 has shipped and should arrive around 20 July 2026."
+
+### Generating a tool with `artisan`
+
+Scaffold a tool instead of writing it by hand:
+
+```bash
+# Blank skeleton — you fill in handle()
+php artisan ai-chatbox:make-tool GetWeatherTool
+
+# Model-backed read tool — introspects the table for typed filter arguments + a query
+php artisan ai-chatbox:make-tool --model=Car
+
+# Restrict which columns become filter arguments
+php artisan ai-chatbox:make-tool --model=Car --filterable=brand,year
+```
+
+Model mode reads the model's table and pre-fills `parameters()` (one optional, **typed** filter per column) and `handle()` (a read query returning the selected columns). It writes to `app/AiTools/`, excludes `id` from filters and timestamps entirely, and prints the exact allow-list line to add.
+
+| Option | Purpose |
+|---|---|
+| `--model=` | Eloquent model to build a read tool from (`Car` or `App\Models\Car`) |
+| `--tool-name=` | Override the tool's snake_case `name()` (default derived) |
+| `--columns=` | Comma list of columns the tool returns (default: all non-timestamp) |
+| `--filterable=` | Comma list of columns exposed as filter arguments |
+| `--namespace=` | Namespace for the generated class (default `App\AiTools`) |
+| `--force` | Overwrite an existing tool |
+
+> Generated tools are **read-only** and default to authenticated-users-only — they are a *starting point*. Add per-user scoping (a `// TODO` marks exactly where) and allow-list the class before it does anything. Customise the generated shape with `php artisan vendor:publish --tag=ai-chatbox-stubs`.
+
+### Registering tools at runtime
+
+Instead of (or in addition to) the config allow-list, register tools programmatically in a service provider:
+
+```php
+use DeveloperUnijaya\AiChatbox\Orchestration\ToolRegistry;
+
+public function boot(): void
+{
+    $this->app->make(ToolRegistry::class)->register(new GetOrderStatusTool());
+}
+```
+
+### Built-in demo tools
+
+Two safe, read-only tools ship with the package — both **disabled** until you allow-list them:
+
+| Tool name | Class | Purpose |
+|---|---|---|
+| `current_datetime` | `Orchestration\Tools\CurrentDateTimeTool` | Returns the current server date/time (optional timezone) |
+| `knowledge_base_search` | `Orchestration\Tools\KnowledgeBaseSearchTool` | Lets the model search the RAG knowledge base on demand (pull, instead of always-on injection) |
+
+```php
+'orchestrator_tools' => [
+    \DeveloperUnijaya\AiChatbox\Orchestration\Tools\CurrentDateTimeTool::class,
+    \DeveloperUnijaya\AiChatbox\Orchestration\Tools\KnowledgeBaseSearchTool::class,
+],
+```
+
+### Streaming behaviour
+
+When streaming is on (`AI_CHATBOX_STREAM=true`) and the orchestrator runs a tool loop, the tool-calling turns run **non-streamed**; the **final answer** is then streamed to the widget token-by-token as usual. No frontend change is required — the Vue, Blade, and Livewire widgets work unchanged.
+
+### Safety & limits
+
+- **Explicit allow-list only** — no auto-discovery. Empty list = no tools.
+- **Per-request authorization** via `authorize()` — scope tools to admins, owners, or logged-in users.
+- **Argument validation** — required arguments are checked before the tool runs.
+- **Step & time caps** (`orchestrator_max_steps`, `orchestrator_timeout`) prevent runaway loops and cost blow-ups.
+- **Failures never 500 the request.** A tool that is unknown, unauthorized, gets bad arguments, or throws is reported back to the model as an error result so it can recover — see the codes below.
+
+> **Cost note.** An orchestrated message can make several model + tool calls, not one. Keep `orchestrator_max_steps` conservative and consider a stricter throttle on high-traffic apps.
+
+### Orchestration error codes
+
+Distinct from the engine's `E01`–`E19` (which are logged to `storage/logs/laravel.log`):
+
+| Code | Meaning | Fatal to the request? |
+|---|---|---|
+| `O01` | Maximum steps reached without a final answer | Yes |
+| `O02` | Wall-clock timeout exceeded | Yes |
+| `O03` | Unknown tool requested | No — reported back to the model |
+| `O04` | Tool not authorized for this request | No — reported back to the model |
+| `O05` | Missing required argument | No — reported back to the model |
+| `O06` | Tool threw during execution | No — reported back to the model |
+
+---
+
 ## Admin Dashboard
 
 Visit **`/ai-chatbox/admin`** (authenticated users only).
@@ -1239,7 +1440,7 @@ Published to `resources/views/vendor/ai-chatbox/`:
 
 ## Architecture
 
-The package is organised into four explicit layers. Each layer communicates only with the layer directly above or below it; controllers contain no business logic.
+The package is organised into four explicit layers. Each layer communicates only with the layer directly above or below it; controllers contain no business logic. An optional **Orchestration** layer sits between the UI and the Engine when [agentic tool calling](#ai-orchestrator-tools--agents) is enabled; when disabled it is bypassed entirely and behaviour is unchanged.
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -1275,12 +1476,17 @@ src/
 ├── Config/
 │   └── ai-chatbox.php
 ├── Console/
-│   └── Commands/
-│       └── PruneConversations.php # ai-chatbox:prune-conversations
+│   ├── Commands/
+│   │   ├── PruneConversations.php # ai-chatbox:prune-conversations
+│   │   ├── GraphifyImport.php     # ai-chatbox:graphify
+│   │   └── MakeAiTool.php         # ai-chatbox:make-tool (orchestrator tool generator)
+│   └── stubs/                     # publishable — tag: ai-chatbox-stubs
 ├── Database/
 │   └── Migrations/
 ├── Engine/
 │   ├── Contracts/AiEngineInterface.php
+│   ├── Contracts/SupportsToolCalling.php   # optional tool-calling capability
+│   ├── EngineResult.php             # text-or-tool-calls result value object
 │   ├── OpenAiCompatibleEngine.php
 │   ├── AnthropicEngine.php          # native Anthropic Messages API (extends OpenAiCompatibleEngine)
 │   ├── HealthChecker.php
@@ -1299,6 +1505,15 @@ src/
 ├── Models/
 │   ├── RagDocument.php
 │   └── RagChunk.php
+├── Orchestration/                    # optional agentic tool-calling layer (off by default)
+│   ├── Contracts/ToolInterface.php
+│   ├── Orchestrator.php              # the tool-calling loop (step/time caps, dispatch)
+│   ├── ToolRegistry.php              # allow-list + authorization + schemas
+│   ├── ToolCall.php · OrchestratorResult.php
+│   ├── Exceptions/OrchestrationException.php   # codes O01–O06
+│   └── Tools/                        # built-in demo tools (disabled until allow-listed)
+│       ├── CurrentDateTimeTool.php
+│       └── KnowledgeBaseSearchTool.php
 ├── Services/
 │   ├── RagRetriever.php
 │   ├── EmbeddingService.php
@@ -1417,9 +1632,29 @@ $this->app->bind(ConversationRepositoryInterface::class, RedisConversationReposi
 
 ---
 
+### Custom orchestrator tool
+
+Give the chatbox a new ability by implementing `ToolInterface` and allow-listing the class. See [AI Orchestrator (Tools & Agents)](#ai-orchestrator-tools--agents) for the full contract, a worked example, and the safety model.
+
+```php
+use DeveloperUnijaya\AiChatbox\Orchestration\Contracts\ToolInterface;
+
+class GetOrderStatusTool implements ToolInterface { /* name/description/parameters/authorize/handle */ }
+```
+
+```php
+// config/ai-chatbox.php
+'orchestrator_enabled' => true,
+'orchestrator_tools'   => [ \App\AiTools\GetOrderStatusTool::class ],
+```
+
+---
+
 ## Troubleshooting
 
 If the widget shows an offline toast or requests fail, check `storage/logs/laravel.log` for an error code (`E01`–`E19`). Full reference: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
+Orchestrator runs add their own codes (`O01`–`O06`) — see [Orchestration error codes](#orchestration-error-codes).
 
 ---
 
@@ -1429,7 +1664,7 @@ If the widget shows an offline toast or requests fail, check `storage/logs/larav
 composer test
 ```
 
-The test suite covers: controller responses, error classification, session history, conversation thread isolation, token-based context trimming, SSE streaming, RAG document upload/delete/reprocess, RAG context injection (vector and keyword fallback), CORS middleware, SSRF protection, health check logic, `AiManager` named provider resolution and engine selection, `AiProvider` fluent modifiers and immutability, the `AI` facade, the `AnthropicEngine` (complete/stream/headers/system message extraction), admin diagnostics (all config groups, keyword-only mode notices), and the `ai-chatbox:prune-conversations` command (pre-flight checks, deletion, boundary conditions, cascade, `--dry-run`, `--force`, config key precedence) — using PHPUnit 11 and Orchestra Testbench.
+The test suite covers: controller responses, error classification, session history, conversation thread isolation, token-based context trimming, SSE streaming, RAG document upload/delete/reprocess, RAG context injection (vector and keyword fallback), CORS middleware, SSRF protection, health check logic, `AiManager` named provider resolution and engine selection, `AiProvider` fluent modifiers and immutability, the `AI` facade, the `AnthropicEngine` (complete/stream/headers/system message extraction), admin diagnostics (all config groups, keyword-only mode notices), and the `ai-chatbox:prune-conversations` command (pre-flight checks, deletion, boundary conditions, cascade, `--dry-run`, `--force`, config key precedence); and the **AI orchestrator** — engine tool-calling for both the OpenAI-compatible and Anthropic engines (payload shapes, tool-call parsing, tool-result messages), the orchestration loop (tool execution, step limit, timeout, and `O03`–`O06` recoverable failures), the tool registry (allow-list, authorization, schema output), the `ai-chatbox:make-tool` generator (blank + model-backed scaffolding, typed filters, overwrite protection), and backward compatibility (identical behaviour when the orchestrator is disabled) — using PHPUnit 11 and Orchestra Testbench.
 
 ---
 
@@ -1478,6 +1713,14 @@ AI_CHATBOX_RAG=false
 AI_CHATBOX_EMBEDDING_TIMEOUT=10       # universal — applies to all providers
 AI_CHATBOX_RAG_PROCESSING_TIMEOUT=0  # 0 = no limit
 AI_CHATBOX_RAG_KEYWORD_FALLBACK=true  # keyword search when embedding URL is absent
+
+# ── AI Orchestrator (agentic tool calling) ────────────────────────────────────
+# Off by default. When enabled, the model can call allow-listed tools. Requires a
+# provider that supports tool calling (OpenAI-compatible or Anthropic). The tool
+# allow-list (orchestrator_tools) is set in the published config, not via env.
+AI_CHATBOX_ORCHESTRATOR=false
+AI_CHATBOX_ORCHESTRATOR_MAX_STEPS=5    # max tool-call loop iterations (runaway guard)
+AI_CHATBOX_ORCHESTRATOR_TIMEOUT=60    # wall-clock seconds for the whole run
 
 # ── Named Provider Credentials ────────────────────────────────────────────────
 # The chatbox widget and AI facade both resolve through these env vars.

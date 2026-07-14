@@ -459,6 +459,41 @@ return [
 
 /*
 |--------------------------------------------------------------------------
+| AI Orchestrator (agentic tool calling)
+|--------------------------------------------------------------------------
+| When enabled, the chatbox becomes a multi-step agent: the model can call the
+| tools you allow-list below, you execute them, and the result is fed back until
+| the model produces a final answer. OFF by default — when disabled (or when the
+| active provider's engine cannot do tool calling, or no tools are allow-listed),
+| the chatbox behaves exactly as before: a single model call per message.
+|
+| 'orchestrator_enabled'   — master switch. Env: AI_CHATBOX_ORCHESTRATOR
+| 'orchestrator_max_steps' — hard cap on tool-call loop iterations (runaway guard)
+| 'orchestrator_timeout'   — wall-clock seconds for the whole run
+| 'orchestrator_tools'     — allow-list of ToolInterface class names the model may
+|                            use. Empty = no tools (safe default). A tool runs only
+|                            if it is listed here AND its authorize() returns true.
+|
+| Tool calling requires a provider that supports it (OpenAI-compatible or Anthropic).
+| Register your own tools by implementing
+| \DeveloperUnijaya\AiChatbox\Orchestration\Contracts\ToolInterface and adding the
+| class name here (or calling ToolRegistry::register() in a service provider).
+*/
+
+    'orchestrator_enabled' => env('AI_CHATBOX_ORCHESTRATOR', false),
+    'orchestrator_max_steps' => (int) env('AI_CHATBOX_ORCHESTRATOR_MAX_STEPS', 5),
+    'orchestrator_timeout' => (int) env('AI_CHATBOX_ORCHESTRATOR_TIMEOUT', 60),
+    'orchestrator_tools' => [
+        // Built-in demo tools (safe, read-only) — uncomment to enable:
+        // \DeveloperUnijaya\AiChatbox\Orchestration\Tools\CurrentDateTimeTool::class,
+        // \DeveloperUnijaya\AiChatbox\Orchestration\Tools\KnowledgeBaseSearchTool::class,
+
+        // Your own tools:
+        // \App\AiTools\GetOrderStatusTool::class,
+    ],
+
+/*
+|--------------------------------------------------------------------------
 | Named AI Providers
 |--------------------------------------------------------------------------
 | Define additional named providers for use with the AI facade:

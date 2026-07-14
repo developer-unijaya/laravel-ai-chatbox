@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use DeveloperUnijaya\AiChatbox\Console\Commands\GraphifyImport;
+use DeveloperUnijaya\AiChatbox\Console\Commands\MakeAiTool;
 use DeveloperUnijaya\AiChatbox\Console\Commands\PruneConversations;
 use DeveloperUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
 use DeveloperUnijaya\AiChatbox\Engine\OpenAiCompatibleEngine;
@@ -43,6 +44,11 @@ class AiChatboxServiceProvider extends ServiceProvider
 
         // Provider abstraction — AI::provider('ollama')->chat(...)
         $this->app->singleton(AiManager::class);
+
+        // Orchestration — tool registry is a singleton so tools registered at runtime
+        // (in a host service provider) persist for the request. The Orchestrator itself
+        // is autowired from AiManager + PromptBuilder + ToolRegistry.
+        $this->app->singleton(\DeveloperUnijaya\AiChatbox\Orchestration\ToolRegistry::class);
 
         // Register the 'AI' alias so it can be used without the full namespace
         $this->app->booting(function () {
@@ -178,6 +184,11 @@ class AiChatboxServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__ . '/Database/Migrations' => database_path('migrations'),
             ], 'ai-chatbox-migrations');
+
+            // Orchestrator tool generator stubs (customise `ai-chatbox:make-tool` output)
+            $this->publishes([
+                __DIR__ . '/Console/stubs' => base_path('stubs'),
+            ], 'ai-chatbox-stubs');
         }
     }
 
@@ -207,6 +218,7 @@ class AiChatboxServiceProvider extends ServiceProvider
             $this->commands([
                 PruneConversations::class,
                 GraphifyImport::class,
+                MakeAiTool::class,
             ]);
         }
     }
