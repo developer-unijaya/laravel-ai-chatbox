@@ -78,6 +78,28 @@ These occur when the AI service is reachable but returns an error HTTP status.
 
 ---
 
+### Orchestration Errors (AI Orchestrator)
+
+These `O##` codes come from the **AI Orchestrator** (agentic tool calling) and only occur when `orchestrator_enabled=true` with tools allow-listed in `orchestrator_tools`. They are unrelated to the `E##` engine/HTTP codes above.
+
+There are two categories:
+
+- **`O01` / `O02` are fatal** — they abort the run and are returned to the client as a `500` JSON error with the `code` field (a generic message is shown to the user; the code is logged).
+- **`O03`–`O06` are recoverable** — they are **not** returned to the user or thrown. The failure is captured on the tool step and fed back to the model as a tool-error result so it can recover (retry, pick another tool, or explain). You will see these while inspecting an orchestration run rather than as an HTTP error (`O06` is also logged as a warning).
+
+| Code | Meaning | How to fix |
+|------|---------|------------|
+| `O01` | Maximum orchestration steps reached without a final answer — the model kept requesting tools past `orchestrator_max_steps` | The model may be stuck in a tool loop. Raise `AI_CHATBOX_ORCHESTRATOR_MAX_STEPS` if the task legitimately needs more steps, or improve the tool descriptions so the model converges. Check the tool results being returned — a tool returning unhelpful/empty data can cause the model to keep retrying. |
+| `O02` | Orchestration timed out — the whole run exceeded `orchestrator_timeout` (wall-clock) | Raise `AI_CHATBOX_ORCHESTRATOR_TIMEOUT`, or speed up slow tools (`handle()` doing slow DB/HTTP work). Note each individual model call also has the provider `timeout`. |
+| `O03` | Unknown tool — the model called a tool name that is not registered/allow-listed | The model hallucinated a tool name, or a tool failed to load. Verify the class is in `orchestrator_tools` and check the log for "could not resolve tool class" / "does not implement ToolInterface" warnings. |
+| `O04` | Not authorized — the tool's `authorize()` returned `false` (or threw) for this request | Expected when a tool is user/role-scoped and the current request isn't permitted. If unexpected, review the tool's `authorize(?Request $request)` logic (note it receives `null` in console/queue contexts). |
+| `O05` | Missing required argument — the model's tool call omitted a key listed in the tool's `parameters().required` | Usually the model self-corrects on the next step. If it persists, clarify the argument in the tool's `description()` / parameter description so the model supplies it. |
+| `O06` | Tool threw during `handle()` — the tool's own code raised an exception | Check `storage/logs/laravel.log` for "tool threw during handle()" with the tool name and exception message, then fix the tool. The exception message is also fed back to the model. |
+
+> **Provider capability:** tool calling only works with a provider whose engine supports it (OpenAI-compatible or Anthropic). If the active provider's engine cannot do tool calling, or no tools are allow-listed, the orchestrator silently falls back to a single plain completion — no `O##` error, just non-agentic behaviour.
+
+---
+
 ## Reading the Log
 
 Every error is logged to Laravel's default log channel with its code:
@@ -180,3 +202,27 @@ AI_CHATBOX_SSRF_PROTECTION=false        # required — localhost is a private IP
 ```
 
 Make sure the **Local Server** is started inside LM Studio and a model is loaded before sending requests.
+
+---
+
+### AI Orchestrator enabled but tools never fire
+
+**Symptom:** `orchestrator_enabled=true` but the model never calls your tool — it just answers normally, with no `O##` error.
+
+The orchestrator silently falls back to a single plain completion (non-agentic) when any of these is true. Check each:
+
+```env
+AI_CHATBOX_ORCHESTRATOR=true
+```
+
+- **No tools allow-listed.** `orchestrator_tools` must contain your tool's class name — an empty list means no tools (the safe default). Add it in `config/ai-chatbox.php`:
+  ```php
+  'orchestrator_tools' => [
+      \App\AiTools\GetOrderStatusTool::class,
+  ],
+  ```
+- **Provider can't do tool calling.** Only OpenAI-compatible and Anthropic engines support it. Point `AI_CHATBOX_ACTIVE_PROVIDER` at a capable provider (e.g. `openai`, `groq`, `anthropic`). Some local/OpenAI-compatible endpoints don't implement `tools`.
+- **`authorize()` returns false.** A tool is hidden from a request when its `authorize(?Request)` returns `false` — it won't even be offered to the model. Verify the current request satisfies it.
+- **The model chose not to.** Even when offered, the model decides when a tool is relevant. Improve the tool's `description()` and parameter descriptions so it's clear when to use it.
+
+Scaffold a tool quickly with `php artisan ai-chatbox:make-tool --model=YourModel`, then add the printed class name to `orchestrator_tools`.
