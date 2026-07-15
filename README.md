@@ -48,6 +48,7 @@ Connect to any **OpenAI-compatible API** including Ollama, OpenAI, Groq, LM Stud
 - Drop `@aichatbox` into any Blade layout — nothing else required
 - Four frontend drivers: **Vue 3** (default), **vanilla JS** (Blade), **Livewire + Alpine.js**, or **API-only** for React/Svelte/custom builds
 - Floating button in any of four corners; dark mode follows OS preference
+- Resizable chat window — cycle **1× / 2× / 3×** from a header button; the preferred size is remembered per user in the browser and restored on the next visit
 - Markdown rendering with syntax-highlighted code blocks (bundled in Vue, CDN in Blade/Livewire)
 - Sound notification on AI reply (Web Audio API, no audio file needed)
 - Messages persist across page refresh via `localStorage` or `sessionStorage`
@@ -1435,6 +1436,27 @@ Published to `resources/views/vendor/ai-chatbox/`:
 | `chatbox-vue.blade.php` | `vue` | CSS link + Vue mount point + JS bundle |
 | `chatbox-blade.blade.php` | `blade` | Full vanilla JS widget |
 | `livewire/chatbox.blade.php` | `livewire` | Alpine.js widget |
+
+### Chat Window Size
+
+End users can resize the chat window with the **resize button** in the widget header. Each click cycles through three sizes:
+
+| Size | Dimensions | CSS class (on `#ai-chatbox-wrapper`) |
+|---|---|---|
+| **1×** (default) | 360 × 480 | *(none)* |
+| **2×** | 720 × 760 | `ai-chatbox--size-2x` |
+| **3×** | 1040 × 980 | `ai-chatbox--size-3x` |
+
+The window is capped to the viewport (`min(…, calc(100vw - 48px))` for width and height), so the largest size never overflows small screens.
+
+The chosen size is **remembered in the browser** — it uses the same `localStorage` / `sessionStorage` driver configured by [`storage`](#configuration-reference), under the storage key suffix `_size` — and is restored on the next visit. A first-time visitor (or after the size key is cleared) starts at **1×**.
+
+To change the 2× / 3× dimensions, override the CSS variables. Publish the assets (`--tag=ai-chatbox-assets`) and add your own rule after the stylesheet, or edit `public/vendor/ai-chatbox/css/chatbox.css`:
+
+```css
+#ai-chatbox-wrapper.ai-chatbox--size-2x { --chatbox-width: 640px;  --chatbox-height: 720px; }
+#ai-chatbox-wrapper.ai-chatbox--size-3x { --chatbox-width: 900px;  --chatbox-height: 900px; }
+```
 
 ---
 

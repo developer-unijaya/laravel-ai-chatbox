@@ -40,6 +40,11 @@
         <div id="ai-chatbox-header">
             <span id="aicb-title"></span>
             <div class="ai-chatbox-header-actions">
+                <button id="aicb-resize" class="ai-chatbox-header-btn" title="Resize chat" aria-label="Resize chat">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 3h7v2H5v5H3V3zm11 0h7v7h-2V5h-5V3zM3 14h2v5h5v2H3v-7zm16 0h2v7h-7v-2h5v-5z"/>
+                    </svg>
+                </button>
                 <button id="aicb-new" class="ai-chatbox-header-btn" title="New conversation" aria-label="New conversation">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
@@ -85,6 +90,7 @@
     var streamOn     = cfg.stream !== false && !!streamUrl && typeof ReadableStream !== 'undefined';
     var STORAGE_KEY  = cfg.storageKey   || 'ai_chatbox_ui';
     var THREAD_KEY   = STORAGE_KEY + '_tid';
+    var SIZE_KEY     = STORAGE_KEY + '_size';
     var storage      = cfg.storageType === 'session' ? sessionStorage : localStorage;
 
     // ── DOM refs ──
@@ -102,6 +108,7 @@
     var titleEl     = document.getElementById('aicb-title');
     var newBtn      = document.getElementById('aicb-new');
     var clearBtn    = document.getElementById('aicb-clear');
+    var resizeBtn   = document.getElementById('aicb-resize');
 
     // ── State ──
     var isOpen        = false;
@@ -111,6 +118,7 @@
     var greetingShown = false;
     var messages      = [];
     var threadId      = '';
+    var size          = 1;   // 1 = default, 2 = 2×, 3 = 3×
     var toastTimer    = null;
     var audioCtx      = null;
     var AudioCtx      = window.AudioContext || window.webkitAudioContext;
@@ -135,6 +143,7 @@
         wrap.style.setProperty('--chatbox-scrollbar', d ? '#4b5563' : '#d1d5db');
     }());
     threadId = loadOrCreateThreadId();
+    loadSize();
     loadFromStorage();
     renderMessages();
     updateUI();
@@ -228,6 +237,26 @@
     // ── Scroll ──
     function scrollToBottom() {
         msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    // ── Window size (1× / 2× / 3×) ──
+    function applySize() {
+        wrap.classList.remove('ai-chatbox--size-1x', 'ai-chatbox--size-2x', 'ai-chatbox--size-3x');
+        wrap.classList.add('ai-chatbox--size-' + size + 'x');
+        if (resizeBtn) resizeBtn.title = 'Chat size ' + size + '× — click to resize';
+    }
+    function loadSize() {
+        try {
+            var s = parseInt(storage.getItem(SIZE_KEY), 10);
+            if (s === 1 || s === 2 || s === 3) size = s;
+        } catch (_) {}
+        applySize();
+    }
+    function cycleSize() {
+        size = size >= 3 ? 1 : size + 1;
+        try { storage.setItem(SIZE_KEY, String(size)); } catch (_) {}
+        applySize();
+        scrollToBottom();
     }
 
     // ── UI state sync ──
@@ -499,6 +528,7 @@
     toggleBtn.addEventListener('click', toggleChat);
     newBtn.addEventListener('click', newConversation);
     clearBtn.addEventListener('click', clearConversation);
+    if (resizeBtn) resizeBtn.addEventListener('click', cycleSize);
     input.addEventListener('input', autoResize);
     input.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' && !e.shiftKey) {

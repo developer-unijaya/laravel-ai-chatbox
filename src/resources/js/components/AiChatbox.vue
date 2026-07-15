@@ -1,5 +1,5 @@
 <template>
-    <div id="ai-chatbox-wrapper" :class="`ai-chatbox--${position}`">
+    <div id="ai-chatbox-wrapper" :class="[`ai-chatbox--${position}`, `ai-chatbox--size-${size}x`]">
 
         <!-- Offline toast -->
         <div id="ai-chatbox-offline-toast" role="alert" aria-live="assertive" :class="{ visible: toastVisible }">
@@ -29,6 +29,11 @@
             <div id="ai-chatbox-header">
                 <span>{{ title }}</span>
                 <div class="ai-chatbox-header-actions">
+                    <button class="ai-chatbox-header-btn" :title="`Chat size ${size}× — click to resize`" aria-label="Resize chat" @click="cycleSize">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M3 3h7v2H5v5H3V3zm11 0h7v7h-2V5h-5V3zM3 14h2v5h5v2H3v-7zm16 0h2v7h-7v-2h5v-5z"/>
+                        </svg>
+                    </button>
                     <button class="ai-chatbox-header-btn" title="New conversation" aria-label="New conversation" @click="newConversation">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
@@ -104,6 +109,7 @@ const position       = cfg.position || 'bottom-right'
 const toggleIcon     = cfg.toggleIcon || null
 const STORAGE_KEY    = cfg.storageKey || 'ai_chatbox_ui'
 const THREAD_KEY     = STORAGE_KEY + '_tid'
+const SIZE_KEY       = STORAGE_KEY + '_size'
 const storageDriver  = cfg.storageType === 'session' ? sessionStorage : localStorage
 
 // ── Thread ID ──
@@ -138,6 +144,7 @@ const toastVisible  = ref(false)
 const messagesRef   = ref(null)
 const inputRef      = ref(null)
 const threadId      = ref('')
+const size          = ref(1)   // 1 = default, 2 = 2×, 3 = 3×
 
 let toastTimer  = null
 let audioCtx    = null
@@ -175,6 +182,19 @@ function loadFromStorage() {
 // ── Markdown ──
 function renderMarkdown(text) {
     return DOMPurify.sanitize(marked.parse(text))
+}
+
+// ── Window size (1× / 2× / 3×) ──
+function loadSize() {
+    try {
+        const s = parseInt(storageDriver.getItem(SIZE_KEY), 10)
+        if (s === 1 || s === 2 || s === 3) size.value = s
+    } catch (_) {}
+}
+function cycleSize() {
+    size.value = size.value >= 3 ? 1 : size.value + 1
+    try { storageDriver.setItem(SIZE_KEY, String(size.value)) } catch (_) {}
+    scrollToBottom()
 }
 
 // ── Input auto-resize ──
@@ -452,6 +472,7 @@ onMounted(() => {
         }
     }
     threadId.value = loadOrCreateThreadId()
+    loadSize()
     loadFromStorage()
     scrollToBottom()
 })
@@ -561,15 +582,19 @@ onMounted(() => {
 #ai-chatbox-window {
   display: none;
   flex-direction: column;
-  width: var(--chatbox-width);
-  height: var(--chatbox-height);
+  width: min(var(--chatbox-width), calc(100vw - 48px));
+  height: min(var(--chatbox-height), calc(100vh - 48px));
   background: var(--chatbox-bg);
   border-radius: var(--chatbox-radius);
   box-shadow: var(--chatbox-shadow);
   overflow: hidden;
   margin-bottom: 12px;
   animation: chatbox-slide-up 0.22s ease;
+  transition: width 0.2s ease, height 0.2s ease;
 }
+/* ── Size variants (user-resizable via header button: 1x / 2x / 3x) ── */
+#ai-chatbox-wrapper.ai-chatbox--size-2x { --chatbox-width: 720px;  --chatbox-height: 760px; }
+#ai-chatbox-wrapper.ai-chatbox--size-3x { --chatbox-width: 1040px; --chatbox-height: 980px; }
 .ai-chatbox--top-right #ai-chatbox-window,
 .ai-chatbox--top-left  #ai-chatbox-window {
   margin-bottom: 0;

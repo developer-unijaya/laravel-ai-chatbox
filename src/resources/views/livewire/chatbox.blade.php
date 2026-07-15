@@ -10,6 +10,7 @@
 <div
     id="ai-chatbox-wrapper"
     class="ai-chatbox--{{ config('ai-chatbox.position', 'bottom-right') }}"
+    :class="'ai-chatbox--size-' + size + 'x'"
     x-data="aiChatboxWidget()"
     x-init="init()"
 >
@@ -52,6 +53,11 @@
         <div id="ai-chatbox-header">
             <span x-text="title"></span>
             <div class="ai-chatbox-header-actions">
+                <button class="ai-chatbox-header-btn" :title="'Chat size ' + size + '× — click to resize'" aria-label="Resize chat" @click="cycleSize()">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 3h7v2H5v5H3V3zm11 0h7v7h-2V5h-5V3zM3 14h2v5h5v2H3v-7zm16 0h2v7h-7v-2h5v-5z"/>
+                    </svg>
+                </button>
                 <button class="ai-chatbox-header-btn" title="New conversation" aria-label="New conversation" @click="newConversation()">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
@@ -104,6 +110,7 @@ function aiChatboxWidget() {
     var streamOn    = cfg.stream !== false && !!cfg.streamUrl && typeof ReadableStream !== 'undefined';
     var STORAGE_KEY = cfg.storageKey || 'ai_chatbox_ui';
     var THREAD_KEY  = STORAGE_KEY + '_tid';
+    var SIZE_KEY    = STORAGE_KEY + '_size';
     var storage     = cfg.storageType === 'session' ? sessionStorage : localStorage;
     var toastTimer  = null;
     var audioCtx    = null;
@@ -129,6 +136,7 @@ function aiChatboxWidget() {
         toastMessage:  '',
         toastVisible:  false,
         threadId:      '',
+        size:          1,   // 1 = default, 2 = 2×, 3 = 3×
 
         init() {
             if (cfg.themeColor) {
@@ -148,7 +156,21 @@ function aiChatboxWidget() {
                 wrap.style.setProperty('--chatbox-scrollbar', d ? '#4b5563' : '#d1d5db');
             }(this.$el));
             this.threadId = this.loadOrCreateThreadId();
+            this.loadSize();
             this.loadFromStorage();
+            this.$nextTick(() => this.scrollToBottom());
+        },
+
+        // ── Window size (1× / 2× / 3×) ──
+        loadSize() {
+            try {
+                var s = parseInt(storage.getItem(SIZE_KEY), 10);
+                if (s === 1 || s === 2 || s === 3) this.size = s;
+            } catch (_) {}
+        },
+        cycleSize() {
+            this.size = this.size >= 3 ? 1 : this.size + 1;
+            try { storage.setItem(SIZE_KEY, String(this.size)); } catch (_) {}
             this.$nextTick(() => this.scrollToBottom());
         },
 
