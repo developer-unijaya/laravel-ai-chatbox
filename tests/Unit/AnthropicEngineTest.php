@@ -31,6 +31,57 @@ class AnthropicEngineTest extends TestCase
         $this->assertSame('Hello from Anthropic', $reply);
     }
 
+    public function test_complete_skips_leading_thinking_block(): void
+    {
+        // Adaptive thinking (default-on for newer models) puts a `thinking`
+        // block first; reading content[0] would misread this as an empty reply.
+        $this->mockGuzzle([
+            new Response(200, [], json_encode([
+                'content' => [
+                    ['type' => 'thinking', 'thinking' => 'Let me consider the question...'],
+                    ['type' => 'text', 'text' => 'The capital of France is Paris.'],
+                ],
+            ])),
+        ]);
+
+        $engine = new AnthropicEngine();
+        $reply = $engine->complete([['role' => 'user', 'content' => 'Hi']], $this->baseOptions);
+
+        $this->assertSame('The capital of France is Paris.', $reply);
+    }
+
+    public function test_complete_concatenates_multiple_text_blocks(): void
+    {
+        $this->mockGuzzle([
+            new Response(200, [], json_encode([
+                'content' => [
+                    ['type' => 'text', 'text' => 'Part one. '],
+                    ['type' => 'text', 'text' => 'Part two.'],
+                ],
+            ])),
+        ]);
+
+        $engine = new AnthropicEngine();
+        $reply = $engine->complete([['role' => 'user', 'content' => 'Hi']], $this->baseOptions);
+
+        $this->assertSame('Part one. Part two.', $reply);
+    }
+
+    public function test_complete_throws_e18_when_only_non_text_blocks(): void
+    {
+        // A response with a thinking block but no text is genuinely empty.
+        $this->mockGuzzle([
+            new Response(200, [], json_encode([
+                'content' => [['type' => 'thinking', 'thinking' => 'hmm']],
+            ])),
+        ]);
+
+        $engine = new AnthropicEngine();
+
+        $this->expectException(\DeveloperUnijaya\AiChatbox\Engine\Exceptions\AiEngineException::class);
+        $engine->complete([['role' => 'user', 'content' => 'Hi']], $this->baseOptions);
+    }
+
     public function test_complete_extracts_system_message_from_messages(): void
     {
         $captured = null;

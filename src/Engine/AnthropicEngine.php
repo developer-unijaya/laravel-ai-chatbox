@@ -36,13 +36,18 @@ class AnthropicEngine extends OpenAiCompatibleEngine
             ]);
 
             $data = json_decode($response->getBody()->getContents(), true);
-            $reply = $data['content'][0]['text'] ?? null;
 
-            if ($reply === null || trim($reply) === '') {
+            // Concatenate every text block rather than reading content[0] — the
+            // first block may be a `thinking` block (adaptive thinking is on by
+            // default on newer models), which would otherwise be misread as an
+            // empty response and reported as a false outage.
+            $reply = $this->extractTextBlocks($data['content'] ?? null);
+
+            if ($reply === '') {
                 throw new AiEngineException(self::E18, 'Unable to reach AI service. Please try again later.', 502);
             }
 
-            return trim($reply);
+            return $reply;
 
         } catch (AiEngineException $e) {
             throw $e;
@@ -209,14 +214,7 @@ class AnthropicEngine extends OpenAiCompatibleEngine
                 return EngineResult::toolCalls($calls, ['role' => 'assistant', 'content' => $echo]);
             }
 
-            $text = '';
-            foreach ($content as $block) {
-                if (($block['type'] ?? '') === 'text') {
-                    $text .= $block['text'] ?? '';
-                }
-            }
-
-            return EngineResult::text(trim($text));
+            return EngineResult::text($this->extractTextBlocks($content));
 
         } catch (AiEngineException $e) {
             throw $e;
@@ -252,6 +250,29 @@ class AnthropicEngine extends OpenAiCompatibleEngine
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Concatenate the text of every `text` content block in an Anthropic
+     * response, skipping non-text blocks (`thinking`, `tool_use`, …). Returns
+     * a trimmed string, or '' when there is no text content.
+     *
+     * @param  mixed  $content  The `content` array from the API response.
+     */
+    private function extractTextBlocks($content): string
+    {
+        if (!is_array($content)) {
+            return '';
+        }
+
+        $text = '';
+        foreach ($content as $block) {
+            if (is_array($block) && ($block['type'] ?? '') === 'text') {
+                $text .= $block['text'] ?? '';
+            }
+        }
+
+        return trim($text);
+    }
 
     private function anthropicHeaders(string $apiToken, array $options = []): array
     {
