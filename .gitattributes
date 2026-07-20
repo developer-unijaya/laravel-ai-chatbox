@@ -1,4 +1,5 @@
 # Keep dev/test-only files out of the distributed package (composer dist archives).
+/art                export-ignore
 /.github            export-ignore
 /tests              export-ignore
 /temp               export-ignore

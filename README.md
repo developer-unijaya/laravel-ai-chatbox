@@ -12,6 +12,10 @@ A drop-in AI chatbox widget for Laravel. One Blade directive — no build tools 
 
 Connect to any **OpenAI-compatible API** including Ollama, OpenAI, Groq, LM Studio, and OpenRouter — plus native **Anthropic (Claude)** support via the Messages API. Includes real-time token streaming, conversation memory, a full **RAG (Retrieval-Augmented Generation)** system, an admin dashboard, and a PHP facade for calling AI from anywhere in your codebase.
 
+<p align="center">
+  <img src="art/chatbox.png" alt="AI Chatbox widget" width="360">
+</p>
+
 ---
 
 ## Table of Contents
