@@ -131,6 +131,8 @@ function aiChatboxWidget() {
         isLoading:     false,
         isTyping:      false,
         greetingShown: false,
+        streamSeq:     0,     // bumped on clear/new to invalidate a running stream
+        streamAbort:   null,  // AbortController for the in-flight stream
         messages:      [],
         inputText:     '',
         toastMessage:  '',
@@ -309,7 +311,17 @@ function aiChatboxWidget() {
         },
 
         // ── Clear / New ──
+        abortStream() {
+            this.streamSeq++; // invalidate any running stream's async callbacks
+            if (this.streamAbort) {
+                try { this.streamAbort.abort(); } catch (_) {}
+                this.streamAbort = null;
+            }
+            this.isLoading = false;
+            this.isTyping  = false;
+        },
         clearConversation() {
+            this.abortStream();
             this.postJson(clearUrl, { thread_id: this.threadId }).catch(() => {});
             this.messages = [];
             try { storage.removeItem(STORAGE_KEY); } catch (_) {}
@@ -321,6 +333,7 @@ function aiChatboxWidget() {
             }
         },
         newConversation() {
+            this.abortStream();
             this.threadId = this.generateUUID();
             try { storage.setItem(THREAD_KEY, this.threadId); } catch (_) {}
             this.messages = [];
@@ -368,8 +381,18 @@ function aiChatboxWidget() {
         // ── Streaming ──
         async sendStreaming(text) {
             this.isTyping = false;
+            // Tag this stream. Clearing / starting a new conversation bumps
+            // streamSeq (and aborts the fetch), so every async step below becomes
+            // a no-op once this stream is no longer the active one — no writing to
+            // a cleared messages array, no resurrected phantom bubble.
+            var myId = ++this.streamSeq;
+            var active = () => this.streamSeq === myId;
+
             this.messages.push({ role: 'ai', text: '', streaming: true });
             var idx = this.messages.length - 1;
+
+            if (this.streamAbort) { try { this.streamAbort.abort(); } catch (_) {} }
+            this.streamAbort = ('AbortController' in window) ? new AbortController() : null;
 
             try {
                 var headers = Object.assign(
@@ -378,11 +401,14 @@ function aiChatboxWidget() {
                 );
                 var response = await fetch(streamUrl, {
                     method: 'POST', headers,
-                    body: JSON.stringify({ message: text, thread_id: this.threadId })
+                    body: JSON.stringify({ message: text, thread_id: this.threadId }),
+                    signal: this.streamAbort ? this.streamAbort.signal : undefined
                 });
+                if (!active()) return;
 
                 if (!response.ok) {
                     var d = await response.json().catch(() => ({}));
+                    if (!active()) return;
                     this.messages[idx] = { role: 'error', text: (d && d.error) || 'Something went wrong. Please try again.' };
                     return;
                 }
@@ -394,6 +420,7 @@ function aiChatboxWidget() {
 
                 while (!done) {
                     var { done: rdone, value } = await reader.read();
+                    if (!active()) return;
                     if (rdone) break;
                     buffer += decoder.decode(value, { stream: true });
                     var parts = buffer.split('\n\n');
@@ -414,16 +441,21 @@ function aiChatboxWidget() {
                     }
                 }
 
+                if (!active()) return;
                 var finalText = this.messages[idx].text;
                 this.messages[idx] = { role: 'ai', text: finalText, streaming: false };
                 if (finalText) { this.saveToStorage(); this.ping(); }
                 else { this.messages[idx] = { role: 'error', text: 'No response received. Please try again.' }; }
 
             } catch (_) {
+                if (!active()) return; // aborted by clear/new — nothing to do
                 this.messages[idx] = { role: 'error', text: 'Network error. Please check your connection.' };
             } finally {
-                this.isLoading = false;
-                this.$nextTick(() => this.scrollToBottom());
+                if (active()) {
+                    this.streamAbort = null;
+                    this.isLoading = false;
+                    this.$nextTick(() => this.scrollToBottom());
+                }
             }
         },
 

@@ -138,6 +138,8 @@ const isLoading     = ref(false)
 const isTyping      = ref(false)
 const greetingShown = ref(false)
 const inputText     = ref('')
+let   streamSeq     = 0     // bumped on clear/new to invalidate a running stream
+let   streamAbort   = null  // AbortController for the in-flight stream
 const messages      = ref([])
 const toastMessage  = ref('')
 const toastVisible  = ref(false)
@@ -302,7 +304,18 @@ async function toggleChat() {
 }
 
 // ── Clear (current thread) ──
+function abortStream() {
+    streamSeq++ // invalidate any running stream's async callbacks
+    if (streamAbort) {
+        try { streamAbort.abort() } catch (_) {}
+        streamAbort = null
+    }
+    isLoading.value = false
+    isTyping.value  = false
+}
+
 async function clearConversation() {
+    abortStream()
     try {
         await httpPost(clearUrl, { thread_id: threadId.value })
     } catch (_) {}
@@ -318,6 +331,7 @@ async function clearConversation() {
 
 // ── New conversation (fresh thread) ──
 function newConversation() {
+    abortStream()
     const id = generateUUID()
     threadId.value = id
     try { storageDriver.setItem(THREAD_KEY, id) } catch (_) {}
@@ -334,7 +348,7 @@ function newConversation() {
 // ── Send ──
 async function sendMessage() {
     const text = inputText.value.trim()
-    if (!text) return
+    if (!text || isLoading.value) return
 
     messages.value.push({ role: 'user', text })
     saveToStorage()
@@ -355,8 +369,18 @@ async function sendMessage() {
 async function sendStreaming(text) {
     // Replace typing indicator with an empty streaming bubble
     isTyping.value = false
+
+    // Tag this stream. Clearing / starting a new conversation bumps streamSeq
+    // (and aborts the fetch), so every async step below no-ops once this stream
+    // is no longer the active one — no write to a cleared array, no phantom bubble.
+    const myId = ++streamSeq
+    const active = () => streamSeq === myId
+
     messages.value.push({ role: 'ai', text: '', streaming: true })
     const idx = messages.value.length - 1
+
+    if (streamAbort) { try { streamAbort.abort() } catch (_) {} }
+    streamAbort = ('AbortController' in window) ? new AbortController() : null
 
     try {
         const headers = Object.assign(
@@ -368,10 +392,13 @@ async function sendStreaming(text) {
             method: 'POST',
             headers,
             body: JSON.stringify({ message: text, thread_id: threadId.value }),
+            signal: streamAbort ? streamAbort.signal : undefined,
         })
+        if (!active()) return
 
         if (!response.ok) {
             const errData = await response.json().catch(() => ({}))
+            if (!active()) return
             messages.value[idx] = { role: 'error', text: errData.error || 'Something went wrong. Please try again.' }
             return
         }
@@ -382,6 +409,7 @@ async function sendStreaming(text) {
 
         outer: while (true) {
             const { done, value } = await reader.read()
+            if (!active()) return
             if (done) break
 
             buffer += decoder.decode(value, { stream: true })
@@ -407,6 +435,7 @@ async function sendStreaming(text) {
             }
         }
 
+        if (!active()) return
         const finalText = messages.value[idx].text
         messages.value[idx].streaming = false
 
@@ -418,10 +447,14 @@ async function sendStreaming(text) {
         }
 
     } catch (_) {
+        if (!active()) return // aborted by clear/new — nothing to do
         messages.value[idx] = { role: 'error', text: 'Network error. Please check your connection.' }
     } finally {
-        isLoading.value = false
-        scrollToBottom()
+        if (active()) {
+            streamAbort = null
+            isLoading.value = false
+            scrollToBottom()
+        }
     }
 }
 

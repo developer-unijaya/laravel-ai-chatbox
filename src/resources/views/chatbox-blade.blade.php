@@ -116,6 +116,7 @@
     var isLoading     = false;
     var isTyping      = false;
     var greetingShown = false;
+    var streamAbort   = null; // AbortController for the in-flight stream
     var messages      = [];
     var threadId      = '';
     var size          = 1;   // 1 = default, 2 = 2×, 3 = 3×
@@ -356,6 +357,7 @@
 
     // ── Clear ──
     function clearConversation() {
+        abortStream();
         postJson(clearUrl, { thread_id: threadId }).catch(function () {});
         messages = [];
         try { storage.removeItem(STORAGE_KEY); } catch (_) {}
@@ -368,8 +370,20 @@
         renderMessages();
     }
 
+    // ── Abort the in-flight stream (used by clear / new) ──
+    function abortStream() {
+        if (streamAbort) {
+            try { streamAbort.abort(); } catch (_) {}
+            streamAbort = null;
+        }
+        isLoading = false;
+        isTyping  = false;
+        updateUI();
+    }
+
     // ── New conversation ──
     function newConversation() {
+        abortStream();
         threadId = generateUUID();
         try { storage.setItem(THREAD_KEY, threadId); } catch (_) {}
         messages = [];
@@ -402,10 +416,24 @@
     // ── Streaming ──
     function sendStreaming(text) {
         isTyping = false;
-        // Add a streaming bubble to the messages array so it persists correctly
-        messages.push({ role: 'ai', text: '', streaming: true });
-        var idx = messages.length - 1;
+        // Hold the streaming bubble by REFERENCE, not by index. Clearing or
+        // starting a new conversation mid-stream empties `messages`, which would
+        // make an index-based write throw or resurrect a phantom bubble; a
+        // reference plus the active() guard makes every async step a no-op once
+        // this bubble is no longer part of the conversation.
+        var assistant = { role: 'ai', text: '', streaming: true };
+        messages.push(assistant);
         renderMessages();
+
+        if (streamAbort) { try { streamAbort.abort(); } catch (_) {} }
+        streamAbort = ('AbortController' in window) ? new AbortController() : null;
+
+        // True only while this bubble is still the active one (not cleared/replaced).
+        function active() { return messages.indexOf(assistant) !== -1; }
+        function replaceSelf(msg) {
+            var i = messages.indexOf(assistant);
+            if (i !== -1) { messages[i] = msg; }
+        }
 
         var headers = Object.assign(
             { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
@@ -415,11 +443,14 @@
         fetch(streamUrl, {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify({ message: text, thread_id: threadId })
+            body: JSON.stringify({ message: text, thread_id: threadId }),
+            signal: streamAbort ? streamAbort.signal : undefined
         }).then(function (response) {
+            if (!active()) return;
             if (!response.ok) {
                 return response.json().catch(function () { return {}; }).then(function (d) {
-                    messages[idx] = { role: 'error', text: (d && d.error) || 'Something went wrong. Please try again.' };
+                    if (!active()) return;
+                    replaceSelf({ role: 'error', text: (d && d.error) || 'Something went wrong. Please try again.' });
                     renderMessages();
                     isLoading = false;
                     updateUI();
@@ -432,8 +463,9 @@
             var done    = false;
 
             function read() {
-                if (done) return;
+                if (done || !active()) return;
                 reader.read().then(function (result) {
+                    if (!active()) return;
                     if (result.done) {
                         finalise();
                         return;
@@ -451,11 +483,11 @@
                         try {
                             var json = JSON.parse(raw);
                             if (json.token) {
-                                messages[idx].text += json.token;
+                                assistant.text += json.token;
                                 // Update streaming bubble directly for performance
                                 var bubble = msgs.querySelector('.ai-chatbox-streaming');
                                 if (bubble) {
-                                    bubble.textContent = messages[idx].text;
+                                    bubble.textContent = assistant.text;
                                     scrollToBottom();
                                 }
                             }
@@ -463,18 +495,20 @@
                     }
 
                     if (done) { finalise(); } else { read(); }
-                }).catch(function () { finalise(); });
+                }).catch(function () { if (active()) finalise(); });
             }
 
             function finalise() {
-                var finalText = messages[idx].text;
-                messages[idx].streaming = false;
+                if (!active()) return;
+                var finalText = assistant.text;
+                assistant.streaming = false;
                 if (finalText) {
                     saveToStorage();
                     ping();
                 } else {
-                    messages[idx] = { role: 'error', text: 'No response received. Please try again.' };
+                    replaceSelf({ role: 'error', text: 'No response received. Please try again.' });
                 }
+                streamAbort = null;
                 isLoading = false;
                 updateUI();
                 renderMessages();
@@ -483,7 +517,10 @@
             read();
 
         }).catch(function () {
-            messages[idx] = { role: 'error', text: 'Network error. Please check your connection.' };
+            // Aborted by clear/new (active() false) → nothing to do.
+            if (!active()) return;
+            replaceSelf({ role: 'error', text: 'Network error. Please check your connection.' });
+            streamAbort = null;
             isLoading = false;
             updateUI();
             renderMessages();
