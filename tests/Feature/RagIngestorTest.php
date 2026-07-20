@@ -116,6 +116,30 @@ class RagIngestorTest extends TestCase
         $this->assertSame(3, RagChunk::where('document_id', $doc->id)->whereNotNull('embedding')->count());
     }
 
+    public function test_max_chunks_per_document_caps_ingestion(): void
+    {
+        // Ten long, delimiter-less paragraphs at a tiny chunk size produce well
+        // over the cap of 3; only the first 3 chunks should be stored.
+        $paras = [];
+        for ($i = 0; $i < 10; $i++) {
+            $paras[] = trim(str_repeat("word{$i} ", 20));
+        }
+        $content = implode("\n\n", $paras);
+
+        $doc = $this->doc();
+        (new RagIngestor())->ingest($doc, $content, $this->cfg([
+            'rag_embedding_url' => '', // keyword-only — no HTTP
+            'rag_chunk_size' => 25,
+            'rag_chunk_overlap' => 0,
+            'rag_max_chunks_per_document' => 3,
+        ]));
+
+        $doc->refresh();
+        $this->assertSame(3, $doc->chunk_count);
+        $this->assertSame(3, RagChunk::where('document_id', $doc->id)->count());
+        $this->assertStringContainsString('exceeded rag_max_chunks_per_document', $doc->error_message);
+    }
+
     public function test_stores_content_hash_after_ingest(): void
     {
         $doc = $this->doc('Hash me.');

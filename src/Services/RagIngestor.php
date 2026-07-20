@@ -34,6 +34,20 @@ class RagIngestor
 
         $textChunks = $chunker->chunk($content, $chunkSize, $overlap);
 
+        // Bound the number of chunks so one oversized upload can't spawn tens of
+        // thousands of chunks (and embedding calls) and exhaust workers.
+        $maxChunks = max(0, (int) ($cfg['rag_max_chunks_per_document'] ?? 5000));
+        $truncated = false;
+        if ($maxChunks > 0 && count($textChunks) > $maxChunks) {
+            Log::warning('AI Chatbox RAG: document exceeded rag_max_chunks_per_document — truncating.', [
+                'document_id' => $document->id,
+                'produced' => count($textChunks),
+                'cap' => $maxChunks,
+            ]);
+            $textChunks = array_slice($textChunks, 0, $maxChunks);
+            $truncated = true;
+        }
+
         $embedSvc = null;
         if (!$skipEmbedding) {
             $embedSvc = new EmbeddingService(
@@ -114,6 +128,11 @@ class RagIngestor
             $errorMessage = $embedFailed > 0
                 ? "{$embedFailed} of {$count} chunks failed to embed and will be skipped during vector retrieval."
                 : null;
+        }
+
+        if ($truncated) {
+            $note = "Only the first {$maxChunks} chunks were indexed (document exceeded rag_max_chunks_per_document).";
+            $errorMessage = $errorMessage ? $errorMessage . ' ' . $note : $note;
         }
 
         // Phase 2 — swap the chunks and update the document atomically, so

@@ -491,14 +491,22 @@ return [
 | call to the embedding API, so large documents on slow local models can
 | easily exceed PHP's default 30-second limit.
 |
-| 0 = no limit (recommended for local models, default)
-| 300 = 5 minutes (a safe upper bound for most use cases)
+| 300 = 5 minutes (the default — a safe upper bound so one slow upload can't
+|       pin a PHP-FPM worker indefinitely)
+| 0   = no limit (only for slow local models you fully control)
 |
 | This only affects the RAG admin upload/reprocess request — all other
-| requests use the normal PHP max_execution_time.
+| requests use the normal PHP max_execution_time. Also see
+| rag_max_chunks_per_document below, which bounds work regardless of timeout.
 */
 
-    'rag_processing_timeout' => (int) env('AI_CHATBOX_RAG_PROCESSING_TIMEOUT', 0),
+    'rag_processing_timeout' => (int) env('AI_CHATBOX_RAG_PROCESSING_TIMEOUT', 300),
+
+    // Hard cap on the number of chunks stored per document. A huge upload at a
+    // small chunk size can otherwise produce tens of thousands of chunks (and
+    // embedding HTTP calls), exhausting workers. Chunks beyond this are dropped
+    // with a warning. 0 = no cap.
+    'rag_max_chunks_per_document' => (int) env('AI_CHATBOX_RAG_MAX_CHUNKS', 5000),
 
 /*
 |--------------------------------------------------------------------------
