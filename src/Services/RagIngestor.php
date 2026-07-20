@@ -44,40 +44,52 @@ class RagIngestor
             );
         }
 
-        // Phase 1 — embed each chunk and BUFFER the rows. The document's existing
+        // Phase 1 — embed the chunks and BUFFER the rows. The document's existing
         // chunks are left untouched during this potentially minutes-long phase,
         // so a crash here (OOM, deploy, fatal) leaves the previous version fully
         // intact rather than half-deleted and stuck.
+        //
+        // Embeddings are requested in BATCHES (one HTTP round-trip per batch) via
+        // the array `input` the /embeddings API accepts, instead of one call per
+        // chunk. Any element the batch could not embed falls back to a per-chunk
+        // call, so endpoints that don't support array input still work.
         $now = now();
         $rows = [];
         $embedFailed = 0;
+        $index = 0;
+        $batchSize = max(1, (int) ($cfg['rag_embedding_batch_size'] ?? 32));
 
-        foreach ($textChunks as $i => $chunkText) {
-            $embedding = null;
+        foreach (array_chunk($textChunks, $batchSize) as $batch) {
+            $vectors = $skipEmbedding ? array_fill(0, count($batch), null) : $embedSvc->embedBatch($batch);
 
-            if (!$skipEmbedding) {
-                $embedding = $embedSvc->embed($chunkText);
+            foreach ($batch as $j => $chunkText) {
+                $embedding = $vectors[$j] ?? null;
 
-                if ($embedding === null) {
+                if (!$skipEmbedding && $embedding === null) {
+                    $embedding = $embedSvc->embed($chunkText); // fallback for non-batch endpoints
+                }
+
+                if (!$skipEmbedding && $embedding === null) {
                     $embedFailed++;
                     Log::warning('AI Chatbox RAG: Chunk embedding failed — chunk stored without a vector.', [
                         'document_id' => $document->id,
-                        'chunk_index' => $i,
+                        'chunk_index' => $index,
                         'embedding_url' => $embeddingUrl,
                         'embedding_model' => $cfg['rag_embedding_model'] ?? '',
                     ]);
                 }
-            }
 
-            $rows[] = [
-                'document_id' => $document->id,
-                'chunk_index' => $i,
-                'content' => $chunkText,
-                // insert() bypasses the model cast, so encode the vector here.
-                'embedding' => $embedding !== null ? json_encode($embedding) : null,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
+                $rows[] = [
+                    'document_id' => $document->id,
+                    'chunk_index' => $index,
+                    'content' => $chunkText,
+                    // insert() bypasses the model cast, so encode the vector here.
+                    'embedding' => $embedding !== null ? json_encode($embedding) : null,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+                $index++;
+            }
         }
 
         $count = count($rows);
@@ -108,7 +120,9 @@ class RagIngestor
         // retrieval never sees a half-replaced set and any failure here rolls
         // back cleanly (leaving the old chunks in place). Rows are batch-inserted
         // rather than one query per chunk.
-        DB::transaction(function () use ($document, $rows, $status, $count, $errorMessage) {
+        $contentHash = hash('sha256', $content);
+
+        DB::transaction(function () use ($document, $rows, $status, $count, $errorMessage, $contentHash) {
             $document->chunks()->delete();
 
             foreach (array_chunk($rows, 500) as $batch) {
@@ -119,6 +133,9 @@ class RagIngestor
                 'status' => $status,
                 'chunk_count' => $count,
                 'error_message' => $errorMessage,
+                // Records the ingested content so callers (e.g. the graphify
+                // importer) can skip re-embedding an unchanged document.
+                'content_hash' => $contentHash,
             ]);
         });
     }

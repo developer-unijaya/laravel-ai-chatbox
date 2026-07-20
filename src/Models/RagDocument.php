@@ -15,6 +15,7 @@ class RagDocument extends Model
         'status',
         'chunk_count',
         'content',
+        'content_hash',
         'error_message',
     ];
 

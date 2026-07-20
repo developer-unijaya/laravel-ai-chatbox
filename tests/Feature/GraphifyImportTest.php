@@ -120,6 +120,41 @@ class GraphifyImportTest extends TestCase
         $this->assertDatabaseCount('ai_chatbox_rag_documents', 2);
     }
 
+    public function test_rebuild_skips_unchanged_files(): void
+    {
+        $dir = $this->makeGraphDir(['GRAPH_REPORT.md' => "# Report\n\nStable content."]);
+
+        Artisan::call('ai-chatbox:graphify', ['--path' => $dir]);
+        $doc = RagDocument::where('original_filename', 'graphify-out/GRAPH_REPORT.md')->firstOrFail();
+        $chunkIdsBefore = $doc->chunks()->pluck('id')->all();
+
+        // Re-run with identical content: the document is unchanged, so its chunks
+        // must NOT be re-created (a re-ingest would delete + reinsert → new ids).
+        Artisan::call('ai-chatbox:graphify', ['--path' => $dir]);
+
+        $this->assertDatabaseCount('ai_chatbox_rag_documents', 1);
+        $this->assertSame(
+            $chunkIdsBefore,
+            $doc->fresh()->chunks()->pluck('id')->all(),
+            'Unchanged file should be skipped, not re-ingested.'
+        );
+    }
+
+    public function test_rebuild_reingests_changed_files(): void
+    {
+        $dir = $this->makeGraphDir(['GRAPH_REPORT.md' => "# Report\n\nVersion one."]);
+        Artisan::call('ai-chatbox:graphify', ['--path' => $dir]);
+        $doc = RagDocument::where('original_filename', 'graphify-out/GRAPH_REPORT.md')->firstOrFail();
+        $idsBefore = $doc->chunks()->pluck('id')->all();
+
+        // Overwrite the file with different content, then rebuild.
+        file_put_contents($dir . '/GRAPH_REPORT.md', "# Report\n\nVersion two is different.");
+        Artisan::call('ai-chatbox:graphify', ['--path' => $dir]);
+
+        $this->assertDatabaseCount('ai_chatbox_rag_documents', 1);
+        $this->assertNotSame($idsBefore, $doc->fresh()->chunks()->pluck('id')->all(), 'Changed file should be re-ingested.');
+    }
+
     public function test_keep_flag_appends_instead_of_replacing(): void
     {
         $dir = $this->makeGraphDir(['GRAPH_REPORT.md' => "# Report\n\nContent."]);

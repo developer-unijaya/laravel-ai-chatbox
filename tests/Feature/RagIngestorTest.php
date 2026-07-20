@@ -87,6 +87,43 @@ class RagIngestorTest extends TestCase
         $this->assertSame(0, $doc->chunk_count);
     }
 
+    public function test_embeds_chunks_in_a_single_batch_request(): void
+    {
+        // Three ~60-char paragraphs with a small chunk size (25 tokens = 100
+        // chars) and no overlap → exactly three separate chunks.
+        $doc = $this->doc();
+        $content = implode("\n\n", [
+            trim(str_repeat('alpha ', 10)),
+            trim(str_repeat('bravo ', 10)),
+            trim(str_repeat('gamma ', 10)),
+        ]);
+
+        $batch = new Response(200, ['Content-Type' => 'application/json'], json_encode([
+            'data' => [
+                ['index' => 0, 'embedding' => [0.1, 0.2, 0.3]],
+                ['index' => 1, 'embedding' => [0.4, 0.5, 0.6]],
+                ['index' => 2, 'embedding' => [0.7, 0.8, 0.9]],
+            ],
+        ]));
+        // Only ONE queued response: if the ingestor made per-chunk calls it would
+        // exhaust the mock and fail.
+        $this->mockGuzzle([$batch]);
+
+        (new RagIngestor())->ingest($doc, $content, $this->cfg(['rag_chunk_size' => 25, 'rag_chunk_overlap' => 0]));
+
+        $doc->refresh();
+        $this->assertSame('ready', $doc->status);
+        $this->assertSame(3, RagChunk::where('document_id', $doc->id)->whereNotNull('embedding')->count());
+    }
+
+    public function test_stores_content_hash_after_ingest(): void
+    {
+        $doc = $this->doc('Hash me.');
+        (new RagIngestor())->ingest($doc, 'Hash me.', $this->cfg(['rag_embedding_url' => '']));
+
+        $this->assertSame(hash('sha256', 'Hash me.'), $doc->fresh()->content_hash);
+    }
+
     public function test_all_embeddings_failing_marks_document_failed(): void
     {
         // Embedding endpoint returns an unusable payload → embed() returns null.

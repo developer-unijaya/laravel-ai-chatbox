@@ -76,6 +76,89 @@ class EmbeddingService
         return $this->model ?? '';
     }
 
+    /**
+     * Embed several texts in ONE request (OpenAI-compatible `input: [...]`,
+     * Ollama `/api/embed` `embeddings: [...]`). Returns an array parallel to
+     * $texts; each element is a float[] vector, or null when that text could
+     * not be embedded (or the whole call failed).
+     *
+     * The caller should fall back to per-text embed() for null results so that
+     * endpoints which do not support array input still work.
+     *
+     * @param  string[]  $texts
+     * @return array<int, float[]|null>
+     */
+    public function embedBatch(array $texts): array
+    {
+        $texts = array_values($texts);
+        $n = count($texts);
+        if ($n === 0) {
+            return [];
+        }
+
+        $url = $this->url ?? '';
+        if (empty($url)) {
+            Log::warning('AI Chatbox RAG: rag_embedding_url is not configured.');
+            return array_fill(0, $n, null);
+        }
+
+        try {
+            $client = app('ai-chatbox.guzzle')(['timeout' => $this->timeout ?? 10]);
+
+            $response = $client->post($url, [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . ($this->token ?? ''),
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
+                ],
+                'json' => [
+                    'model' => $this->model ?? '',
+                    'input' => $texts,
+                ],
+            ]);
+
+            $data = json_decode($response->getBody()->getContents(), true);
+
+            // OpenAI / LM Studio / Ollama v1: data[] each with {embedding, index}.
+            if (isset($data['data']) && is_array($data['data'])) {
+                $out = array_fill(0, $n, null);
+                foreach ($data['data'] as $pos => $item) {
+                    $idx = is_int($item['index'] ?? null) ? $item['index'] : $pos;
+                    if (isset($item['embedding']) && is_array($item['embedding']) && $idx >= 0 && $idx < $n) {
+                        $out[$idx] = array_map('floatval', $item['embedding']);
+                    }
+                }
+                return $out;
+            }
+
+            // Ollama /api/embed: embeddings[] is a list of vectors, in order.
+            if (isset($data['embeddings']) && is_array($data['embeddings']) && is_array($data['embeddings'][0] ?? null)) {
+                $out = array_fill(0, $n, null);
+                foreach (array_values($data['embeddings']) as $idx => $vec) {
+                    if ($idx < $n && is_array($vec)) {
+                        $out[$idx] = array_map('floatval', $vec);
+                    }
+                }
+                return $out;
+            }
+
+            Log::warning('AI Chatbox RAG: Batch embedding API returned an unrecognised format.', [
+                'url' => $url,
+                'keys' => array_keys($data ?? []),
+            ]);
+
+            return array_fill(0, $n, null);
+
+        } catch (\Throwable $e) {
+            Log::warning('AI Chatbox RAG: Batch embedding API call failed — falling back to per-chunk.', [
+                'url' => $url,
+                'model' => $this->model ?? '',
+                'error' => $e->getMessage(),
+            ]);
+            return array_fill(0, $n, null);
+        }
+    }
+
     public function embed(string $text): ?array
     {
         $url = $this->url ?? '';

@@ -67,20 +67,18 @@ class GraphifyImport extends Command
         }
 
         $cfg = $aiManager->resolveConfig(config('ai-chatbox.active_provider', 'default'));
+        $keep = (bool) $this->option('keep');
 
-        if (!$this->option('keep')) {
-            $stale = RagDocument::where('original_filename', 'like', self::SOURCE_PREFIX . '%')->get();
-            if ($stale->isNotEmpty()) {
-                foreach ($stale as $doc) {
-                    $doc->chunks()->delete();
-                    $doc->delete();
-                }
-                $this->line("Replaced {$stale->count()} previously imported graphify document(s).");
-            }
-        }
+        // Existing graphify-imported documents, keyed by original_filename. Used
+        // to skip re-embedding files whose content is unchanged (default path).
+        $existing = $keep
+            ? collect()
+            : RagDocument::where('original_filename', 'like', self::SOURCE_PREFIX . '%')->get()->keyBy('original_filename');
 
         $imported = 0;
+        $skipped = 0;
         $totalChunks = 0;
+        $seen = [];
 
         foreach ($files as $file) {
             $rel = self::SOURCE_PREFIX . str_replace('\\', '/', $file->getRelativePathname());
@@ -91,14 +89,34 @@ class GraphifyImport extends Command
                 continue;
             }
 
-            $document = RagDocument::create([
-                'title' => 'Graphify — ' . str_replace('\\', '/', $file->getRelativePathname()),
-                'original_filename' => $rel,
-                'file_type' => 'md',
-                'status' => 'processing',
-                'chunk_count' => 0,
-                'content' => $content,
-            ]);
+            $seen[$rel] = true;
+            $hash = hash('sha256', $content);
+            $current = $existing[$rel] ?? null;
+
+            // Unchanged and already indexed → keep it, skip the embedding cost.
+            if ($current && $current->content_hash === $hash && $current->status === 'ready') {
+                $skipped++;
+                $totalChunks += (int) $current->chunk_count;
+                $this->line("  unchanged: {$rel} ({$current->chunk_count} chunks)");
+                continue;
+            }
+
+            $title = 'Graphify — ' . str_replace('\\', '/', $file->getRelativePathname());
+
+            if ($current) {
+                // Re-use the existing row (RagIngestor swaps its chunks atomically).
+                $current->update(['title' => $title, 'content' => $content, 'status' => 'processing', 'error_message' => null]);
+                $document = $current;
+            } else {
+                $document = RagDocument::create([
+                    'title' => $title,
+                    'original_filename' => $rel,
+                    'file_type' => 'md',
+                    'status' => 'processing',
+                    'chunk_count' => 0,
+                    'content' => $content,
+                ]);
+            }
 
             try {
                 $ingestor->ingest($document, $content, $cfg);
@@ -114,8 +132,20 @@ class GraphifyImport extends Command
             $this->line("  indexed: {$rel} ({$chunks} chunks)");
         }
 
+        // Remove previously-imported documents whose source file is gone (default path).
+        if (!$keep) {
+            $removed = $existing->reject(fn($doc, $name) => isset($seen[$name]));
+            foreach ($removed as $doc) {
+                $doc->chunks()->delete();
+                $doc->delete();
+            }
+            if ($removed->isNotEmpty()) {
+                $this->line("Removed {$removed->count()} document(s) whose source file no longer exists.");
+            }
+        }
+
         $this->newLine();
-        $this->info("Knowledge base rebuilt: {$imported} document(s), {$totalChunks} chunk(s) from graphify.");
+        $this->info("Knowledge base rebuilt: {$imported} indexed, {$skipped} unchanged, {$totalChunks} chunk(s) from graphify.");
 
         if (!config('ai-chatbox.rag_enabled')) {
             $this->warn('RAG is currently disabled — set AI_CHATBOX_RAG=true so the chatbox uses these documents.');

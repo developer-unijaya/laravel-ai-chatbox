@@ -343,6 +343,11 @@ return [
 
     'rag_enabled' => env('AI_CHATBOX_RAG', false),
     'rag_embedding_timeout' => (int) env('AI_CHATBOX_EMBEDDING_TIMEOUT', 10),
+    // Chunks per embedding request. The /embeddings API accepts an array of
+    // inputs, so batching cuts ingestion from one HTTP call per chunk to one
+    // per batch. Any chunk a batch can't embed falls back to a single call, so
+    // endpoints that don't support array input still work. Set to 1 to disable.
+    'rag_embedding_batch_size' => (int) env('AI_CHATBOX_EMBEDDING_BATCH_SIZE', 32),
     'rag_top_k' => 10,
     'rag_chunk_size' => 500,
     'rag_chunk_overlap' => 50,
