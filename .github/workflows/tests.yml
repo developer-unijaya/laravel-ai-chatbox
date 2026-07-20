@@ -7,6 +7,17 @@ on:
     branches: [main]
 
 jobs:
+  validate:
+    name: composer validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+      - run: composer validate --strict
+
   test:
     name: PHP ${{ matrix.php }} — Laravel ${{ matrix.laravel }}
     runs-on: ubuntu-latest
@@ -14,11 +25,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ["8.2", "8.3", "8.4"]
-        laravel: ["12.*"]
+        # composer.json claims ^10.0|^11.0|^12.0, so test all three. Each
+        # Laravel release pins a Testbench major, which in turn pins the PHPUnit
+        # range — hence the explicit per-row pairing rather than a bare axis.
         include:
-          - laravel: "12.*"
-            testbench: "^10.0"
+          # Laravel 10 — Testbench 8 (PHPUnit 10), PHP 8.2–8.3
+          - { laravel: "10.*", testbench: "^8.0", phpunit: "^10.5", php: "8.2" }
+          - { laravel: "10.*", testbench: "^8.0", phpunit: "^10.5", php: "8.3" }
+          # Laravel 11 — Testbench 9 (PHPUnit 10/11), PHP 8.2–8.3
+          - { laravel: "11.*", testbench: "^9.0", phpunit: "^11.5", php: "8.2" }
+          - { laravel: "11.*", testbench: "^9.0", phpunit: "^11.5", php: "8.3" }
+          # Laravel 12 — Testbench 10 (PHPUnit 11), PHP 8.2–8.4
+          - { laravel: "12.*", testbench: "^10.0", phpunit: "^11.5", php: "8.2" }
+          - { laravel: "12.*", testbench: "^10.0", phpunit: "^11.5", php: "8.3" }
+          - { laravel: "12.*", testbench: "^10.0", phpunit: "^11.5", php: "8.4" }
 
     steps:
       - name: Checkout
@@ -33,7 +53,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          composer require "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
+          composer require --dev --no-interaction --no-update \
+            "laravel/framework:${{ matrix.laravel }}" \
+            "orchestra/testbench:${{ matrix.testbench }}" \
+            "phpunit/phpunit:${{ matrix.phpunit }}"
           composer update --prefer-dist --no-interaction
 
       - name: Run tests
