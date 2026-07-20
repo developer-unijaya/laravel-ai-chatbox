@@ -205,9 +205,31 @@ class AdminController extends Controller
         ];
     }
 
+    /**
+     * True for config keys whose value is a secret (API tokens, keys,
+     * passwords) and must be masked before reaching the view. Anchored to the
+     * end of the key so `max_tokens` and similar are never matched.
+     */
+    private function isSecretConfigKey(string $key): bool
+    {
+        return (bool) preg_match('/(?:_token|_secret|_key|_password|password)$/i', $key);
+    }
+
+    /**
+     * Mask a secret to a fixed run of dots plus its last 4 characters, so the
+     * admin can confirm which key is set without the value being disclosed.
+     */
+    private function maskSecret(string $value): string
+    {
+        $len = strlen($value);
+        $dots = str_repeat('•', min(12, max(0, $len - 4)));
+
+        return $len > 4 ? $dots . substr($value, -4) : $value;
+    }
+
     private function buildConfigGroups(array $cfg): array
     {
-        return [
+        $groups = [
             'AI API' => [
                 'active_provider' => $cfg['active_provider'] ?? 'default',
                 'engine' => $cfg['engine'] ?? null,
@@ -270,6 +292,19 @@ class AdminController extends Controller
                 'rag_context_prompt' => $cfg['rag_context_prompt'] ?? null,
             ],
         ];
+
+        // Mask secret-looking values so tokens/keys never reach the rendered
+        // view — the previous per-key Blade check only covered `api_token`,
+        // leaving `rag_embedding_token` (and any future secret key) in cleartext.
+        foreach ($groups as $groupName => $keys) {
+            foreach ($keys as $key => $val) {
+                if (is_string($val) && $val !== '' && $this->isSecretConfigKey($key)) {
+                    $groups[$groupName][$key] = $this->maskSecret($val);
+                }
+            }
+        }
+
+        return $groups;
     }
 
     // ── Diagnostics orchestrator ──────────────────────────────────────────────

@@ -239,8 +239,6 @@
                                 <span class="badge {{ $val ? 'badge-green' : 'badge-gray' }}">{{ $val ? 'true' : 'false' }}</span>
                             @elseif(is_array($val))
                                 {{ implode(', ', $val) }}
-                            @elseif($key === 'api_token')
-                                {{ str_repeat('•', min(12, max(0, strlen($val) - 4))) }}{{ strlen($val) > 4 ? substr($val, -4) : $val }}
                             @elseif($key === 'system_prompt' || $key === 'rag_context_prompt')
                                 <span class="line-clamp-2 text-gray-600 dark:text-gray-400">{{ $val }}</span>
                             @elseif($key === 'active_provider')
@@ -384,10 +382,11 @@
                         </div>
 
                         @foreach($provider as $k => $v)
+                        @php $isSecret = is_string($v) && $v !== '' && preg_match('/(?:_token|_secret|_key|_password|password)$/i', $k); @endphp
                         <div class="grid grid-cols-[auto_1fr] gap-x-3 text-xs mb-0.5">
                             <span class="config-key text-gray-400 whitespace-nowrap">{{ $k }}</span>
                             <span class="config-val {{ $isActive ? 'text-gray-700 dark:text-gray-200' : 'text-gray-600 dark:text-gray-300' }} break-all">
-                                @if($k === 'api_token')
+                                @if($isSecret)
                                     {{ str_repeat('•', min(12, max(0, strlen($v) - 4))) }}{{ strlen($v) > 4 ? substr($v, -4) : $v }}
                                 @else
                                     {{ $v ?: '—' }}
