@@ -50,7 +50,15 @@ class HealthChecker
                 return $this->offline(self::E06, $offlineMessage);
             }
 
-            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            // Loopback (127.0.0.0/8, ::1) is always an operator-configured local
+            // provider (Ollama / LM Studio), never an SSRF pivot — allow it so the
+            // zero-config default stack (localhost provider + ssrf_protection on)
+            // isn't blocked. Private ranges and link-local metadata (169.254.x)
+            // are still rejected.
+            if (
+                !$this->isLoopback($ip)
+                && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false
+            ) {
                 return $this->offline(self::E05, $offlineMessage);
             }
         }
@@ -116,6 +124,12 @@ class HealthChecker
         }
 
         return $cache[$host] = $ip;
+    }
+
+    /** Loopback addresses (IPv4 127.0.0.0/8 and IPv6 ::1) are operator-local, not SSRF pivots. */
+    private function isLoopback(string $ip): bool
+    {
+        return str_starts_with($ip, '127.') || $ip === '::1';
     }
 
     private function classifyConnect(ConnectException $e): string

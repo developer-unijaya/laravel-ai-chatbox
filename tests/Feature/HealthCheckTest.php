@@ -41,14 +41,19 @@ class HealthCheckTest extends TestCase
             ->assertJsonFragment(['code' => 'E05', 'status' => 'offline']);
     }
 
-    public function test_returns_e05_when_ssrf_blocks_localhost(): void
+    public function test_ssrf_allows_loopback_local_provider(): void
     {
+        // Loopback is always an operator-configured local provider (Ollama /
+        // LM Studio), never an SSRF pivot — it must pass the guard so the
+        // zero-config default stack (localhost provider + ssrf_protection on)
+        // isn't a dead widget.
         $this->app['config']->set('ai-chatbox.ssrf_protection', true);
         $this->app['config']->set('ai-chatbox.providers.testprovider.api_url', 'http://127.0.0.1:11434/v1/chat/completions');
+        $this->mockGuzzle([new \GuzzleHttp\Psr7\Response(200, [], 'ok')]);
 
         $this->getJson('/ai-chatbox/health')
-            ->assertStatus(503)
-            ->assertJsonFragment(['code' => 'E05', 'status' => 'offline']);
+            ->assertStatus(200)
+            ->assertJsonFragment(['status' => 'online']);
     }
 
     public function test_returns_e06_when_dns_resolution_fails(): void
