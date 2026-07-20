@@ -4,6 +4,7 @@ namespace DeveloperUnijaya\AiChatbox\Memory;
 use DeveloperUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
 use DeveloperUnijaya\AiChatbox\Memory\Models\Conversation;
 use DeveloperUnijaya\AiChatbox\Memory\Models\Message;
+use Illuminate\Database\QueryException;
 
 /**
  * Stores conversation history in the database.
@@ -60,6 +61,25 @@ class DatabaseConversationRepository implements ConversationRepositoryInterface
         }
 
         // Keep updated_at current so the prune command can use it as last-activity time
+        $conversation->touch();
+    }
+
+    public function appendMessages(string $threadId, array $messages): void
+    {
+        if (empty($messages)) {
+            return;
+        }
+
+        $conversation = $this->resolveForWrite($threadId);
+
+        // Null means the thread is owned by someone else — never write into it.
+        if ($conversation === null) {
+            return;
+        }
+
+        // Plain append of this turn's own messages — no count diff, so concurrent
+        // writes to the same thread can't drop or duplicate each other's rows.
+        $conversation->messages()->createMany($messages);
         $conversation->touch();
     }
 
@@ -137,7 +157,15 @@ class DatabaseConversationRepository implements ConversationRepositoryInterface
             return $existing->user_id === $userId ? $existing : null;
         }
 
-        return Conversation::create(['thread_id' => $threadId, 'user_id' => $userId]);
+        try {
+            return Conversation::create(['thread_id' => $threadId, 'user_id' => $userId]);
+        } catch (QueryException $e) {
+            // A concurrent first message created the row first (unique thread_id).
+            // Re-fetch and re-apply the ownership check instead of failing.
+            $existing = Conversation::where('thread_id', $threadId)->first();
+
+            return ($existing !== null && $existing->user_id === $userId) ? $existing : null;
+        }
     }
 
     private function activeMessages(Conversation $conversation)

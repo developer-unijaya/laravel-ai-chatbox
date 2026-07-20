@@ -71,10 +71,14 @@ class ChatboxController extends Controller
         if (($cfg['history_enabled'] ?? true) && $reply !== '') {
             try {
                 $historyLimit = (int) ($cfg['history_limit'] ?? 50);
-                $fullHistory[] = ['role' => 'user', 'content' => $userMsg];
-                $fullHistory[] = ['role' => 'assistant', 'content' => $reply];
-                $this->repository->saveHistory($threadId, $fullHistory);
-                if (count($fullHistory) > $historyLimit * 2) {
+                // Append only this turn's messages (never the full history) so
+                // concurrent writes to the same thread can't lose or duplicate
+                // each other's rows via a count-based diff.
+                $this->repository->appendMessages($threadId, [
+                    ['role' => 'user', 'content' => $userMsg],
+                    ['role' => 'assistant', 'content' => $reply],
+                ]);
+                if (count($fullHistory) + 2 > $historyLimit * 2) {
                     $this->repository->trimToLimit($threadId, $historyLimit);
                 }
             } catch (Throwable $e) {
@@ -158,10 +162,11 @@ class ChatboxController extends Controller
 
                 if ($useHistory && $fullReply !== '') {
                     try {
-                        $fullHistory[] = ['role' => 'user', 'content' => $userMsg];
-                        $fullHistory[] = ['role' => 'assistant', 'content' => $fullReply];
-                        $this->repository->saveHistory($threadId, $fullHistory);
-                        if (count($fullHistory) > $historyLimit * 2) {
+                        $this->repository->appendMessages($threadId, [
+                            ['role' => 'user', 'content' => $userMsg],
+                            ['role' => 'assistant', 'content' => $fullReply],
+                        ]);
+                        if (count($fullHistory) + 2 > $historyLimit * 2) {
                             $this->repository->trimToLimit($threadId, $historyLimit);
                         }
                         session()->save(); // required because the response has already started
@@ -301,10 +306,11 @@ class ChatboxController extends Controller
 
                 if ($useHistory && $reply !== '') {
                     try {
-                        $fullHistory[] = ['role' => 'user', 'content' => $userMsg];
-                        $fullHistory[] = ['role' => 'assistant', 'content' => $reply];
-                        $this->repository->saveHistory($threadId, $fullHistory);
-                        if (count($fullHistory) > $historyLimit * 2) {
+                        $this->repository->appendMessages($threadId, [
+                            ['role' => 'user', 'content' => $userMsg],
+                            ['role' => 'assistant', 'content' => $reply],
+                        ]);
+                        if (count($fullHistory) + 2 > $historyLimit * 2) {
                             $this->repository->trimToLimit($threadId, $historyLimit);
                         }
                         session()->save();

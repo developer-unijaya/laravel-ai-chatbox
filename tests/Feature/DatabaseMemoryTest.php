@@ -213,6 +213,48 @@ class DatabaseMemoryTest extends TestCase
         $this->assertSame('Reply 2', $history[3]['content']);
     }
 
+    public function test_append_messages_never_loses_concurrent_turns(): void
+    {
+        $threadId = '550e8400-e29b-4d4f-a716-446655440000';
+        $repo = new DatabaseConversationRepository();
+
+        // One existing pair.
+        $repo->appendMessages($threadId, [
+            ['role' => 'user', 'content' => 'q0'],
+            ['role' => 'assistant', 'content' => 'a0'],
+        ]);
+
+        // Two turns append their own messages (append-only, no count diff). The
+        // old count-based saveHistory would have dropped the second turn when
+        // both were built from the same stale snapshot.
+        $repo->appendMessages($threadId, [
+            ['role' => 'user', 'content' => 'qA'],
+            ['role' => 'assistant', 'content' => 'aA'],
+        ]);
+        $repo->appendMessages($threadId, [
+            ['role' => 'user', 'content' => 'qB'],
+            ['role' => 'assistant', 'content' => 'aB'],
+        ]);
+
+        $contents = array_column($repo->getHistory($threadId), 'content');
+        $this->assertCount(6, $contents);
+        $this->assertContains('aA', $contents);
+        $this->assertContains('aB', $contents);
+    }
+
+    public function test_append_messages_ignores_threads_owned_by_others(): void
+    {
+        $threadId = '550e8400-e29b-4d4f-a716-446655440000';
+        // A conversation owned by user 5 (guest requester has auth()->id() null).
+        Conversation::create(['thread_id' => $threadId, 'user_id' => 5]);
+
+        (new DatabaseConversationRepository())->appendMessages($threadId, [
+            ['role' => 'user', 'content' => 'intrusion'],
+        ]);
+
+        $this->assertDatabaseMissing('ai_chatbox_messages', ['content' => 'intrusion']);
+    }
+
     public function test_failed_ai_turn_leaves_no_orphan_user_message(): void
     {
         $threadId = '550e8400-e29b-4d4f-a716-446655440000';

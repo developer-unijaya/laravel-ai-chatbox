@@ -27,6 +27,17 @@ class SessionConversationRepository implements ConversationRepositoryInterface
         session([$this->key($threadId) => $history]);
     }
 
+    public function appendMessages(string $threadId, array $messages): void
+    {
+        if (empty($messages)) {
+            return;
+        }
+
+        $key = $this->key($threadId);
+        $history = session($key, []);
+        session([$key => array_merge($history, array_values($messages))]);
+    }
+
     public function trimToLimit(string $threadId, int $maxPairs): void
     {
         $key = $this->key($threadId);

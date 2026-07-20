@@ -25,6 +25,18 @@ interface ConversationRepositoryInterface
     public function saveHistory(string $threadId, array $history): void;
 
     /**
+     * Append the given (new) messages to a thread's stored history.
+     *
+     * Unlike saveHistory(), the caller passes ONLY the messages produced by this
+     * turn (e.g. the user prompt + assistant reply), never the full history — so
+     * there is no count-based diff to get wrong when two requests write to the
+     * same thread concurrently.
+     *
+     * @param  array<int, array{role: string, content: string}>  $messages
+     */
+    public function appendMessages(string $threadId, array $messages): void;
+
+    /**
      * Prune the stored history to at most $maxPairs user + assistant pairs,
      * dropping the oldest pairs first.
      */
