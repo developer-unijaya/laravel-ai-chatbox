@@ -1,72 +1,72 @@
 Flow Diagram:
 
-┌───────────────────────────────────────────────┐
-│                CLIENT (Browser)                │
-│                                                │
-│   Chat widget — one of three drivers:          │
-│     • Vue  • Blade (vanilla JS)  • Livewire     │
-│   - User input                                 │
-│   - Chat history (session/localStorage)        │
-└──────────────────────┬─────────────────────────┘
-                       │ HTTP  (POST /message · SSE /stream · /clear · /health)
-                       ▼
-┌───────────────────────────────────────────────┐
-│              APPLICATION SERVER                │
-│           (Laravel 10 / 11 / 12)               │
-│                                                │
-│  Layer 3 — UI                                  │
-│  ┌──────────────────────────────────────────┐ │
-│  │ ChatboxController                         │ │
-│  │  validate → load history → trim context   │ │
-│  └───────────────┬──────────────────────────┘ │
-│                  ▼                             │
-│  Layer 1.5 — Orchestration                     │
-│  ┌──────────────────────────────────────────┐ │
-│  │ Orchestrator  (agentic tool loop)         │ │
-│  │  OFF by default → collapses to one call.  │ │
-│  │  ON → model calls allow-listed Tools,     │ │
-│  │  results fed back, repeat to an answer.    │ │
-│  └───────┬───────────────────────┬──────────┘ │
-│          │ prompt assembly       │ engine pick │
-│          ▼                       ▼             │
-│  ┌───────────────┐      ┌──────────────────┐   │
-│  │ PromptBuilder │      │ AiManager        │   │
-│  │  + RAG inject │      │  resolveEngine() │   │
-│  └──────┬────────┘      └────────┬─────────┘   │
-│         │                        │             │
-│         ▼                        ▼             │
-│  Services / RAG           Layer 1 — Engine     │
-│  ┌───────────────┐      ┌──────────────────┐   │
-│  │ RagRetriever  │      │ OpenAiCompatible  │  │
-│  │ EmbeddingSvc  │      │  / Anthropic      │  │
-│  │ DocumentChunk │      │  (retry + SSRF     │  │
-│  └──────┬────────┘      │   guard, no       │  │
-│         │               │   redirects)      │  │
-│         ▼               └────────┬─────────┘   │
-│  Layer 2 — Memory                │             │
-│  ┌───────────────┐               │             │
-│  │ Conversation  │               │             │
-│  │  session | DB │               │             │
-│  └───────────────┘               │             │
-│                                  │             │
-│  Internal storage:               │             │
-│   • MySQL — chat logs (DB driver)│             │
-│   • RAG tables — documents+chunks│             │
-└──────────────────────────────────┼─────────────┘
+┌──────────────────────────────────────────────────┐
+│                 CLIENT (Browser)                 │
+│                                                  │
+│   Chat widget — one of three drivers:            │
+│     • Vue   • Blade (vanilla JS)   • Livewire    │
+│   - User input                                   │
+│   - Chat history (session/localStorage)          │
+└───────────────────────┬──────────────────────────┘
+                        │ HTTP  (POST /message · SSE /stream · /clear · /health)
+                        ▼
+┌──────────────────────────────────────────────────┐
+│              APPLICATION SERVER                  │
+│           (Laravel 10 / 11 / 12)                 │
+│                                                  │
+│  Layer 3 — UI                                    │
+│  ┌─────────────────────────────────────────┐     │
+│  │ ChatboxController                       │     │
+│  │  validate → load history → trim context │     │
+│  └────────────────────┬────────────────────┘     │
+│                       ▼                          │
+│  Layer 1.5 — Orchestration                       │
+│  ┌─────────────────────────────────────────┐     │
+│  │ Orchestrator  (agentic tool loop)       │     │
+│  │  OFF by default → collapses to one call.│     │
+│  │  ON → model calls allow-listed Tools,   │     │
+│  │  results fed back, repeat to an answer. │     │
+│  └──────┬────────────────────────┬─────────┘     │
+│         │ prompt assembly        │ engine pick   │
+│         ▼                        ▼               │
+│  ┌───────────────┐      ┌──────────────────┐     │
+│  │ PromptBuilder │      │ AiManager        │     │
+│  │  + RAG inject │      │  resolveEngine() │     │
+│  └──────┬────────┘      └────────┬─────────┘     │
+│         │                        │               │
+│         ▼                        ▼               │
+│  Services / RAG           Layer 1 — Engine       │
+│  ┌───────────────┐      ┌──────────────────┐     │
+│  │ RagRetriever  │      │ OpenAiCompatible │     │
+│  │ EmbeddingSvc  │      │  / Anthropic     │     │
+│  │ DocumentChunk │      │  (retry + SSRF   │     │
+│  └──────┬────────┘      │   guard, no      │     │
+│         │               │   redirects)     │     │
+│         ▼               └────────┬─────────┘     │
+│  Layer 2 — Memory                │               │
+│  ┌───────────────┐               │               │
+│  │ Conversation  │               │               │
+│  │  session | DB │               │               │
+│  └───────────────┘               │               │
+│                                  │               │
+│  Internal storage:               │               │
+│   • MySQL — chat logs (DB driver)│               │
+│   • RAG tables — documents+chunks│               │
+└──────────────────────────────────┬───────────────┘
                                    │ HTTPS (REST) — no redirects followed
                                    ▼
-┌───────────────────────────────────────────────┐
-│                   AI PROVIDER                  │
-│   (whichever AI_CHATBOX_ACTIVE_PROVIDER names) │
-│                                                │
-│   ┌────────────────────┐  ┌─────────────────┐  │
-│   │ OpenAI-compatible   │  │ Anthropic       │  │
-│   │  Ollama / OpenAI /  │  │  Messages API   │  │
-│   │  Groq / LM Studio / │  │  (Claude)       │  │
-│   │  OpenRouter …       │  │                 │  │
-│   └────────────────────┘  └─────────────────┘  │
-│   Chat completion  +  (optional) /embeddings   │
-└───────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│                   AI PROVIDER                    │
+│   (whichever AI_CHATBOX_ACTIVE_PROVIDER names)   │
+│                                                  │
+│   ┌────────────────────┐  ┌─────────────────┐    │
+│   │ OpenAI-compatible  │  │ Anthropic       │    │
+│   │  Ollama / OpenAI / │  │  Messages API   │    │
+│   │  Groq / LM Studio /│  │  (Claude)       │    │
+│   │  OpenRouter …      │  │                 │    │
+│   └────────────────────┘  └─────────────────┘    │
+│   Chat completion  +  (optional) /embeddings     │
+└──────────────────────────────────────────────────┘
 
 ---
 

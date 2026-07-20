@@ -14,6 +14,78 @@ grep "E07" storage/logs/laravel.log
 
 > **How URLs and tokens are configured:** `api_url`, `api_token`, and `api_model` are always sourced from the **active named provider**, not from top-level env vars. Set `AI_CHATBOX_ACTIVE_PROVIDER` to select the provider, then configure that provider's own variables (e.g. `OLLAMA_URL`, `OPENAI_API_KEY`). See the [Configuration Reference](README.md#ai-providers) in the README.
 
+### Contents
+
+- **[How to debug — start here](#how-to-debug--start-here)** — the 3-tool workflow (read this first)
+- [The Admin Diagnostics panel](#the-admin-diagnostics-panel) · [The health endpoint](#the-health-endpoint)
+- [Where to look — a map](#where-to-look--a-map)
+- [Error Code Reference](#error-code-reference) — `E01`–`E19` (config, security, network, HTTP, response) and `O01`–`O06` (orchestration)
+- [HTTP status quick reference](#http-status-quick-reference) — the package route's own 400/403/419/422/429/500/502
+- [What the widget shows the user](#what-the-widget-shows-the-user) — bubble text → real cause
+- [Reading the Log](#reading-the-log) · [Log message index](#log-message-index)
+- [Common Scenarios](#common-scenarios) — per-provider setup, [widget doesn't appear](#widget-does-not-appear-at-all), [session expired](#the-widget-says-your-session-has-expired), [silent fallbacks](#silent-fallbacks-no-error-but-not-what-you-expected), [console commands](#console-command-errors)
+
+---
+
+## How to debug — start here
+
+Work through these three tools **in order**. Most issues are identified at step 1 without ever reading a log.
+
+1. **Open the built-in Diagnostics panel** at **`/ai-chatbox/admin`**. It runs ~11 automated checks against your live config and lists every problem as an **error** (red — will break), **warning** (amber — may misbehave), or **info** (blue — worth knowing). This is the fastest way to find a misconfiguration. See [The Admin Diagnostics panel](#the-admin-diagnostics-panel) below.
+2. **Open your browser DevTools → Network tab**, reproduce the issue, and click the failed `message` / `stream` / `rag` request. The **HTTP status** and the JSON body (which usually contains a `code` field) tell you what the *server* returned. See [HTTP status quick reference](#http-status-quick-reference) and [What the widget shows the user](#what-the-widget-shows-the-user).
+3. **Read the server log** — `storage/logs/laravel.log`. Every error the package handles is logged with a searchable `AI Chatbox` prefix and, for provider failures, the provider's **real error body**. See [Reading the Log](#reading-the-log) and the [Log message index](#log-message-index).
+
+> **Golden rule:** the message shown to the end-user is always generic ("Unable to reach AI service", "Something went wrong") on purpose — the *specific* cause is in the Diagnostics panel, the HTTP response `code`, or the log. Never debug from the chat bubble text alone.
+
+---
+
+## The Admin Diagnostics panel
+
+Visit **`/ai-chatbox/admin`** (the `route_prefix` defaults to `ai-chatbox`). The dashboard runs these checks live and shows the results grouped by area:
+
+| Group | Catches (examples) |
+|---|---|
+| **PHP** | `curl` extension missing (all AI calls fail); `mbstring` missing |
+| **Active Provider** | `AI_CHATBOX_ACTIVE_PROVIDER` unset / points at an undefined provider; missing `api_url` / `api_token` / `api_model`; placeholder values still in place |
+| **Providers** | each named provider's URL/token/model completeness ("complete" vs "incomplete" badge) |
+| **Security** | `APP_DEBUG=true` in production; `allowed_origins` wildcard; SSRF disabled; token exposure |
+| **Response** | `system_prompt`, `temperature`, `max_tokens` sanity (e.g. `max_tokens` very low → truncated replies) |
+| **History** | `memory_driver` / `history_limit` / `context_token_limit` sanity |
+| **Frontend / Widget** | invalid `frontend` driver, `position`, `color_scheme`, `storage`; markdown/CDN notes |
+| **RAG** | `rag_embedding_url` set but `rag_embedding_model` empty; external embedding host with no `rag_embedding_token`; documents in `failed` state; zero indexed chunks |
+| **Memory** | `memory_driver=database` but the tables aren't migrated |
+| **Admin Protection** | admin / RAG routes still on the bare `[web, auth]` gate (any logged-in user gets in) |
+| **Streaming** | `stream=true` combined with settings/servers that buffer SSE |
+
+Each item is one of:
+
+- 🔴 **error** — will break the feature; fix before expecting it to work.
+- 🟠 **warning** — works but likely misconfigured or insecure.
+- 🔵 **info** — informational (a fallback is active, a default is in play).
+
+The dashboard also shows the resolved config (secrets masked), the RAG/knowledge-base stats, and a **provider "Test" button** that runs the [health check](#the-health-endpoint) live.
+
+> **Can't reach `/ai-chatbox/admin`?** In production it returns **403** by default until you configure a real admin gate — see [Admin dashboard or Knowledge Base returns 403](#admin-dashboard-or-knowledge-base-returns-403-in-production).
+
+### The health endpoint
+
+`GET /ai-chatbox/health` (optionally `?provider=<name>`) pings the configured provider's base URL and returns `{"status":"online"|"offline","code":"E##","message":...}`. The widget calls it before opening. Hit it directly (or use the admin "Test" button) to check connectivity in isolation from the chat flow.
+
+---
+
+## Where to look — a map
+
+| Symptom source | Where to look |
+|---|---|
+| Configuration / setup problems | **`/ai-chatbox/admin`** diagnostics panel (start here) |
+| A request that returned an error | Browser **DevTools → Network** → the request's status + JSON `code` |
+| The *real* provider error behind a generic message | `storage/logs/laravel.log` → `AI Chatbox: provider request failed` (`provider_response`) |
+| Any handled error, with its code | `storage/logs/laravel.log` → search `AI Chatbox` |
+| RAG document state (ready / failed / processing) | Admin → Knowledge Base (`/ai-chatbox/rag`), each doc's status + `error_message` |
+| Widget not appearing at all | Browser **Console** for JS errors; page source for the widget markup; see [Widget doesn't appear](#widget-does-not-appear-at-all) |
+| Console command failures | The command's stdout (`ai-chatbox:graphify`, `:make-tool`, `:prune-conversations`) |
+| Effective config values | Admin panel (masked), or `php artisan config:show ai-chatbox` |
+
 ---
 
 ## Error Code Reference
@@ -115,6 +187,38 @@ There are two categories:
 
 ---
 
+## HTTP status quick reference
+
+This maps the **HTTP status of the package's own route** (what you see in DevTools → Network for `/message`, `/stream`, `/rag*`, `/admin*`) to its cause. This is distinct from the `E##` codes above, which describe the *upstream provider's* status.
+
+| Status | Route(s) | Cause | Where to fix |
+|---|---|---|---|
+| **400** | `/message`, `/stream` | Unknown / unresolvable provider (`{"error":"Unknown provider."}`), or a malformed request | Check `AI_CHATBOX_ACTIVE_PROVIDER` and the `?provider=` param; see Diagnostics → Active Provider |
+| **403** | `/admin*`, `/rag*` | Admin gate not configured for production, **or** a cross-origin request blocked by CORS (`Cross-origin request blocked.`) | [Admin 403](#admin-dashboard-or-knowledge-base-returns-403-in-production) / add the origin to `allowed_origins` |
+| **419** | `/message`, `/stream`, `/clear`, `/rag*` | CSRF token missing/expired (`Page Expired`) | Ensure the CSRF cookie/meta is present; the widget sends `X-XSRF-TOKEN`. See [session expired](#the-widget-says-your-session-has-expired) |
+| **422** | `/message`, `/rag*` | Validation failed — message > 2000 chars, bad `thread_id` (> 36 chars), or a RAG document with **no chunks** (`Document has no chunks`) | Fix the input; for RAG, re-check the source document/chunking |
+| **429** | `/message`, `/stream` | The package's own **rate limiter** (not the provider's) throttled the client | Raise `AI_CHATBOX_RATE_LIMIT`, or back off |
+| **500** | `/message`, `/stream` | Unhandled server exception, or a **fatal** orchestration error (`O02` timeout) | Read `storage/logs/laravel.log` for the trace / `O02` |
+| **502** | `/rag/{id}/chat` | The RAG "chat with document" call to the provider failed (`AI call failed. Check your provider config in the dashboard.`) | Fix provider config (same as an `E##` on the main chat) |
+
+> The **200-with-an-error-body** case: the main chat endpoints return HTTP **200** even when the provider is offline, carrying `{"status":"offline","code":"E##"}` in the JSON so the widget can render a friendly bubble. So a "200" in Network is **not** proof the AI answered — check the JSON body for a `code`.
+
+---
+
+## What the widget shows the user
+
+End-users only ever see generic text. Use this table to translate the **bubble/toast the user reports** into where the real cause lives.
+
+| What the user sees | What actually happened | Where to look |
+|---|---|---|
+| *"Network error. Please check your connection."* | The `fetch` to the package route never completed — server unreachable, CORS block, or a dropped connection | DevTools → Network (is the request red/failed?); [CORS 403](#admin-dashboard-or-knowledge-base-returns-403-in-production) |
+| *"Your session has expired. Please refresh the page."* | **419** — CSRF token invalid/expired | [session expired](#the-widget-says-your-session-has-expired) |
+| *"No response received. Please try again."* / *"No response."* | The request succeeded but the reply body was empty — usually an `E18`, or an offline provider (`status:offline`) | Log → `provider_response`; run the health check |
+| *"Something went wrong. Please try again."* | A non-OK HTTP status (4xx/5xx) from the package route, or a stream error | DevTools → Network status → [HTTP status quick reference](#http-status-quick-reference); log |
+| The friendly "AI service is currently unreachable" bubble | `status:offline` with an `E##` code (health check or request failed) | Match the `E##` in the [Error Code Reference](#error-code-reference) |
+
+---
+
 ## Reading the Log
 
 Every error is logged to Laravel's default log channel with its code:
@@ -137,6 +241,36 @@ To tail the log in real time:
 ```bash
 tail -f storage/logs/laravel.log | grep "AI Chatbox"
 ```
+
+### Log message index
+
+Every line the package writes is prefixed `AI Chatbox`. Search for the exact phrase to jump to the cause. Levels: 🔴 `error` · 🟠 `warning` · 🔵 `info`.
+
+| Log message (grep this) | Level | What it means / where to fix |
+|---|---|---|
+| `AI Chatbox: provider request failed` | 🟠 | A chat completion failed. The `provider_response` field holds the **provider's real error body** — the single most useful line for `E12`–`E18`. |
+| `AI Chatbox error` | 🔴 | A handled `AiServiceException` reached the controller — has `code` + `status`. |
+| `AI Chatbox orchestration error` | 🔴 | Fatal orchestration failure (`O02`) — the run was aborted. |
+| `AI Chatbox stream error` | 🔴 | The SSE `/stream` request failed mid-stream (has `code` if it was an `AiServiceException`). |
+| `AI Chatbox: failed to save AI reply` | 🔴 | The reply was generated but couldn't be persisted (DB driver) — check the `memory` DB connection/migrations. |
+| `AI Chatbox health check failed` | 🟠 | `/health` (or the admin "Test") couldn't reach the provider — has the `E##` code. |
+| `AI Chatbox: APP_DEBUG is enabled while a real API token is configured` | 🟠 | Security: turn off `APP_DEBUG` in production (would leak the token in stack traces). |
+| `AI Chatbox orchestrator: tool threw during handle().` | 🟠 | A tool's own code threw (`O06`) — the **real exception** is here (the model only got a generic message). Has the `tool` name. |
+| `AI Chatbox orchestrator: could not resolve tool class.` | 🟠 | A class in `orchestrator_tools` doesn't exist / can't be built — fix the FQCN. |
+| `AI Chatbox orchestrator: tool class does not implement ToolInterface — skipped.` | 🟠 | An allow-listed class isn't a valid tool — it's ignored. |
+| `AI Chatbox orchestrator: tool authorize() threw — treating as denied.` | 🟠 | A tool's `authorize()` raised (treated as `O04` denied) — review that method. |
+| `AI Chatbox orchestrator: knowledge_base_search failed.` | 🟠 | The built-in KB-search tool errored (RAG query failed under the orchestrator). |
+| `AI Chatbox RAG retrieval failed` | 🟠 | RAG lookup threw during prompt building — the message is sent **without** grounding rather than failing. |
+| `AI Chatbox RAG: embedding unavailable — falling back to keyword search.` | 🔵 | No embedding endpoint configured → RAG is using keyword search (works, but lower quality). See [silent fallbacks](#silent-fallbacks-no-error-but-not-what-you-expected). |
+| `AI Chatbox RAG: Query embedding failed` | 🟠 | The query couldn't be embedded — no RAG context this message. Check `rag_embedding_url`/token. |
+| `AI Chatbox RAG: rag_embedding_url is not configured.` | 🟠 | Embedding requested but no URL set. |
+| `AI Chatbox RAG: Embedding API call failed.` / `Batch embedding API call failed` | 🔴/🟠 | The embedding provider itself errored — check its URL/token/model. |
+| `AI Chatbox RAG: ... returned an unrecognised format.` | 🟠 | The embedding endpoint replied with an unexpected shape — wrong endpoint/model. |
+| `AI Chatbox RAG: Chunk embedding dimension mismatch — skipping chunk.` | 🟠 | Stored chunks use a different embedding dimension than the current model — **reprocess the document** after changing the embedding model. |
+| `AI Chatbox RAG: Skipped chunks with no stored embedding — reprocess the document to fix.` | 🟠 | Some chunks were stored without a vector — reprocess the document. |
+| `AI Chatbox RAG: All chunk embeddings failed — document marked as failed.` | 🔴 | Ingestion failed for a whole document → it shows `failed` in the Knowledge Base. Fix embeddings, then reprocess. |
+| `AI Chatbox RAG: document exceeded rag_max_chunks_per_document — truncating.` | 🟠 | The document was too large and was cut off — raise the cap or split the source. |
+| `AI Chatbox RAG: No chunks met the similarity threshold` | 🔵 | Retrieval found nothing similar enough — lower `rag_similarity_threshold`. |
 
 ---
 
@@ -329,3 +463,74 @@ Two steps are easy to forget after `composer update`:
 **Symptom:** the widget shows old styling or an old bug after upgrading.
 
 The `?v=` cache-buster on the published assets is derived from the installed package version, so browsers pick up new files per release — but only if you re-published the assets (see *After upgrading the package* above). Force-refresh the browser (Ctrl/Cmd-Shift-R) once after re-publishing.
+
+---
+
+### Widget does not appear at all
+
+**Symptom:** no chat bubble renders on the page — not an error bubble, *nothing*.
+
+This is a front-end / wiring issue, not a provider issue, so the `E##` codes don't apply. Check in order:
+
+1. **Is the directive/component on the page?** The widget only renders where you place it — `@aichatbox` (Blade), `<ai-chatbox>` (Vue mount point), or `<livewire:ai-chatbox />`, depending on your `frontend` driver. View the page **source** and confirm the markup is present.
+2. **Does the `frontend` driver match how you embedded it?** `AI_CHATBOX_FRONTEND` must be `vue`, `blade`, or `livewire` and match the tag you used. A mismatch (e.g. `frontend=blade` but you placed the Vue mount point) renders nothing. The Diagnostics panel flags an invalid driver.
+3. **Were the assets published?** `php artisan vendor:publish --tag=ai-chatbox-assets --force`. If `public/vendor/ai-chatbox/...` is missing, the CSS/JS 404 (check DevTools → Network) and nothing mounts.
+4. **JS errors in the Console?** Open DevTools → **Console**. A Vue mount error, a missing CSRF meta tag, or a CSP that blocks the inline/bundled script will abort rendering. For Vue, ensure the bundle is loaded on the page.
+5. **`enabled` / route prefix.** If `AI_CHATBOX_ENABLED=false` the widget and routes are off. Confirm it's `true`.
+
+---
+
+### The widget says "Your session has expired"
+
+**Symptom:** the bubble shows *"Your session has expired. Please refresh the page."* — the request returned **419**.
+
+This is Laravel CSRF, not the AI. The package sends the `X-XSRF-TOKEN` header from the `XSRF-TOKEN` cookie. It breaks when:
+
+- The `XSRF-TOKEN` cookie is missing — the page must be served through Laravel's `web` middleware (which sets it), and the widget's route prefix must be on the same domain.
+- The session expired (the user left the tab open past the session lifetime) — refreshing fixes it.
+- A reverse proxy/CDN is stripping cookies or the `X-XSRF-TOKEN` header — allow them through.
+- For SPA/cross-subdomain setups, configure `SANCTUM_STATEFUL_DOMAINS` / `session.domain` so the cookie is readable by the front-end origin.
+
+---
+
+### Silent fallbacks (no error, but not what you expected)
+
+Some features **degrade quietly** by design — you get an answer, but not the behaviour you configured. These produce **no error code**; the only signal is a log line (see the [Log message index](#log-message-index)).
+
+| You configured… | …but it silently does this | Tell-tale log line / signal |
+|---|---|---|
+| RAG with no embedding endpoint | Uses **keyword** search instead of vector similarity | `embedding unavailable — falling back to keyword search` |
+| RAG, but nothing scores high enough | Injects **no** grounding for that message (answers from base knowledge) | `No chunks met the similarity threshold` — lower `rag_similarity_threshold` |
+| Orchestrator ON, but no capable provider / no tools / model declined | Falls back to a **single plain completion** (non-agentic) | No `O##` code; see [orchestrator tools never fire](#ai-orchestrator-enabled-but-tools-never-fire) |
+| Orchestrator hit `orchestrator_max_steps` | Makes one final **tool-less** call for a best-effort answer | No `O01` any more; raise `orchestrator_max_steps` if replies feel cut off |
+| Separate embedding host needing auth, no `rag_embedding_token` | Sends the embedding request **without** an auth header (then the provider rejects it) | Embedding API call failed |
+
+> If a feature "seems off but throws nothing," this table is where to look — then confirm with the matching log line.
+
+---
+
+### Console command errors
+
+The package's Artisan commands print their own diagnostics to stdout.
+
+**`php artisan ai-chatbox:graphify`** (import `graphify-out/` markdown into the knowledge base):
+
+- `graphify-out directory not found` — run graphify first, or pass the correct `--dir`.
+- `No markdown files found under …` — the directory has no `.md` files.
+- `skipped (empty/unreadable): …` — that file was empty or unreadable (warning, continues).
+- `failed: … — <error>` — that file threw during ingestion (embedding/DB error).
+- `RAG is currently disabled — set AI_CHATBOX_RAG=true` — documents were imported but won't be used until RAG is enabled.
+
+**`php artisan ai-chatbox:make-tool`** (scaffold an orchestrator tool):
+
+- `Provide a tool class name or --model=` — pass one, e.g. `--model=Order`.
+- `Model [X] could not be resolved — generating a blank tool instead` — the model class wasn't found; edit the generated stub by hand.
+- `Could not read the schema for [X]` / `Table for [X] has no columns` — the model's table isn't migrated/reachable; a blank tool is generated.
+- `Skipping invalid column identifier: '…'` — a column name wasn't a safe identifier and was left out.
+
+**`php artisan ai-chatbox:prune-conversations`** (delete old DB-driver conversations):
+
+- `Days must be 1 or greater.` — fix the `--days` value.
+- `memory_driver is set to '…', not 'database'.` — pruning only applies to the database memory driver; pass `--force` to run anyway.
+- `Table 'ai_chatbox_conversations' does not exist.` — run `php artisan migrate`.
+- `Table 'ai_chatbox_messages' does not exist … Run 'php artisan migrate'` — same fix; message cascade is skipped until then.
