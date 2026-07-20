@@ -9,6 +9,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Admin') - AI Chatbox</title>
+    {{--
+        Tailwind Play CDN (pinned to 3.4.17). This is a convenience for the admin
+        panel and is Tailwind's own "not for production" build (it JIT-compiles CSS
+        in the browser). It CANNOT carry an SRI `integrity` hash: cdn.tailwindcss.com
+        serves no `Access-Control-Allow-Origin` header, so adding `crossorigin` +
+        `integrity` would make the browser block the script and break the panel.
+        For a hardened / offline deployment, self-host a compiled admin stylesheet
+        and replace this tag — see the "Admin panel assets" note in the README.
+    --}}
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <script>tailwind.config = { darkMode: 'class' }</script>
     @stack('head')

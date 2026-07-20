@@ -1418,6 +1418,15 @@ The `color_scheme` setting controls both the chat widget and all admin pages (`/
 
 > Run `php artisan config:clear` after changing config values.
 
+### Admin panel assets (Tailwind)
+
+The admin pages are styled with the pinned **Tailwind Play CDN** (`cdn.tailwindcss.com/3.4.17`) — a zero-config convenience. Note two limitations for hardened deployments:
+
+- It is Tailwind's own *"not for production"* build (it compiles CSS in the browser at runtime), so it adds a little load time.
+- It **cannot carry an SRI `integrity` hash**, because `cdn.tailwindcss.com` does not send CORS headers — adding `crossorigin`/`integrity` would make the browser block the script.
+
+For an offline or supply-chain-hardened install, publish the admin views (`php artisan vendor:publish --tag=ai-chatbox-views`), build a compiled Tailwind stylesheet that scans `resources/views/vendor/ai-chatbox/`, and replace the CDN `<script>` in `admin-layout.blade.php` with a `<link>` to your local build. The end-user chat widget does **not** use this CDN — it ships a precompiled stylesheet.
+
 ---
 
 ## Customising the Widget
