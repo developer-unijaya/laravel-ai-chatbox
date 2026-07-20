@@ -9,6 +9,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\TooManyRedirectsException;
+use Illuminate\Support\Facades\Log;
 use Psr\Http\Message\StreamInterface;
 
 class OpenAiCompatibleEngine implements AiEngineInterface, SupportsToolCalling
@@ -92,8 +93,7 @@ class OpenAiCompatibleEngine implements AiEngineInterface, SupportsToolCalling
         } catch (ConnectException $e) {
             throw new AiEngineException($this->classifyConnectException($e), 'Unable to reach AI service. Please try again later.', 503, $e);
         } catch (RequestException $e) {
-            $status = $e->hasResponse() ? $e->getResponse()->getStatusCode() : 500;
-            throw new AiEngineException($this->classifyHttpStatus($status), 'Unable to reach AI service. Please try again later.', $status, $e);
+            throw $this->httpException($e, $model);
         } catch (\Throwable $e) {
             throw new AiEngineException(self::E19, 'Unable to reach AI service. Please try again later.', 500, $e);
         }
@@ -142,8 +142,7 @@ class OpenAiCompatibleEngine implements AiEngineInterface, SupportsToolCalling
         } catch (ConnectException $e) {
             throw new AiEngineException($this->classifyConnectException($e), 'Unable to reach AI service. Please try again later.', 503, $e);
         } catch (RequestException $e) {
-            $status = $e->hasResponse() ? $e->getResponse()->getStatusCode() : 500;
-            throw new AiEngineException($this->classifyHttpStatus($status), 'Unable to reach AI service. Please try again later.', $status, $e);
+            throw $this->httpException($e, $model);
         } catch (\Throwable $e) {
             throw new AiEngineException(self::E19, 'Unable to reach AI service. Please try again later.', 500, $e);
         }
@@ -279,6 +278,46 @@ class OpenAiCompatibleEngine implements AiEngineInterface, SupportsToolCalling
         return connection_aborted() === 1;
     }
 
+    /**
+     * Build the AiEngineException for a failed provider HTTP request, logging
+     * the provider's error body first.
+     *
+     * The client-facing message stays generic (the raw provider text is never
+     * returned to the browser), but the provider's response body — where the
+     * real cause lives, e.g. "temperature is not supported", "max_tokens:
+     * required", "model not found" — is logged server-side so operators can
+     * actually diagnose the failure instead of only seeing "E17 / unreachable".
+     * Only the response body is logged, never the request headers, so the API
+     * token is not written to the log.
+     */
+    protected function httpException(RequestException $e, string $model = ''): AiEngineException
+    {
+        $status = $e->hasResponse() ? $e->getResponse()->getStatusCode() : 500;
+
+        $body = '';
+        if ($e->hasResponse()) {
+            $body = trim((string) $e->getResponse()->getBody());
+            if (strlen($body) > 2000) {
+                $body = substr($body, 0, 2000) . '…';
+            }
+        }
+
+        Log::warning('AI Chatbox: provider request failed', [
+            'engine' => static::class,
+            'model' => $model,
+            'status' => $status,
+            'error_code' => $this->classifyHttpStatus($status),
+            'provider_response' => $body,
+        ]);
+
+        return new AiEngineException(
+            $this->classifyHttpStatus($status),
+            'Unable to reach AI service. Please try again later.',
+            $status,
+            $e,
+        );
+    }
+
     // ── SupportsToolCalling ───────────────────────────────────────────────────
 
     public function completeWithTools(array $messages, array $tools, array $options = []): EngineResult
@@ -348,8 +387,7 @@ class OpenAiCompatibleEngine implements AiEngineInterface, SupportsToolCalling
         } catch (ConnectException $e) {
             throw new AiEngineException($this->classifyConnectException($e), 'Unable to reach AI service. Please try again later.', 503, $e);
         } catch (RequestException $e) {
-            $status = $e->hasResponse() ? $e->getResponse()->getStatusCode() : 500;
-            throw new AiEngineException($this->classifyHttpStatus($status), 'Unable to reach AI service. Please try again later.', $status, $e);
+            throw $this->httpException($e, $model);
         } catch (\Throwable $e) {
             throw new AiEngineException(self::E19, 'Unable to reach AI service. Please try again later.', 500, $e);
         }

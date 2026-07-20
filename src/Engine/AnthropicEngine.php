@@ -59,8 +59,7 @@ class AnthropicEngine extends OpenAiCompatibleEngine
         } catch (ConnectException $e) {
             throw new AiEngineException($this->classifyConnectException($e), 'Unable to reach AI service. Please try again later.', 503, $e);
         } catch (RequestException $e) {
-            $status = $e->hasResponse() ? $e->getResponse()->getStatusCode() : 500;
-            throw new AiEngineException($this->classifyHttpStatus($status), 'Unable to reach AI service. Please try again later.', $status, $e);
+            throw $this->httpException($e, $model);
         } catch (\Throwable $e) {
             throw new AiEngineException(self::E19, 'Unable to reach AI service. Please try again later.', 500, $e);
         }
@@ -102,8 +101,7 @@ class AnthropicEngine extends OpenAiCompatibleEngine
         } catch (ConnectException $e) {
             throw new AiEngineException($this->classifyConnectException($e), 'Unable to reach AI service. Please try again later.', 503, $e);
         } catch (RequestException $e) {
-            $status = $e->hasResponse() ? $e->getResponse()->getStatusCode() : 500;
-            throw new AiEngineException($this->classifyHttpStatus($status), 'Unable to reach AI service. Please try again later.', $status, $e);
+            throw $this->httpException($e, $model);
         } catch (\Throwable $e) {
             throw new AiEngineException(self::E19, 'Unable to reach AI service. Please try again later.', 500, $e);
         }
@@ -217,8 +215,7 @@ class AnthropicEngine extends OpenAiCompatibleEngine
         } catch (ConnectException $e) {
             throw new AiEngineException($this->classifyConnectException($e), 'Unable to reach AI service. Please try again later.', 503, $e);
         } catch (RequestException $e) {
-            $status = $e->hasResponse() ? $e->getResponse()->getStatusCode() : 500;
-            throw new AiEngineException($this->classifyHttpStatus($status), 'Unable to reach AI service. Please try again later.', $status, $e);
+            throw $this->httpException($e, $model);
         } catch (\Throwable $e) {
             throw new AiEngineException(self::E19, 'Unable to reach AI service. Please try again later.', 500, $e);
         }

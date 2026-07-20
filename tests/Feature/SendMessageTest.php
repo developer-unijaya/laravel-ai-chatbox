@@ -190,6 +190,27 @@ class SendMessageTest extends TestCase
         $this->assertStringNotContainsString('DB error', $response->getContent());
     }
 
+    public function test_provider_error_body_is_logged_for_diagnosis(): void
+    {
+        \Illuminate\Support\Facades\Log::spy();
+
+        // A 400 whose body explains the real cause (as newer Anthropic models return).
+        $this->mockGuzzle([$this->errorResponse(400, 'temperature is not supported by this model')]);
+
+        $response = $this->postJson('/ai-chatbox/message', ['message' => 'Hello']);
+
+        // Client still gets the generic message (no provider detail leaked)...
+        $this->assertStringNotContainsString('temperature is not supported', $response->getContent());
+
+        // ...but the provider's error body is logged server-side for the operator.
+        \Illuminate\Support\Facades\Log::shouldHaveReceived('warning')
+            ->withArgs(function ($message, $context = []) {
+                return str_contains((string) $message, 'provider request failed')
+                    && str_contains($context['provider_response'] ?? '', 'temperature is not supported');
+            })
+            ->atLeast()->once();
+    }
+
     // ── Session history ───────────────────────────────────────────────────────
 
     public function test_stores_conversation_in_session(): void
