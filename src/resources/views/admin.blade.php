@@ -443,9 +443,19 @@
                     if (data.status === 'online') {
                         el.innerHTML = '<span class="badge badge-green">online</span>';
                     } else {
-                        const msg  = data.message || 'offline';
-                        const code = data.code ? ' <span style="opacity:0.75">[' + data.code + ']</span>' : '';
-                        el.innerHTML = '<span class="badge badge-red">' + msg + code + '</span>';
+                        // data.message / data.code relay upstream provider text —
+                        // build via textContent so a hostile/MITM'd provider can't
+                        // inject markup into the admin page.
+                        const badge = document.createElement('span');
+                        badge.className = 'badge badge-red';
+                        badge.textContent = data.message || 'offline';
+                        if (data.code) {
+                            const codeEl = document.createElement('span');
+                            codeEl.style.opacity = '0.75';
+                            codeEl.textContent = ' [' + data.code + ']';
+                            badge.appendChild(codeEl);
+                        }
+                        el.replaceChildren(badge);
                     }
                 } catch (e) {
                     el.innerHTML = '<span class="badge badge-red">request failed</span>';
