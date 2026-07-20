@@ -97,7 +97,48 @@ class PromptBuilder
         //    intentionally NOT stored in history, so it doesn't accumulate.
         $messages[] = $this->userTurn($userMessage, $rag['reference'], $systemPrompt, $language);
 
-        return $messages;
+        return $this->coalesceRoles($messages);
+    }
+
+    /**
+     * Merge consecutive same-role conversational turns (user/assistant) so the
+     * outgoing payload always alternates roles — a hard requirement of the
+     * Anthropic Messages API, which rejects two `user` (or two `assistant`)
+     * turns in a row with a 400.
+     *
+     * On a well-formed history this is a no-op. It becomes load-bearing when a
+     * history is malformed — e.g. a thread corrupted by an orphaned user turn
+     * from a previously failed request, or a concurrent write — turning what
+     * would be a hard 400 into a merged, valid turn. System messages pass
+     * through untouched (engines handle them separately) and do not break the
+     * adjacency of the conversational turns around them.
+     *
+     * @param  array<int, array{role: string, content: string}>  $messages
+     * @return array<int, array{role: string, content: string}>
+     */
+    private function coalesceRoles(array $messages): array
+    {
+        $result = [];
+        $lastConvIndex = null; // index in $result of the last user/assistant turn
+
+        foreach ($messages as $msg) {
+            $role = $msg['role'] ?? '';
+
+            if ($role !== 'user' && $role !== 'assistant') {
+                $result[] = $msg; // system (or other) — passes through, not a boundary
+                continue;
+            }
+
+            if ($lastConvIndex !== null && $result[$lastConvIndex]['role'] === $role) {
+                $result[$lastConvIndex]['content'] .= "\n\n" . ($msg['content'] ?? '');
+                continue;
+            }
+
+            $result[] = $msg;
+            $lastConvIndex = array_key_last($result);
+        }
+
+        return $result;
     }
 
     /**

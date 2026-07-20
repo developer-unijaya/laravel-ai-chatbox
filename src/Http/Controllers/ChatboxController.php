@@ -51,20 +51,13 @@ class ChatboxController extends Controller
         $system = $this->promptBuilder->systemMessages($cfg);
         $contextHistory = $this->contextManager->trim($fullHistory, $system, $userMsg, $cfg, $this->ragBudget($cfg));
 
-        // Persist the user message immediately before calling the AI
-        if ($cfg['history_enabled'] ?? true) {
-            try {
-                $this->repository->saveMessage($threadId, 'user', $userMsg);
-            } catch (Throwable $e) {
-                Log::error('AI Chatbox: failed to save user message', [
-                    'thread_id' => $threadId,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
         // Orchestration layer: single call when disabled, agentic tool loop when enabled.
         // (Prompt assembly, incl. RAG injection, happens inside the orchestrator.)
+        // The user message is NOT persisted before this call: on the DB driver a
+        // pre-saved user turn with no assistant pair (a failed turn) would leave
+        // two consecutive user messages in history and permanently break the
+        // thread (Anthropic rejects non-alternating roles). User + assistant are
+        // saved together only after a successful reply, below.
         try {
             $reply = $this->orchestrator->run($userMsg, $contextHistory, $cfg, $request)->reply;
         } catch (AiEngineException $e) {
@@ -114,17 +107,8 @@ class ChatboxController extends Controller
         $useHistory = $cfg['history_enabled'] ?? true;
         $historyLimit = (int) ($cfg['history_limit'] ?? 50);
 
-        // Persist the user message immediately before the stream begins
-        if ($useHistory) {
-            try {
-                $this->repository->saveMessage($threadId, 'user', $userMsg);
-            } catch (Throwable $e) {
-                Log::error('AI Chatbox: failed to save user message', [
-                    'thread_id' => $threadId,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
+        // The user message is persisted together with the assistant reply after a
+        // successful turn (see sendMessage() for why it is not pre-saved).
 
         // Orchestrator enabled: run the (possibly multi-step) tool loop to completion,
         // then stream the final answer text. Tool turns are not token-streamed in v1.

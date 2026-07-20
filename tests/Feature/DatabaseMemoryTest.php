@@ -213,6 +213,50 @@ class DatabaseMemoryTest extends TestCase
         $this->assertSame('Reply 2', $history[3]['content']);
     }
 
+    public function test_failed_ai_turn_leaves_no_orphan_user_message(): void
+    {
+        $threadId = '550e8400-e29b-4d4f-a716-446655440000';
+
+        // First turn fails at the provider (500). The user message must NOT be
+        // persisted on its own — an orphaned user turn would break the thread.
+        $this->mockGuzzle([
+            new Response(500, [], json_encode(['error' => ['message' => 'boom']])),
+        ]);
+
+        $this->postJson('/ai-chatbox/message', ['message' => 'first try', 'thread_id' => $threadId])
+            ->assertStatus(500);
+
+        $this->assertDatabaseCount('ai_chatbox_messages', 0);
+        $this->assertDatabaseMissing('ai_chatbox_messages', ['role' => 'user', 'content' => 'first try']);
+    }
+
+    public function test_thread_stays_usable_after_a_failed_turn(): void
+    {
+        $threadId = '550e8400-e29b-4d4f-a716-446655440000';
+
+        // Turn 1 fails, turn 2 succeeds. Without the orphan fix, turn 2's history
+        // would contain two consecutive user turns and corrupt the thread.
+        $this->mockGuzzle([
+            new Response(503, [], json_encode(['error' => ['message' => 'unavailable']])),
+            new Response(200, [], json_encode(['choices' => [['message' => ['content' => 'Recovered reply']]]])),
+        ]);
+
+        $this->postJson('/ai-chatbox/message', ['message' => 'first try', 'thread_id' => $threadId]);
+        $this->postJson('/ai-chatbox/message', ['message' => 'second try', 'thread_id' => $threadId])
+            ->assertOk()
+            ->assertJsonFragment(['reply' => 'Recovered reply']);
+
+        // Exactly one clean pair — no orphan from the failed first turn.
+        $history = (new DatabaseConversationRepository())->getHistory($threadId);
+        $this->assertSame(
+            [
+                ['role' => 'user', 'content' => 'second try'],
+                ['role' => 'assistant', 'content' => 'Recovered reply'],
+            ],
+            $history,
+        );
+    }
+
     public function test_different_threads_have_isolated_db_histories(): void
     {
         $threadA = '550e8400-e29b-4d4f-a716-446655440000';

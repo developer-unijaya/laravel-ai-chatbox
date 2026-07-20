@@ -271,6 +271,54 @@ class PromptBuilderTest extends TestCase
         $this->assertStringContainsString('French', $userContent);
     }
 
+    // ── Role alternation (Anthropic 400 guard) ────────────────────────────────
+
+    public function test_orphaned_user_turn_in_history_is_merged_not_left_consecutive(): void
+    {
+        // A thread corrupted by a previously failed turn: history ends with an
+        // unpaired user message. Building must not emit two consecutive user
+        // turns (which Anthropic rejects with a 400).
+        $history = [
+            ['role' => 'user', 'content' => 'earlier question'],
+            ['role' => 'assistant', 'content' => 'earlier answer'],
+            ['role' => 'user', 'content' => 'ORPHAN (never answered)'],
+        ];
+
+        $messages = $this->builder->build('new question', $history, $this->cfg());
+
+        // No two adjacent messages share a role.
+        for ($i = 1; $i < count($messages); $i++) {
+            $this->assertNotSame(
+                $messages[$i - 1]['role'],
+                $messages[$i]['role'],
+                "Messages at {$i} and " . ($i - 1) . ' must not share a role',
+            );
+        }
+
+        // The orphan and the new question are merged into a single user turn.
+        $last = end($messages);
+        $this->assertSame('user', $last['role']);
+        $this->assertStringContainsString('ORPHAN (never answered)', $last['content']);
+        $this->assertStringContainsString('new question', $last['content']);
+    }
+
+    public function test_well_formed_history_is_not_altered_by_coalescing(): void
+    {
+        $history = [
+            ['role' => 'user', 'content' => 'q1'],
+            ['role' => 'assistant', 'content' => 'a1'],
+        ];
+
+        $messages = $this->builder->build('q2', $history, $this->cfg());
+
+        // system, user q1, assistant a1, user q2 — unchanged, one turn each.
+        $this->assertCount(4, $messages);
+        $this->assertSame(['system', 'user', 'assistant', 'user'], array_column($messages, 'role'));
+        $this->assertSame('q1', $messages[1]['content']);
+        $this->assertSame('a1', $messages[2]['content']);
+        $this->assertStringContainsString('q2', $messages[3]['content']);
+    }
+
     // ── RAG disabled ──────────────────────────────────────────────────────────
 
     public function test_build_does_not_inject_rag_context_when_disabled(): void
