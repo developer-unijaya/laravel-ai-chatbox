@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('document_id')->constrained('ai_chatbox_rag_documents')->cascadeOnDelete();
             $table->unsignedInteger('chunk_index');
-            $table->text('content');
+            $table->longText('content'); // a single chunk can exceed 64 KB (long delimiter-less segments)
             $table->longText('embedding')->nullable(); // JSON float array
             $table->timestamps();
 

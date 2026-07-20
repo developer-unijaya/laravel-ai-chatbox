@@ -15,7 +15,10 @@ return new class extends Migration
             $table->string('file_type', 10);
             $table->enum('status', ['pending', 'processing', 'ready', 'failed'])->default('pending');
             $table->unsignedInteger('chunk_count')->default(0);
-            $table->text('content')->nullable(); // raw text stored for reprocessing
+            // longText (up to 4 GB): the whole uploaded file is stored here for
+            // reprocessing, and uploads may be several MB — a plain TEXT column
+            // caps at 64 KB on MySQL and would silently truncate larger docs.
+            $table->longText('content')->nullable();
             $table->text('error_message')->nullable();
             $table->timestamps();
         });

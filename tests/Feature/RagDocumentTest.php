@@ -280,4 +280,23 @@ class RagDocumentTest extends TestCase
         $response->assertStatus(200)
             ->assertJson(['reply' => 'Laravel is great!']);
     }
+
+    public function test_document_content_column_stores_large_text(): void
+    {
+        // The content column holds the whole uploaded file and must not truncate
+        // multi-MB documents (a plain TEXT column caps at 64 KB on MySQL — the
+        // column is now longText). ~500 KB round-trip.
+        $large = str_repeat('A', 500_000);
+
+        $doc = RagDocument::create([
+            'title' => 'Big',
+            'original_filename' => 'big.txt',
+            'file_type' => 'txt',
+            'status' => 'ready',
+            'chunk_count' => 0,
+            'content' => $large,
+        ]);
+
+        $this->assertSame(500_000, strlen($doc->fresh()->content));
+    }
 }
