@@ -1101,6 +1101,7 @@ AI_CHATBOX_ORCHESTRATOR=true
 |---|---|---|---|
 | `orchestrator_enabled` | `AI_CHATBOX_ORCHESTRATOR` | `false` | Master switch |
 | `orchestrator_max_steps` | `AI_CHATBOX_ORCHESTRATOR_MAX_STEPS` | `5` | Max tool-call loop iterations (runaway guard) |
+| `orchestrator_max_tokens` | `AI_CHATBOX_ORCHESTRATOR_MAX_TOKENS` | `1024` | Max tokens for agentic tool turns (independent of the chat `max_tokens`) |
 | `orchestrator_timeout` | `AI_CHATBOX_ORCHESTRATOR_TIMEOUT` | `60` | Wall-clock seconds for the whole run |
 | `orchestrator_tools` | — | `[]` | Allow-list of tool class names the model may use |
 

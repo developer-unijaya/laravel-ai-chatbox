@@ -32,7 +32,7 @@ return [
 | Publish the config to change: php artisan vendor:publish --tag=ai-chatbox-config
 */
 
-    'language' => 'English',
+    'language' => env('AI_CHATBOX_LANGUAGE', 'English'),
 
 /*
 |--------------------------------------------------------------------------
@@ -186,7 +186,7 @@ return [
 | Set to false to display replies as plain text.
 */
 
-    'markdown' => true,
+    'markdown' => env('AI_CHATBOX_MARKDOWN', true),
 
 /*
 |--------------------------------------------------------------------------
@@ -225,7 +225,7 @@ return [
 */
 
     'history_enabled' => env('AI_CHATBOX_HISTORY', true),
-    'history_limit' => 50,
+    'history_limit' => (int) env('AI_CHATBOX_HISTORY_LIMIT', 50),
 
 /*
 |--------------------------------------------------------------------------
@@ -480,7 +480,7 @@ return [
 | Only applies when memory_driver=database.
 */
 
-    'conversation_prune_days' => 30,
+    'conversation_prune_days' => (int) env('AI_CHATBOX_PRUNE_DAYS', 30),
 
 /*
 |--------------------------------------------------------------------------
