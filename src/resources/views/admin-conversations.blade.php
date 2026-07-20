@@ -277,7 +277,7 @@
             const roleClass = row.last_role === 'user' ? 'badge-blue' : 'badge-gray';
             const roleBadge = row.last_role ? `<span class="badge ${roleClass} mr-1.5">${escHtml(row.last_role)}</span>` : '';
             return `
-            <tr class="conv-row" data-id="${row.id}" tabindex="0" role="button" aria-label="View conversation ${thread}">
+            <tr class="conv-row" data-id="${row.id}" tabindex="0" role="button" aria-label="View conversation ${escHtml(thread)}">
                 <td class="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">${escHtml(thread)}</td>
                 <td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">${user}</td>
                 <td class="px-4 py-3 text-center text-xs font-semibold">${row.messages_count}</td>
@@ -505,9 +505,13 @@
 
     function renderMarkdown(text) {
         if (!text) return '';
-        if (typeof marked === 'undefined') return escHtml(text);
-        const raw = marked.parse(String(text), { breaks: true, gfm: true });
-        return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(raw) : raw;
+        // AI/user content is untrusted — only render HTML when BOTH the parser
+        // and the sanitizer loaded; otherwise fall back to escaped plain text.
+        // (If the DOMPurify CDN fails to load, never emit unsanitized markup.)
+        if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
+            return escHtml(text);
+        }
+        return DOMPurify.sanitize(marked.parse(String(text), { breaks: true, gfm: true }));
     }
 
     if (typeof marked !== 'undefined') { marked.setOptions({ breaks: true, gfm: true }); }
