@@ -62,7 +62,7 @@ class OpenAiCompatibleEngine implements AiEngineInterface, SupportsToolCalling
         try {
             $client = $this->makeClient(['timeout' => $timeout]);
 
-            $response = $client->post($apiUrl, [
+            $response = $this->postWithRetry($client, $apiUrl, [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $apiToken,
                     'Content-Type' => 'application/json',
@@ -357,7 +357,7 @@ class OpenAiCompatibleEngine implements AiEngineInterface, SupportsToolCalling
                 ], $tools);
             }
 
-            $response = $client->post($apiUrl, [
+            $response = $this->postWithRetry($client, $apiUrl, [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $apiToken,
                     'Content-Type' => 'application/json',
@@ -481,8 +481,82 @@ class OpenAiCompatibleEngine implements AiEngineInterface, SupportsToolCalling
             403 => self::E13,
             404 => self::E14,
             429 => self::E15,
-            500, 502, 503, 504 => self::E16,
+            // 408 Request Timeout and 529 Overloaded (Anthropic) are transient
+            // server-side conditions — classify them with the retryable 5xx class
+            // rather than the "unexpected status" bucket.
+            408, 500, 502, 503, 504, 529 => self::E16,
             default => self::E17,
         };
+    }
+
+    /**
+     * HTTP statuses that are worth retrying (transient server-side / throttling).
+     *
+     * @return int[]
+     */
+    protected function retryableStatuses(): array
+    {
+        return [408, 429, 500, 502, 503, 504, 529];
+    }
+
+    /**
+     * POST with bounded retries on transient failures — retryable HTTP statuses
+     * (429/5xx/529/408) and connection errors — honouring a `Retry-After`
+     * response header when present. Non-retryable errors (4xx other than
+     * 408/429) and the final attempt propagate to the caller's catch chain.
+     *
+     * Controlled by config `max_retries` (default 2) and `retry_base_delay_ms`
+     * (default 500); set `max_retries` to 0 to disable retries entirely.
+     */
+    protected function postWithRetry(Client $client, string $url, array $options): \Psr\Http\Message\ResponseInterface
+    {
+        $maxAttempts = 1 + max(0, (int) config('ai-chatbox.max_retries', 2));
+        $attempt = 0;
+
+        while (true) {
+            $attempt++;
+
+            try {
+                return $client->post($url, $options);
+            } catch (ConnectException $e) {
+                if ($attempt >= $maxAttempts) {
+                    throw $e;
+                }
+                $this->sleepBeforeRetry($attempt, null);
+            } catch (RequestException $e) {
+                $status = $e->hasResponse() ? $e->getResponse()->getStatusCode() : 0;
+                if ($attempt >= $maxAttempts || !in_array($status, $this->retryableStatuses(), true)) {
+                    throw $e;
+                }
+                $retryAfter = $e->hasResponse() ? $this->parseRetryAfter($e->getResponse()) : null;
+                $this->sleepBeforeRetry($attempt, $retryAfter);
+            }
+        }
+    }
+
+    /**
+     * Sleep before the next retry. Uses the server's `Retry-After` seconds when
+     * provided (capped), otherwise exponential backoff from `retry_base_delay_ms`.
+     */
+    protected function sleepBeforeRetry(int $attempt, ?int $retryAfterSeconds): void
+    {
+        if ($retryAfterSeconds !== null) {
+            $ms = min($retryAfterSeconds, 30) * 1000;
+        } else {
+            $base = max(0, (int) config('ai-chatbox.retry_base_delay_ms', 500));
+            $ms = $base * (2 ** ($attempt - 1));
+        }
+
+        if ($ms > 0) {
+            usleep($ms * 1000);
+        }
+    }
+
+    /** Parse a `Retry-After` header (delta-seconds only) into an int, or null. */
+    protected function parseRetryAfter(\Psr\Http\Message\ResponseInterface $response): ?int
+    {
+        $value = trim($response->getHeaderLine('Retry-After'));
+
+        return ($value !== '' && ctype_digit($value)) ? (int) $value : null;
     }
 }

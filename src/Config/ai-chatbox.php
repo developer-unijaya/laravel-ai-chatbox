@@ -305,6 +305,20 @@ return [
 
 /*
 |--------------------------------------------------------------------------
+| Transient-failure retries
+|--------------------------------------------------------------------------
+| The engine retries a failed provider request on transient conditions —
+| HTTP 408/429/500/502/503/504/529 and connection errors — honouring a
+| Retry-After header when present, otherwise exponential backoff from
+| retry_base_delay_ms. Non-retryable errors (other 4xx) are never retried.
+| Set max_retries to 0 to disable retries entirely.
+*/
+
+    'max_retries' => (int) env('AI_CHATBOX_MAX_RETRIES', 2),
+    'retry_base_delay_ms' => (int) env('AI_CHATBOX_RETRY_BASE_DELAY_MS', 500),
+
+/*
+|--------------------------------------------------------------------------
 | RAG — Retrieval-Augmented Generation
 |--------------------------------------------------------------------------
 | When enabled, the chatbox retrieves relevant context from your uploaded

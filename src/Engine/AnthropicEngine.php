@@ -33,7 +33,7 @@ class AnthropicEngine extends OpenAiCompatibleEngine
                 $payload['temperature'] = $temp;
             }
 
-            $response = $client->post($apiUrl, [
+            $response = $this->postWithRetry($client, $apiUrl, [
                 'headers' => $this->anthropicHeaders($apiToken, $options),
                 'json' => $payload,
             ]);
@@ -172,7 +172,7 @@ class AnthropicEngine extends OpenAiCompatibleEngine
                 ], $tools);
             }
 
-            $response = $client->post($apiUrl, [
+            $response = $this->postWithRetry($client, $apiUrl, [
                 'headers' => $this->anthropicHeaders($apiToken, $options),
                 'json' => $payload,
             ]);

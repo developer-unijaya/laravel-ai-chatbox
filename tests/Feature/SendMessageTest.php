@@ -211,6 +211,70 @@ class SendMessageTest extends TestCase
             ->atLeast()->once();
     }
 
+    // ── Transient-failure retries (#12) ───────────────────────────────────────
+
+    private function enableRetries(int $max = 2): void
+    {
+        $this->app['config']->set('ai-chatbox.max_retries', $max);
+        $this->app['config']->set('ai-chatbox.retry_base_delay_ms', 0); // no real sleep in tests
+    }
+
+    public function test_transient_500_is_retried_then_succeeds(): void
+    {
+        $this->enableRetries(2);
+        $this->mockGuzzle([
+            $this->errorResponse(500, 'temporary'),
+            $this->openAiResponse('Recovered'),
+        ]);
+
+        $this->postJson('/ai-chatbox/message', ['message' => 'Hi'])
+            ->assertOk()
+            ->assertJsonFragment(['reply' => 'Recovered']);
+    }
+
+    public function test_retries_are_bounded_and_final_error_propagates(): void
+    {
+        $this->enableRetries(1);
+        $this->mockGuzzle([
+            $this->errorResponse(503, 'down'),
+            $this->errorResponse(503, 'still down'),
+        ]);
+
+        $this->postJson('/ai-chatbox/message', ['message' => 'Hi'])
+            ->assertStatus(503)
+            ->assertJsonFragment(['code' => 'E16']);
+    }
+
+    public function test_529_overloaded_is_classified_as_retryable_5xx(): void
+    {
+        // Retries off (harness default) — a 529 must still classify as E16, not E17.
+        $this->mockGuzzle([$this->errorResponse(529, 'overloaded')]);
+
+        $this->postJson('/ai-chatbox/message', ['message' => 'Hi'])
+            ->assertJsonFragment(['code' => 'E16']);
+    }
+
+    public function test_non_retryable_400_is_not_retried(): void
+    {
+        $this->enableRetries(2);
+        // Only one response queued: a retry would exhaust the mock queue and change the code.
+        $this->mockGuzzle([$this->errorResponse(400, 'bad request')]);
+
+        $this->postJson('/ai-chatbox/message', ['message' => 'Hi'])
+            ->assertJsonFragment(['code' => 'E17']); // 400 → E17, not retried
+    }
+
+    public function test_retry_after_header_is_honoured(): void
+    {
+        $this->enableRetries(1);
+        $throttled = new Response(429, ['Retry-After' => '0'], json_encode(['error' => ['message' => 'slow down']]));
+        $this->mockGuzzle([$throttled, $this->openAiResponse('OK')]);
+
+        $this->postJson('/ai-chatbox/message', ['message' => 'Hi'])
+            ->assertOk()
+            ->assertJsonFragment(['reply' => 'OK']);
+    }
+
     // ── Session history ───────────────────────────────────────────────────────
 
     public function test_stores_conversation_in_session(): void

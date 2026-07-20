@@ -31,6 +31,10 @@ abstract class TestCase extends Orchestra
             'foreign_key_constraints' => true,
         ]);
 
+        // Retries off by default in tests: single-attempt behaviour keeps the
+        // mocked Guzzle queue deterministic. Retry tests re-enable this per-test.
+        $app['config']->set('ai-chatbox.max_retries', 0);
+
         $app['config']->set('ai-chatbox.stream', false);
         $app['config']->set('ai-chatbox.ssrf_protection', false);
         $app['config']->set('ai-chatbox.allowed_origins', ['http://localhost']);
