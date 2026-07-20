@@ -103,7 +103,7 @@ class EmbeddingService
         }
 
         try {
-            $client = app('ai-chatbox.guzzle')(['timeout' => $this->timeout ?? 10]);
+            $client = app('ai-chatbox.guzzle')(['timeout' => $this->timeout ?? 10, 'allow_redirects' => false]);
 
             $response = $client->post($url, [
                 'headers' => [
@@ -172,7 +172,7 @@ class EmbeddingService
         }
 
         try {
-            $client = app('ai-chatbox.guzzle')(['timeout' => $timeout]);
+            $client = app('ai-chatbox.guzzle')(['timeout' => $timeout, 'allow_redirects' => false]);
 
             $response = $client->post($url, [
                 'headers' => [

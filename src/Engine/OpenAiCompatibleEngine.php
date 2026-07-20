@@ -451,7 +451,12 @@ class OpenAiCompatibleEngine implements AiEngineInterface, SupportsToolCalling
 
     protected function makeClient(array $config): Client
     {
-        return app('ai-chatbox.guzzle')($config);
+        // Never follow redirects on provider API calls. API endpoints don't
+        // legitimately redirect, and following one is an SSRF bypass (a redirect
+        // to a private/metadata IP defeats any host allow-listing) and a secret-
+        // leak vector (Guzzle replays custom auth headers like Anthropic's
+        // x-api-key to the redirect target's host).
+        return app('ai-chatbox.guzzle')(array_merge(['allow_redirects' => false], $config));
     }
 
     protected function classifyConnectException(ConnectException $e): string

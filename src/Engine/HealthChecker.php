@@ -62,7 +62,9 @@ class HealthChecker
 
         try {
             $client = app('ai-chatbox.guzzle')(['timeout' => $timeout, 'connect_timeout' => $timeout]);
-            $client->get($baseUrl, ['http_errors' => false]);
+            // Do not follow redirects: the SSRF host check above validated the
+            // configured host, but a 30x could redirect to a private/metadata IP.
+            $client->get($baseUrl, ['http_errors' => false, 'allow_redirects' => false]);
 
             return ['status' => 'online', 'message' => 'AI service is reachable.'];
 
