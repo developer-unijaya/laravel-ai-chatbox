@@ -358,6 +358,22 @@ return [
         'have', 'has', 'had', 'does', 'did',
         'for', 'and', 'but', 'not', 'you', 'your',
     ],
+/*
+|--------------------------------------------------------------------------
+| Admin & Knowledge Base access
+|--------------------------------------------------------------------------
+| Middleware protecting the admin dashboard and the RAG (Knowledge Base)
+| pages. The default [web, auth] means "any logged-in user" — fine for local
+| testing, but NOT authorization. For that reason the package FAILS CLOSED:
+| outside the local/testing environment, if either gate is left at the exact
+| bare default [web, auth], the routes return 403 until you configure a real
+| gate here. Set a role/permission/policy middleware appropriate to your app,
+| e.g. 'role:admin' (Spatie), 'can:manage-ai-chatbox' (Laravel Gate), or a
+| custom middleware. Any customisation disables the tripwire.
+|
+| admin_middleware = null inherits rag_admin_middleware.
+*/
+
     'rag_admin_middleware' => ['web', 'auth'],
     'admin_middleware' => null, // null = inherit rag_admin_middleware
 

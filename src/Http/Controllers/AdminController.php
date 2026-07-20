@@ -761,7 +761,8 @@ class AdminController extends Controller
         if ($adminSorted === $defaultSorted) {
             $diagnostics[] = ['level' => 'warning', 'group' => 'Security', 'message' =>
                 'The admin dashboard is only protected by the default middleware [web, auth] — any authenticated user can access it. '
-                . 'Add a role or permission middleware to admin_middleware in your config, e.g. "role:admin" (Spatie), "can:manage-chatbox" (Laravel Gates), or a custom middleware.'];
+                . 'This is allowed in local/testing for zero-config setup, but the package FAILS CLOSED (returns 403) on these routes in every other environment until you configure a real gate. '
+                . 'Add a role or permission middleware to admin_middleware in your config, e.g. "role:admin" (Spatie), "can:manage-ai-chatbox" (Laravel Gates), or a custom middleware.'];
         } elseif (!$hasRoleCheck($adminMiddleware)) {
             $diagnostics[] = ['level' => 'info', 'group' => 'Security', 'message' =>
                 'admin_middleware has been customised but no role/permission middleware was detected. Ensure dashboard access is restricted to trusted users only.'];
@@ -770,6 +771,7 @@ class AdminController extends Controller
         if ($ragSorted === $defaultSorted) {
             $diagnostics[] = ['level' => 'warning', 'group' => 'Security', 'message' =>
                 'The Knowledge Base (RAG) pages are only protected by the default middleware [web, auth] — any authenticated user can upload or delete documents. '
+                . 'This is allowed in local/testing only; outside those environments the package returns 403 until a real gate is configured. '
                 . 'Add a role or permission middleware to rag_admin_middleware in your config.'];
         } elseif (!$hasRoleCheck($ragMiddleware)) {
             $diagnostics[] = ['level' => 'info', 'group' => 'Security', 'message' =>

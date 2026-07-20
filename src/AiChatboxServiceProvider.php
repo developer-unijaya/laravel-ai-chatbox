@@ -7,6 +7,7 @@ use DeveloperUnijaya\AiChatbox\Console\Commands\PruneConversations;
 use DeveloperUnijaya\AiChatbox\Engine\Contracts\AiEngineInterface;
 use DeveloperUnijaya\AiChatbox\Engine\OpenAiCompatibleEngine;
 use DeveloperUnijaya\AiChatbox\Http\Middleware\CorsMiddleware;
+use DeveloperUnijaya\AiChatbox\Http\Middleware\EnsureAdminAccessConfigured;
 use DeveloperUnijaya\AiChatbox\Memory\Contracts\ConversationRepositoryInterface;
 use DeveloperUnijaya\AiChatbox\Memory\DatabaseConversationRepository;
 use DeveloperUnijaya\AiChatbox\Memory\SessionConversationRepository;
@@ -146,13 +147,15 @@ class AiChatboxServiceProvider extends ServiceProvider
 
     protected function ragRouteConfiguration(): array
     {
-        $middleware = config('ai-chatbox.rag_admin_middleware', ['web', 'auth']);
+        $middleware = $this->guardAdminMiddleware(
+            (array) config('ai-chatbox.rag_admin_middleware', ['web', 'auth'])
+        );
 
         // Throttle the RAG endpoints — upload, reprocess, and test-chat each call the
         // live AI/embedding provider, so they need a rate cap independent of the widget.
         $limit = (int) config('ai-chatbox.rag_rate_limit', 30);
         $window = (int) config('ai-chatbox.rag_rate_window', 1);
-        $middleware = array_merge((array) $middleware, ["throttle:{$limit},{$window}"]);
+        $middleware = array_merge($middleware, ["throttle:{$limit},{$window}"]);
 
         return [
             'prefix' => config('ai-chatbox.route_prefix') . '/rag',
@@ -162,12 +165,49 @@ class AiChatboxServiceProvider extends ServiceProvider
 
     protected function adminRouteConfiguration(): array
     {
-        $middleware = config('ai-chatbox.admin_middleware') ?? config('ai-chatbox.rag_admin_middleware', ['web', 'auth']);
+        $middleware = $this->guardAdminMiddleware(
+            (array) (config('ai-chatbox.admin_middleware') ?? config('ai-chatbox.rag_admin_middleware', ['web', 'auth']))
+        );
 
         return [
             'prefix' => config('ai-chatbox.route_prefix') . '/admin',
             'middleware' => $middleware,
         ];
+    }
+
+    /**
+     * Fail closed when the admin/RAG routes would be exposed with only the bare
+     * default gate ([web, auth]). In local/testing the default is left untouched
+     * so a fresh install works with zero configuration; in every other
+     * environment a tripwire middleware is appended that returns 403 until the
+     * integrator sets admin_middleware / rag_admin_middleware to a real gate.
+     * Only the exact bare default trips this — any customisation (a role check,
+     * a policy, an extra middleware) is treated as intentional and left as-is,
+     * matching the AdminController diagnostic warning.
+     *
+     * @param  array<int, string>  $middleware
+     * @return array<int, string>
+     */
+    protected function guardAdminMiddleware(array $middleware): array
+    {
+        if ($this->isBareDefaultGate($middleware) && !$this->app->environment('local', 'testing')) {
+            // Prepend so the routes are sealed for everyone (not just authenticated
+            // users) with the instructive 403, rather than 'auth' redirecting first.
+            array_unshift($middleware, EnsureAdminAccessConfigured::class);
+        }
+
+        return $middleware;
+    }
+
+    /**
+     * @param  array<int, string>  $middleware
+     */
+    protected function isBareDefaultGate(array $middleware): bool
+    {
+        $normalized = array_values(array_unique(array_map('strval', $middleware)));
+        sort($normalized);
+
+        return $normalized === ['auth', 'web'];
     }
 
     protected function registerPublishing(): void
