@@ -19,6 +19,45 @@ class EmbeddingService
     ) {}
 
     /**
+     * Resolve the token to use for embedding calls from a provider config.
+     *
+     * An explicit `rag_embedding_token` always wins. When it is absent we only
+     * fall back to the chat `api_token` if the embedding endpoint is the SAME
+     * host as the chat endpoint (i.e. the same provider) — otherwise the chat
+     * provider's secret would be transmitted to a different, third-party host
+     * on every embedding call. In that cross-host case we return null (no auth
+     * header) and rely on an explicit `rag_embedding_token` being configured.
+     *
+     * @param  array<string, mixed>  $cfg  Resolved provider config.
+     */
+    public static function resolveToken(array $cfg): ?string
+    {
+        $embToken = (string) ($cfg['rag_embedding_token'] ?? '');
+        if ($embToken !== '') {
+            return $embToken;
+        }
+
+        $embUrl = (string) ($cfg['rag_embedding_url'] ?? '');
+        $apiUrl = (string) ($cfg['api_url'] ?? '');
+
+        // Empty embedding URL → no call is made, so the value is moot; same host
+        // → same provider, reusing the token is correct and intended.
+        if ($embUrl === '' || self::sameHost($embUrl, $apiUrl)) {
+            return $cfg['api_token'] ?? null;
+        }
+
+        return null;
+    }
+
+    private static function sameHost(string $a, string $b): bool
+    {
+        $hostA = strtolower((string) parse_url($a, PHP_URL_HOST));
+        $hostB = strtolower((string) parse_url($b, PHP_URL_HOST));
+
+        return $hostA !== '' && $hostA === $hostB;
+    }
+
+    /**
      * Generate an embedding vector for the given text.
      *
      * Tries the OpenAI-compatible format first (used by OpenAI, LM Studio,

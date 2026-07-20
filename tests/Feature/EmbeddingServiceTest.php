@@ -141,4 +141,58 @@ class EmbeddingServiceTest extends TestCase
 
         $this->assertNull($result);
     }
+
+    // ── resolveToken(): never leak the chat token to a foreign host ───────────
+
+    public function test_resolve_token_prefers_explicit_embedding_token(): void
+    {
+        $token = EmbeddingService::resolveToken([
+            'rag_embedding_token' => 'embed-secret',
+            'api_token' => 'chat-secret',
+            'rag_embedding_url' => 'https://embeddings.other.com/v1/embeddings',
+            'api_url' => 'https://api.chat.com/v1/chat',
+        ]);
+
+        $this->assertSame('embed-secret', $token);
+    }
+
+    public function test_resolve_token_reuses_chat_token_when_same_host(): void
+    {
+        // OpenAI chat + OpenAI embeddings → same host → reuse is correct.
+        $token = EmbeddingService::resolveToken([
+            'rag_embedding_token' => '',
+            'api_token' => 'sk-openai',
+            'rag_embedding_url' => 'https://api.openai.com/v1/embeddings',
+            'api_url' => 'https://api.openai.com/v1/chat/completions',
+        ]);
+
+        $this->assertSame('sk-openai', $token);
+    }
+
+    public function test_resolve_token_does_not_send_chat_token_to_foreign_host(): void
+    {
+        // Chat provider is Anthropic; embeddings point at a different host.
+        // The Anthropic key must NOT be forwarded there.
+        $token = EmbeddingService::resolveToken([
+            'rag_embedding_token' => '',
+            'api_token' => 'sk-ant-secret',
+            'rag_embedding_url' => 'https://embeddings.thirdparty.com/v1/embeddings',
+            'api_url' => 'https://api.anthropic.com/v1/messages',
+        ]);
+
+        $this->assertNull($token);
+    }
+
+    public function test_resolve_token_falls_back_when_embedding_url_empty(): void
+    {
+        // No embedding URL → no call is made, so reusing the token is harmless.
+        $token = EmbeddingService::resolveToken([
+            'rag_embedding_token' => '',
+            'api_token' => 'chat-secret',
+            'rag_embedding_url' => '',
+            'api_url' => 'https://api.anthropic.com/v1/messages',
+        ]);
+
+        $this->assertSame('chat-secret', $token);
+    }
 }

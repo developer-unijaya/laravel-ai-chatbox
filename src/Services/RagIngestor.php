@@ -41,7 +41,7 @@ class RagIngestor
         $embedSvc = null;
 
         if (!$skipEmbedding) {
-            $embeddingToken = ($cfg['rag_embedding_token'] ?? '') ?: ($cfg['api_token'] ?? null);
+            $embeddingToken = EmbeddingService::resolveToken($cfg);
             $embedSvc = new EmbeddingService(
                 $embeddingUrl,
                 $cfg['rag_embedding_model'] ?? null,

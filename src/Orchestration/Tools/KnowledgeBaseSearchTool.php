@@ -61,7 +61,7 @@ class KnowledgeBaseSearchTool implements ToolInterface
         $cfg = $this->aiManager->resolveConfig(config('ai-chatbox.active_provider', 'default'));
 
         try {
-            $embeddingToken = ($cfg['rag_embedding_token'] ?? '') ?: ($cfg['api_token'] ?? null);
+            $embeddingToken = EmbeddingService::resolveToken($cfg);
             $retriever = new RagRetriever(new EmbeddingService(
                 $cfg['rag_embedding_url'] ?? null,
                 $cfg['rag_embedding_model'] ?? null,
