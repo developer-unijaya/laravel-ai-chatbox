@@ -327,4 +327,53 @@ class RagContextInjectionTest extends TestCase
         $this->assertStringContainsString('Widgets ship in 3 days.', $user);
         $this->assertStringContainsString('<reference_material>', $user);
     }
+
+    public function test_vector_retrieval_ranks_and_limits_chunks_by_similarity(): void
+    {
+        // Three chunks with distinct embeddings; the query points at the first
+        // axis. Exercises the streamed (lazyById) scoring path: correct ranking,
+        // top-K limit, and the similarity-threshold cut all at once.
+        config(['ai-chatbox.rag_enabled' => true, 'ai-chatbox.rag_top_k' => 2]);
+
+        $doc = RagDocument::create([
+            'title' => 'Doc',
+            'original_filename' => 'doc.txt',
+            'file_type' => 'txt',
+            'status' => 'ready',
+            'chunk_count' => 3,
+            'content' => 'multi',
+        ]);
+
+        $rows = [
+            ['content' => 'BEST match chunk.',    'embedding' => [1.0, 0.0, 0.0]],   // cosine 1.0
+            ['content' => 'PARTIAL match chunk.', 'embedding' => [0.8, 0.6, 0.0]],   // cosine 0.8
+            ['content' => 'IRRELEVANT chunk.',    'embedding' => [0.0, 0.0, 1.0]],   // cosine 0.0 → below threshold
+        ];
+        foreach ($rows as $i => $row) {
+            RagChunk::create([
+                'document_id' => $doc->id,
+                'chunk_index' => $i,
+                'content' => $row['content'],
+                'embedding' => $row['embedding'],
+            ]);
+        }
+
+        // Query embedding aligned with the first axis.
+        $this->mockGuzzle([
+            new Response(200, [], json_encode(['data' => [['embedding' => [1.0, 0.0, 0.0]]]])),
+        ]);
+
+        $user = $this->ragUserContent($this->builder->build('best?', [], $this->cfg()));
+
+        // top_k=2 → only the two highest-scoring chunks, best first; the
+        // below-threshold chunk is excluded entirely.
+        $this->assertStringContainsString('BEST match chunk.', $user);
+        $this->assertStringContainsString('PARTIAL match chunk.', $user);
+        $this->assertStringNotContainsString('IRRELEVANT chunk.', $user);
+        $this->assertLessThan(
+            strpos($user, 'PARTIAL match chunk.'),
+            strpos($user, 'BEST match chunk.'),
+            'Higher-similarity chunk should appear first.'
+        );
+    }
 }

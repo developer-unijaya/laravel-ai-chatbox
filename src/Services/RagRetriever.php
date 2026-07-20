@@ -6,6 +6,12 @@ use Illuminate\Support\Facades\Log;
 
 class RagRetriever
 {
+    /**
+     * Number of chunks fetched per DB round-trip while scoring. Bounds peak
+     * memory to one page of decoded embeddings instead of the whole corpus.
+     */
+    private const SCORING_PAGE_SIZE = 500;
+
     public function __construct(private readonly EmbeddingService $embedder)
     {}
 
@@ -44,48 +50,55 @@ class RagRetriever
             return [];
         }
 
-        // Load only id + embedding for scoring — content is fetched below for top-K only.
-        // This avoids transferring chunk text (~500 chars each) for every chunk in the corpus.
-        // Use chunk_count > 0 (not status = 'ready') so documents whose embedding failed
-        // but whose text was chunked successfully remain searchable via keyword fallback.
-        $chunks = RagChunk::whereHas(
-            'document',
-            fn($q) => $q->where('chunk_count', '>', 0)
-        )->get(['id', 'embedding']);
-
-        if ($chunks->isEmpty()) {
-            return [];
-        }
-
+        // Score every chunk against the query embedding. Chunks are STREAMED with
+        // lazyById() rather than loaded all at once: a single embedding is ~1536
+        // floats (~tens of KB decoded), so ->get() over a large corpus would hold
+        // the entire set in memory and OOM. lazyById keeps only one page resident
+        // at a time; we retain just the tiny {id, score} results. (A DB-side vector
+        // index — pgvector / MySQL VECTOR — is the real answer at very large scale.)
+        // Load only id + embedding here; content is fetched below for top-K only.
+        // Use chunk_count > 0 (not status = 'ready') so documents whose embedding
+        // failed but whose text was chunked stay searchable via keyword fallback.
         $scored = [];
         $nullEmbeddings = 0;
         $belowThreshold = 0;
+        $scanned = 0;
 
-        foreach ($chunks as $chunk) {
-            $embedding = $chunk->embedding;
+        RagChunk::whereHas('document', fn($q) => $q->where('chunk_count', '>', 0))
+            ->select(['id', 'embedding'])
+            ->lazyById(self::SCORING_PAGE_SIZE)
+            ->each(function (RagChunk $chunk) use (
+                &$scored, &$nullEmbeddings, &$belowThreshold, &$scanned, $queryEmbedding, $threshold
+            ) {
+                $scanned++;
+                $embedding = $chunk->embedding;
 
-            if (!is_array($embedding) || count($embedding) === 0) {
-                $nullEmbeddings++;
-                continue;
-            }
+                if (!is_array($embedding) || count($embedding) === 0) {
+                    $nullEmbeddings++;
+                    return;
+                }
 
-            if (count($embedding) !== count($queryEmbedding)) {
-                Log::warning('AI Chatbox RAG: Chunk embedding dimension mismatch — skipping chunk.', [
-                    'chunk_id' => $chunk->id,
-                    'chunk_dims' => count($embedding),
-                    'query_dims' => count($queryEmbedding),
-                    'embedding_model' => $this->embedder->resolvedModel(),
-                ]);
-                continue;
-            }
+                if (count($embedding) !== count($queryEmbedding)) {
+                    Log::warning('AI Chatbox RAG: Chunk embedding dimension mismatch — skipping chunk.', [
+                        'chunk_id' => $chunk->id,
+                        'chunk_dims' => count($embedding),
+                        'query_dims' => count($queryEmbedding),
+                        'embedding_model' => $this->embedder->resolvedModel(),
+                    ]);
+                    return;
+                }
 
-            $score = $this->cosineSimilarity($queryEmbedding, $embedding);
+                $score = $this->cosineSimilarity($queryEmbedding, $embedding);
 
-            if ($score >= $threshold) {
-                $scored[] = ['id' => $chunk->id, 'score' => $score];
-            } else {
-                $belowThreshold++;
-            }
+                if ($score >= $threshold) {
+                    $scored[] = ['id' => $chunk->id, 'score' => $score];
+                } else {
+                    $belowThreshold++;
+                }
+            });
+
+        if ($scanned === 0) {
+            return [];
         }
 
         if ($nullEmbeddings > 0) {
