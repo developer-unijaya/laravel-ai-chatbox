@@ -40,16 +40,28 @@ class RagContextInjectionTest extends TestCase
         ], $overrides);
     }
 
-    /** Find the system message injected immediately before the final user turn. */
+    /** Find the RAG grounding instruction (system role) before the final user turn. */
     private function ragSystemMessage(array $messages): ?string
     {
-        // Order is [system, ...history, RAG system, user]; the RAG message is the
-        // last system-role entry before the trailing user message.
+        // Order is [system, ...history, RAG system, user]; the RAG instruction is
+        // the last system-role entry before the trailing user message.
         $user = array_pop($messages);
         $this->assertSame('user', $user['role']);
 
         $last = end($messages);
         return ($last && $last['role'] === 'system') ? $last['content'] : null;
+    }
+
+    /**
+     * The final user turn's content. Retrieved chunks are folded in here (as
+     * delimited reference data), not into the system role.
+     */
+    private function ragUserContent(array $messages): string
+    {
+        $user = end($messages);
+        $this->assertSame('user', $user['role']);
+
+        return $user['content'];
     }
 
     // ── No-match → grounding guard ────────────────────────────────────────────
@@ -114,8 +126,9 @@ class RagContextInjectionTest extends TestCase
 
         $injected = $this->ragSystemMessage($messages);
         $this->assertNotNull($injected);
-        $this->assertStringContainsString('Widgets ship within three business days.', $injected);
         $this->assertStringNotContainsString('NO_CONTEXT_GUARD', $injected);
+        // Chunk text is delivered in the user turn, not the system role.
+        $this->assertStringContainsString('Widgets ship within three business days.', $this->ragUserContent($messages));
     }
 
     public function test_keyword_fallback_respects_top_k_limit(): void
@@ -146,10 +159,10 @@ class RagContextInjectionTest extends TestCase
             $this->cfg(['rag_embedding_url' => '', 'api_token' => 'tok'])
         );
 
-        $injected = $this->ragSystemMessage($messages);
-        $this->assertNotNull($injected);
-        // With top_k=2, only 2 of the 5 matching chunks should be injected.
-        $this->assertSame(2, substr_count($injected, 'Policy chunk'));
+        $this->assertNotNull($this->ragSystemMessage($messages));
+        // With top_k=2, only 2 of the 5 matching chunks should be injected —
+        // the chunk text now lives in the user turn.
+        $this->assertSame(2, substr_count($this->ragUserContent($messages), 'Policy chunk'));
     }
 
     public function test_keyword_fallback_ignores_words_shorter_than_3_chars(): void
@@ -271,8 +284,8 @@ class RagContextInjectionTest extends TestCase
 
         $injected = $this->ragSystemMessage($messages);
         $this->assertNotNull($injected);
-        $this->assertStringContainsString('Widgets ship within three business days.', $injected);
         $this->assertStringNotContainsString('NO_CONTEXT_GUARD', $injected);
+        $this->assertStringContainsString('Widgets ship within three business days.', $this->ragUserContent($messages));
     }
 
     // ── Match → strict context prompt ─────────────────────────────────────────
@@ -306,8 +319,12 @@ class RagContextInjectionTest extends TestCase
 
         $injected = $this->ragSystemMessage($messages);
         $this->assertNotNull($injected);
+        // Grounding instruction stays in the system role...
         $this->assertStringContainsString('Answer using ONLY this context', $injected);
-        $this->assertStringContainsString('Widgets ship in 3 days.', $injected);
         $this->assertStringNotContainsString('NO_CONTEXT_GUARD', $injected);
+        // ...while the untrusted chunk text is folded into the user turn.
+        $user = $this->ragUserContent($messages);
+        $this->assertStringContainsString('Widgets ship in 3 days.', $user);
+        $this->assertStringContainsString('<reference_material>', $user);
     }
 }
