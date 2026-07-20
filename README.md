@@ -250,7 +250,7 @@ Then edit `config/ai-chatbox.php` directly.
 | `history_limit` | - | `50` | Max user+assistant pairs kept per thread |
 | `context_token_limit` | - | `4000` | Max estimated tokens of history per request — trims oldest pairs first (`0` = rely on `history_limit` only) |
 | `memory_driver` | `AI_CHATBOX_MEMORY_DRIVER` | `session` | Server-side history driver — `session` or `database` |
-| `storage` | - | `local` | Browser storage — `local` (persists across sessions) or `session` (clears on tab close) |
+| `storage` | `AI_CHATBOX_STORAGE` | `session` | Browser storage — `session` (clears on tab close, default) or `local` (persists across sessions) |
 
 ---
 
@@ -720,8 +720,8 @@ Chat bubbles are persisted in the browser, automatically scoped to prevent histo
 
 | Setting | Behaviour |
 |---|---|
-| `AI_CHATBOX_STORAGE=local` | Persists across browser sessions (default) |
-| `AI_CHATBOX_STORAGE=session` | Cleared when the tab is closed |
+| `AI_CHATBOX_STORAGE=session` | Cleared when the tab is closed (default) |
+| `AI_CHATBOX_STORAGE=local` | Persists across browser sessions |
 
 ---
 

@@ -270,13 +270,15 @@ return [
 |--------------------------------------------------------------------------
 | Controls where chat history is persisted in the browser.
 |
-| 'local'   — localStorage: survives tab/browser close (default)
-| 'session' — sessionStorage: cleared when the tab is closed (more private)
+| 'session' — sessionStorage: cleared when the tab is closed (default, private)
+| 'local'   — localStorage: survives tab/browser close (persists indefinitely)
 |
-| Use 'session' for apps where users may discuss sensitive information.
+| The default is 'session' so a transcript is not left behind on a shared
+| machine after the user leaves. Set AI_CHATBOX_STORAGE=local to persist chat
+| history across browser sessions if that is acceptable for your app.
 */
 
-    'storage' => 'local',
+    'storage' => env('AI_CHATBOX_STORAGE', 'session'),
 
 /*
 |--------------------------------------------------------------------------
