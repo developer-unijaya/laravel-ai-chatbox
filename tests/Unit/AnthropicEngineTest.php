@@ -242,6 +242,62 @@ class AnthropicEngineTest extends TestCase
         $this->assertSame('2024-06-01', $capturedHeaders['anthropic-version']);
     }
 
+    // ── temperature / sampling-param handling ─────────────────────────────────
+
+    /** Capture the JSON payload sent to the Anthropic API for one complete() call. */
+    private function capturePayload(array $options): array
+    {
+        $captured = null;
+        $this->app->bind('ai-chatbox.guzzle', function () use (&$captured) {
+            return function (array $config) use (&$captured) {
+                return new class($captured) extends \GuzzleHttp\Client
+                {
+                    public function __construct(private &$captured)
+                    {}
+                    public function post($uri, array $options = []): \GuzzleHttp\Psr7\Response
+                    {
+                        $this->captured = $options['json'];
+                        return new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+                            'content' => [['type' => 'text', 'text' => 'ok']],
+                        ]));
+                    }
+                };
+            };
+        });
+
+        (new AnthropicEngine())->complete([['role' => 'user', 'content' => 'Hi']], $options);
+
+        return $captured;
+    }
+
+    public function test_temperature_is_sent_for_older_models(): void
+    {
+        // Sonnet 4.6 (the shipped default) still accepts sampling params.
+        $payload = $this->capturePayload(['temperature' => 0.5] + $this->baseOptions);
+
+        $this->assertArrayHasKey('temperature', $payload);
+        $this->assertSame(0.5, $payload['temperature']);
+    }
+
+    public function test_temperature_is_omitted_for_newer_models_that_reject_it(): void
+    {
+        // Sonnet 5 / Opus 4.7+ / Fable 5 reject temperature with a 400.
+        foreach (['claude-sonnet-5', 'claude-opus-4-7', 'claude-opus-4-8', 'claude-fable-5'] as $model) {
+            $payload = $this->capturePayload(
+                ['api_model' => $model, 'temperature' => 0.5] + $this->baseOptions
+            );
+
+            $this->assertArrayNotHasKey('temperature', $payload, "temperature must be omitted for {$model}");
+        }
+    }
+
+    public function test_explicit_null_temperature_is_omitted_on_any_model(): void
+    {
+        $payload = $this->capturePayload(['temperature' => null] + $this->baseOptions);
+
+        $this->assertArrayNotHasKey('temperature', $payload);
+    }
+
     // ── beginStream() ─────────────────────────────────────────────────────────
 
     public function test_begin_stream_parses_content_block_delta_events(): void

@@ -25,9 +25,12 @@ class AnthropicEngine extends OpenAiCompatibleEngine
         try {
             $client = $this->makeClient(['timeout' => $timeout]);
 
-            $payload = ['model' => $model, 'messages' => $filtered, 'temperature' => $temp, 'max_tokens' => $maxTokens, 'stream' => false];
+            $payload = ['model' => $model, 'messages' => $filtered, 'max_tokens' => $maxTokens, 'stream' => false];
             if ($system !== '') {
                 $payload['system'] = $system;
+            }
+            if ($this->includeTemperature($model, $options)) {
+                $payload['temperature'] = $temp;
             }
 
             $response = $client->post($apiUrl, [
@@ -80,9 +83,12 @@ class AnthropicEngine extends OpenAiCompatibleEngine
         try {
             $client = $this->makeClient(['timeout' => $timeout]);
 
-            $payload = ['model' => $model, 'messages' => $filtered, 'temperature' => $temp, 'max_tokens' => $maxTokens, 'stream' => true];
+            $payload = ['model' => $model, 'messages' => $filtered, 'max_tokens' => $maxTokens, 'stream' => true];
             if ($system !== '') {
                 $payload['system'] = $system;
+            }
+            if ($this->includeTemperature($model, $options)) {
+                $payload['temperature'] = $temp;
             }
 
             $response = $client->post($apiUrl, [
@@ -152,9 +158,12 @@ class AnthropicEngine extends OpenAiCompatibleEngine
         try {
             $client = $this->makeClient(['timeout' => $timeout]);
 
-            $payload = ['model' => $model, 'messages' => $filtered, 'temperature' => $temp, 'max_tokens' => $maxTokens, 'stream' => false];
+            $payload = ['model' => $model, 'messages' => $filtered, 'max_tokens' => $maxTokens, 'stream' => false];
             if ($system !== '') {
                 $payload['system'] = $system;
+            }
+            if ($this->includeTemperature($model, $options)) {
+                $payload['temperature'] = $temp;
             }
             // Anthropic tool schema: [{name, description, input_schema}]
             if (!empty($tools)) {
@@ -235,6 +244,37 @@ class AnthropicEngine extends OpenAiCompatibleEngine
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Whether to include a `temperature` in the request payload.
+     *
+     * Newer Anthropic models — Opus 4.7+, Sonnet 5+, and the Fable/Mythos 5
+     * family — REMOVED sampling parameters (`temperature`/`top_p`/`top_k`) and
+     * reject them with a 400. Older models (Sonnet 4.6, Opus 4.6 and earlier)
+     * still accept them, so temperature is preserved there to keep existing
+     * behaviour unchanged. An explicit `temperature => null` in the options is
+     * honoured as an escape hatch to omit it on any model.
+     */
+    private function includeTemperature(string $model, array $options): bool
+    {
+        if (array_key_exists('temperature', $options) && $options['temperature'] === null) {
+            return false;
+        }
+
+        return !$this->modelRejectsSampling($model);
+    }
+
+    /**
+     * True for Anthropic model families that reject sampling parameters with a
+     * 400 (Opus 4.7 and later, Sonnet 5 and later, Fable/Mythos 5).
+     */
+    private function modelRejectsSampling(string $model): bool
+    {
+        return (bool) preg_match(
+            '/(opus-4-(?:[7-9]|\d\d)|opus-[5-9]|sonnet-[5-9]|fable-\d|mythos-\d)/i',
+            $model
+        );
+    }
 
     /**
      * Concatenate the text of every `text` content block in an Anthropic
