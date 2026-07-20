@@ -181,4 +181,48 @@ class DocumentChunkerTest extends TestCase
             $this->assertNotSame('', trim($chunk));
         }
     }
+
+    // ── Multibyte safety (#14) ─────────────────────────────────────────────────
+
+    public function test_overlap_never_splits_a_multibyte_codepoint(): void
+    {
+        // A long single paragraph of multibyte text forces flush + overlap tail.
+        // With byte-based slicing the overlap could start mid-codepoint; every
+        // returned chunk must be valid UTF-8.
+        $text = str_repeat('日本語のテキストです。', 400); // ~4400 chars, all 3-byte
+        $chunks = $this->chunker->chunk($text, 100, 20);
+
+        $this->assertNotEmpty($chunks);
+        foreach ($chunks as $chunk) {
+            $this->assertTrue(mb_check_encoding($chunk, 'UTF-8'), 'chunk is not valid UTF-8');
+            // A valid re-encode round-trips only when no codepoint was cut.
+            $this->assertSame($chunk, mb_convert_encoding($chunk, 'UTF-8', 'UTF-8'));
+        }
+    }
+
+    public function test_sizing_is_character_based_for_multibyte_text(): void
+    {
+        // 300 three-byte characters = 900 bytes but only 300 chars. With a
+        // char-based 100-token (=400 char) target it fits in a single chunk;
+        // byte-based sizing would have split it.
+        $text = str_repeat('あ', 300);
+        $chunks = $this->chunker->chunk($text, 100, 0);
+
+        $this->assertCount(1, $chunks);
+        $this->assertSame(300, mb_strlen($chunks[0]));
+    }
+
+    public function test_oversize_delimiterless_segment_is_hard_wrapped(): void
+    {
+        // No sentence/paragraph boundaries and longer than one chunk → must be
+        // hard-split so no single chunk blows past the target size.
+        $chars = 25;
+        $text = str_repeat('x', 5000); // no delimiters at all
+        $chunks = $this->chunker->chunk($text, $chars, 0); // target = 100 chars
+
+        $this->assertGreaterThan(1, count($chunks));
+        foreach ($chunks as $chunk) {
+            $this->assertLessThanOrEqual($chars * 4, mb_strlen($chunk));
+        }
+    }
 }
