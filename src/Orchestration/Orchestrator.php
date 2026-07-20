@@ -161,7 +161,11 @@ class Orchestrator
                 'tool' => $name,
                 'error' => $e->getMessage(),
             ]);
-            return $fail('O06', "Tool '{$name}' failed: " . $e->getMessage());
+            // Feed a GENERIC failure back to the model — never $e->getMessage().
+            // A raw exception (e.g. a QueryException) can carry SQL, table names,
+            // or connection credentials, which the model tends to echo to the
+            // user. The real detail is kept in the log above.
+            return $fail('O06', "Tool '{$name}' failed to execute.");
         }
 
         return new ToolCall($id, $name, $args, $result, null, null, (microtime(true) - $start) * 1000);

@@ -186,7 +186,7 @@ class OrchestratorTest extends TestCase
         $this->assertSame('O05', $result->steps[0]->errorCode);
     }
 
-    public function test_throwing_tool_reports_O06_with_message(): void
+    public function test_throwing_tool_reports_O06_without_leaking_message(): void
     {
         $engine = new FakeToolEngine([
             $this->toolCallResult('echo_tool', ['text' => 'x']),
@@ -196,8 +196,11 @@ class OrchestratorTest extends TestCase
 
         $result = $orch->run('hi', [], $this->cfg());
 
+        // The raw exception message ('boom') must NOT reach the model — a real
+        // exception can carry SQL/creds. Only a generic failure is fed back.
         $this->assertSame('O06', $result->steps[0]->errorCode);
-        $this->assertStringContainsString('boom', (string) $result->steps[0]->error);
+        $this->assertStringNotContainsString('boom', (string) $result->steps[0]->error);
+        $this->assertStringContainsString('failed to execute', (string) $result->steps[0]->error);
     }
 
     // ── Graceful degradation to a single plain completion ─────────────────────
