@@ -21,6 +21,30 @@ use Illuminate\Support\ServiceProvider;
 
 class AiChatboxServiceProvider extends ServiceProvider
 {
+    /** Fallback package version used for the asset cache-buster. Bump on release. */
+    private const VERSION = '1.4.0';
+
+    /**
+     * Resolve a stable, per-release asset version string for cache-busting the
+     * published CSS/JS. Prefers Composer's installed version; falls back to the
+     * shipped constant when that is unavailable (e.g. path/symlink installs).
+     */
+    private function assetVersion(): string
+    {
+        if (class_exists(\Composer\InstalledVersions::class)) {
+            try {
+                $version = \Composer\InstalledVersions::getPrettyVersion('developer-unijaya/laravel-ai-chatbox');
+                if (!empty($version)) {
+                    return (string) $version;
+                }
+            } catch (\Throwable) {
+                // Package not registered with Composer runtime — use the constant.
+            }
+        }
+
+        return self::VERSION;
+    }
+
     public function register(): void
     {
         $this->mergeConfigFrom(
@@ -76,7 +100,11 @@ class AiChatboxServiceProvider extends ServiceProvider
 
         // Compute once at boot — app.url never changes at runtime
         View::share('aiChatboxAppHash', substr(md5(config('app.url', 'default')), 0, 8));
-        View::share('aiChatboxVersion', config('app.version', ''));
+        // Cache-buster for the published CSS/JS. `app.version` is NOT a standard
+        // Laravel config key (it resolved to '' for nearly every install, so the
+        // `?v=` was always empty and browsers served stale assets after upgrades).
+        // Use the installed package version, falling back to the shipped constant.
+        View::share('aiChatboxVersion', $this->assetVersion());
 
         $this->registerRoutes();
         $this->registerPublishing();
