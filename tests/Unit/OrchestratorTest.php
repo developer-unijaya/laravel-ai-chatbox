@@ -86,20 +86,37 @@ class OrchestratorTest extends TestCase
 
     // ── Safety limits ─────────────────────────────────────────────────────────
 
-    public function test_stops_at_max_steps_with_O01(): void
+    public function test_finalizes_without_tools_when_max_steps_reached(): void
     {
+        // The model keeps calling tools and never volunteers a final answer.
+        // At the step limit the orchestrator makes ONE last tool-less call so
+        // the model must answer from the results gathered — no O01 error bubble.
         $engine = new FakeToolEngine([
             $this->toolCallResult('echo_tool', ['text' => 'a']),
             $this->toolCallResult('echo_tool', ['text' => 'b']),
+            EngineResult::text('final answer from gathered results'),
         ]);
         $orch = $this->orchestrator($engine, $this->registryWith(new FakeEchoTool()));
 
-        try {
-            $orch->run('hi', [], $this->cfg(['orchestrator_max_steps' => 2]));
-            $this->fail('Expected OrchestrationException');
-        } catch (OrchestrationException $e) {
-            $this->assertSame('O01', $e->errorCode);
-        }
+        $result = $orch->run('hi', [], $this->cfg(['orchestrator_max_steps' => 2]));
+
+        $this->assertSame('final answer from gathered results', $result->reply);
+        $this->assertCount(2, $result->steps);                  // both tool steps recorded
+        $this->assertSame(3, $engine->completeWithToolsCalls);  // 2 loop + 1 finalization
+        $this->assertSame([], $engine->lastTools);              // finalization sends NO tools
+    }
+
+    public function test_finalization_empty_answer_throws_e18(): void
+    {
+        // Loop exhausts, and the final tool-less call also yields no text.
+        $engine = new FakeToolEngine([
+            $this->toolCallResult('echo_tool', ['text' => 'a']),
+            EngineResult::text('   '), // finalization returns whitespace → empty
+        ]);
+        $orch = $this->orchestrator($engine, $this->registryWith(new FakeEchoTool()));
+
+        $this->expectException(\DeveloperUnijaya\AiChatbox\Engine\Exceptions\AiEngineException::class);
+        $orch->run('hi', [], $this->cfg(['orchestrator_max_steps' => 1]));
     }
 
     public function test_times_out_with_O02(): void

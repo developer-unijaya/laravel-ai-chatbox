@@ -98,7 +98,18 @@ class Orchestrator
             $messages = array_merge($messages, $engine->toolResultMessages($result, $toolResults));
         }
 
-        throw new OrchestrationException('O01', 'Maximum orchestration steps (' . $maxSteps . ') reached without a final answer.');
+        // Max steps reached without the model volunteering a final answer. Rather
+        // than discard all the tool work the user already paid for (and return an
+        // error bubble), make ONE last call with NO tools so the model is forced
+        // to produce a text answer from the results gathered so far.
+        $final = $engine->completeWithTools($messages, [], $cfg);
+        $text = $final->isText() ? trim((string) $final->text) : '';
+
+        if ($text === '') {
+            throw new AiEngineException('E18', 'Unable to reach AI service. Please try again later.', 502);
+        }
+
+        return OrchestratorResult::text($text, $steps);
     }
 
     // ── Internals ─────────────────────────────────────────────────────────────
