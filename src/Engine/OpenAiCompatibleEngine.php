@@ -9,6 +9,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\TooManyRedirectsException;
+use Psr\Http\Message\StreamInterface;
 
 class OpenAiCompatibleEngine implements AiEngineInterface, SupportsToolCalling
 {
@@ -149,52 +150,133 @@ class OpenAiCompatibleEngine implements AiEngineInterface, SupportsToolCalling
 
         $body = $response->getBody();
 
-        // Return a reader closure to be called inside response()->stream()
+        // Return a reader closure to be called inside response()->stream().
+        // Per-line parsing is OpenAI-compatible (choices[].delta.content) with
+        // an Ollama-native fallback (message.content / done:true); the robust
+        // read loop itself is shared with AnthropicEngine via readEventStream().
         return function (callable $onToken) use ($body): string {
-            $fullReply = '';
-            $buffer = '';
+            return $this->readEventStream($body, $onToken, function (array $data): array {
+                return [
+                    'token' => $data['choices'][0]['delta']['content'] ?? $data['message']['content'] ?? null,
+                    // Ollama native signals end with done: true.
+                    'stop' => ($data['done'] ?? false) === true,
+                ];
+            });
+        };
+    }
 
-            while (!$body->eof()) {
-                $buffer .= $body->read(1024);
+    /**
+     * Read a streaming SSE / NDJSON response body, dispatching each parsed token
+     * to $onToken and returning the full concatenated reply.
+     *
+     * Hardened against three failure modes the naive read loop ignored:
+     *   1. Socket read timeout / stall — Guzzle's StreamHandler returns '' from
+     *      read() while eof() stays false, which would busy-spin at 100% CPU
+     *      forever. read() on a blocking body only returns '' at EOF or on
+     *      timeout, so we stop instead of re-looping on empty reads.
+     *   2. Client disconnect — once the browser closes the SSE connection we
+     *      stop draining the upstream, which would otherwise keep burning
+     *      provider tokens (and hold a worker) for the full response.
+     *   3. Trailing line — a final line not terminated by "\n" (legal for a
+     *      truncated stream or Ollama NDJSON) is processed after the loop
+     *      instead of being silently dropped with its last token(s).
+     *
+     * @param  callable(array): array{token?: ?string, stop?: bool}  $parse
+     *         Given the decoded JSON of one data line, returns the token text to
+     *         emit (if any) and whether the stream should stop.
+     */
+    protected function readEventStream(StreamInterface $stream, callable $onToken, callable $parse): string
+    {
+        $fullReply = '';
+        $buffer = '';
+        $stop = false;
 
-                while (($nl = strpos($buffer, "\n")) !== false) {
-                    $line = rtrim(substr($buffer, 0, $nl), "\r");
-                    $buffer = substr($buffer, $nl + 1);
-
-                    if ($line === '' || str_starts_with($line, ':')) {
-                        continue; // blank keep-alive or SSE comment
-                    }
-
-                    if ($line === 'data: [DONE]') {
-                        break 2;
-                    }
-
-                    // Strip SSE prefix (OpenAI-compatible) or parse raw JSON (Ollama native)
-                    $jsonStr = str_starts_with($line, 'data: ') ? substr($line, 6) : $line;
-                    $data = json_decode($jsonStr, true);
-
-                    if (!is_array($data)) {
-                        continue;
-                    }
-
-                    // OpenAI-compatible: choices[0].delta.content
-                    // Ollama native:     message.content
-                    $token = $data['choices'][0]['delta']['content'] ?? $data['message']['content'] ?? null;
-
-                    if ($token !== null && $token !== '') {
-                        $fullReply .= $token;
-                        ($onToken)($token);
-                    }
-
-                    // Ollama native signals end with done: true
-                    if (($data['done'] ?? false) === true) {
-                        break 2;
-                    }
-                }
+        while (!$stop && !$stream->eof()) {
+            if ($this->clientDisconnected()) {
+                break;
             }
 
-            return $fullReply;
-        };
+            $chunk = $stream->read(1024);
+
+            // A blocking body returns '' only at EOF or on a read timeout/stall —
+            // in every case there is no more usable data, so stop rather than
+            // spin on !eof().
+            if ($chunk === '') {
+                break;
+            }
+
+            $buffer .= $chunk;
+
+            while (($nl = strpos($buffer, "\n")) !== false) {
+                $line = rtrim(substr($buffer, 0, $nl), "\r");
+                $buffer = substr($buffer, $nl + 1);
+
+                if ($this->consumeSseLine($line, $parse, $onToken, $fullReply)) {
+                    $stop = true;
+                    break;
+                }
+            }
+        }
+
+        // Flush a final line that had no trailing newline (truncated stream / NDJSON).
+        if (!$stop && trim($buffer) !== '') {
+            $this->consumeSseLine(rtrim($buffer, "\r"), $parse, $onToken, $fullReply);
+        }
+
+        return $fullReply;
+    }
+
+    /**
+     * Parse one SSE/NDJSON line: skip comments/blank/event lines, honour the
+     * [DONE] sentinel, decode JSON, emit any token, and report whether the
+     * stream should stop. $fullReply is accumulated by reference.
+     */
+    private function consumeSseLine(string $line, callable $parse, callable $onToken, string &$fullReply): bool
+    {
+        if ($line === '' || str_starts_with($line, ':') || str_starts_with($line, 'event:')) {
+            return false; // blank keep-alive, SSE comment, or event-type line
+        }
+
+        // Strip the SSE "data:" field prefix (the space after the colon is
+        // optional per the SSE spec) or take the raw line (Ollama NDJSON).
+        if (str_starts_with($line, 'data:')) {
+            $payload = substr($line, 5);
+            if (str_starts_with($payload, ' ')) {
+                $payload = substr($payload, 1);
+            }
+        } else {
+            $payload = $line;
+        }
+
+        // Terminal sentinel — tolerate "data: [DONE]" and "data:[DONE]".
+        if (trim($payload) === '[DONE]') {
+            return true;
+        }
+
+        $data = json_decode($payload, true);
+        if (!is_array($data)) {
+            return false;
+        }
+
+        $result = $parse($data);
+
+        $token = $result['token'] ?? null;
+        if ($token !== null && $token !== '') {
+            $fullReply .= $token;
+            ($onToken)($token);
+        }
+
+        return (bool) ($result['stop'] ?? false);
+    }
+
+    /**
+     * Whether the HTTP client (browser) has closed the connection. PHP only
+     * flags this once it next tries to flush output, which the streaming
+     * controller does after each token — so mid-stream disconnects are seen.
+     */
+    protected function clientDisconnected(): bool
+    {
+        return connection_aborted() === 1;
     }
 
     // ── SupportsToolCalling ───────────────────────────────────────────────────

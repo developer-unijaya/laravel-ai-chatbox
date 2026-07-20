@@ -104,44 +104,29 @@ class AnthropicEngine extends OpenAiCompatibleEngine
 
         $stream = $response->getBody();
 
+        // Per-line parsing follows the Anthropic Messages streaming shape
+        // (content_block_delta.delta.text, message_stop); the robust read loop
+        // is shared with OpenAiCompatibleEngine via readEventStream().
         return function (callable $onToken) use ($stream): string {
-            $fullReply = '';
-            $buffer = '';
+            return $this->readEventStream($stream, $onToken, function (array $data): array {
+                $type = $data['type'] ?? '';
 
-            while (!$stream->eof()) {
-                $buffer .= $stream->read(1024);
-
-                while (($nl = strpos($buffer, "\n")) !== false) {
-                    $line = rtrim(substr($buffer, 0, $nl), "\r");
-                    $buffer = substr($buffer, $nl + 1);
-
-                    if ($line === '' || str_starts_with($line, ':') || str_starts_with($line, 'event:')) {
-                        continue;
-                    }
-
-                    $jsonStr = str_starts_with($line, 'data: ') ? substr($line, 6) : $line;
-                    $data = json_decode($jsonStr, true);
-
-                    if (!is_array($data)) {
-                        continue;
-                    }
-
-                    if (($data['type'] ?? '') === 'message_stop') {
-                        break 2;
-                    }
-
-                    if (($data['type'] ?? '') === 'content_block_delta') {
-                        $token = $data['delta']['text'] ?? null;
-
-                        if ($token !== null && $token !== '') {
-                            $fullReply .= $token;
-                            ($onToken)($token);
-                        }
-                    }
+                if ($type === 'message_stop') {
+                    return ['stop' => true];
                 }
-            }
 
-            return $fullReply;
+                // A mid-stream error event (e.g. overloaded_error) ends the
+                // stream rather than being silently swallowed as a normal reply.
+                if ($type === 'error') {
+                    return ['stop' => true];
+                }
+
+                if ($type === 'content_block_delta') {
+                    return ['token' => $data['delta']['text'] ?? null];
+                }
+
+                return [];
+            });
         };
     }
 

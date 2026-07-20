@@ -313,6 +313,45 @@ class AnthropicEngineTest extends TestCase
         $this->assertSame('OK', $fullReply);
     }
 
+    public function test_begin_stream_stops_on_mid_stream_error_event(): void
+    {
+        // Anthropic can emit an `error` event (e.g. overloaded_error) partway
+        // through; it must end the stream, not be silently treated as content.
+        $body = implode('', [
+            'data: ' . json_encode(['type' => 'content_block_delta', 'index' => 0, 'delta' => ['type' => 'text_delta', 'text' => 'Partial']]) . "\n\n",
+            'data: ' . json_encode(['type' => 'error', 'error' => ['type' => 'overloaded_error', 'message' => 'Overloaded']]) . "\n\n",
+            'data: ' . json_encode(['type' => 'content_block_delta', 'index' => 0, 'delta' => ['type' => 'text_delta', 'text' => ' MORE']]) . "\n\n",
+        ]);
+
+        $this->mockGuzzle([
+            new Response(200, ['Content-Type' => 'text/event-stream'], Utils::streamFor($body)),
+        ]);
+
+        $engine = new AnthropicEngine();
+        $reader = $engine->beginStream([['role' => 'user', 'content' => 'Hi']], $this->baseOptions);
+        $fullReply = $reader(fn() => null);
+
+        // Content after the error event is not appended.
+        $this->assertSame('Partial', $fullReply);
+    }
+
+    public function test_begin_stream_flushes_final_line_without_trailing_newline(): void
+    {
+        // A truncated stream whose last data line has no terminating newline
+        // must still be processed rather than dropped at EOF.
+        $body = 'data: ' . json_encode(['type' => 'content_block_delta', 'index' => 0, 'delta' => ['type' => 'text_delta', 'text' => 'Tail']]);
+
+        $this->mockGuzzle([
+            new Response(200, ['Content-Type' => 'text/event-stream'], Utils::streamFor($body)),
+        ]);
+
+        $engine = new AnthropicEngine();
+        $reader = $engine->beginStream([['role' => 'user', 'content' => 'Hi']], $this->baseOptions);
+        $fullReply = $reader(fn() => null);
+
+        $this->assertSame('Tail', $fullReply);
+    }
+
     public function test_begin_stream_throws_e12_on_401(): void
     {
         $this->mockGuzzle([
