@@ -579,8 +579,8 @@ return [
             'api_url' => env('OLLAMA_URL', 'http://localhost:11434/v1/chat/completions'),
             'api_token' => env('OLLAMA_TOKEN', 'your-ollama-token'),
             'api_model' => env('OLLAMA_MODEL', 'gpt-oss:120b'),
-            'rag_embedding_url' => env('OLLAMA_EMBEDDING_URL', 'http://localhost:11434/v1/embeddings'),
-            'rag_embedding_model' => env('OLLAMA_EMBEDDING_MODEL', 'nomic-embed-text'),
+            'rag_embedding_url' => env('OLLAMA_EMBEDDING_URL', ''),
+            'rag_embedding_model' => env('OLLAMA_EMBEDDING_MODEL', ''),
         ],
 
         'openai' => [
