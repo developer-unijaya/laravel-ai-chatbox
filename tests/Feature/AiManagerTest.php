@@ -219,6 +219,38 @@ class AiManagerTest extends TestCase
         $this->assertNotInstanceOf(AnthropicEngine::class, $engine);
     }
 
+    // ── shipped gemini provider ───────────────────────────────────────────────
+
+    public function test_shipped_config_defines_gemini_provider_with_openai_compatible_defaults(): void
+    {
+        $shipped = require __DIR__ . '/../../src/Config/ai-chatbox.php';
+
+        $this->assertArrayHasKey('gemini', $shipped['providers']);
+
+        $gemini = $shipped['providers']['gemini'];
+
+        $this->assertArrayNotHasKey('engine', $gemini, 'gemini must not opt into a native engine');
+        $this->assertSame('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', $gemini['api_url']);
+        $this->assertSame('gemini-2.5-flash', $gemini['api_model']);
+        $this->assertSame('https://generativelanguage.googleapis.com/v1beta/openai/embeddings', $gemini['rag_embedding_url']);
+        $this->assertSame('gemini-embedding-001', $gemini['rag_embedding_model']);
+    }
+
+    public function test_shipped_gemini_provider_resolves_to_openai_compatible_engine(): void
+    {
+        $shipped = require __DIR__ . '/../../src/Config/ai-chatbox.php';
+        $this->setProviders(['gemini' => array_merge($shipped['providers']['gemini'], ['api_token' => 'gemini-key'])]);
+
+        $manager = $this->app->make(AiManager::class);
+        $config = $manager->resolveConfig('gemini');
+        $engine = $manager->resolveEngine($config);
+
+        $this->assertInstanceOf(OpenAiCompatibleEngine::class, $engine);
+        $this->assertNotInstanceOf(AnthropicEngine::class, $engine);
+        $this->assertSame('gemini-2.5-flash', $config['api_model']);
+        $this->assertSame('gemini-embedding-001', $config['rag_embedding_model']);
+    }
+
     // ── __call delegation ─────────────────────────────────────────────────────
 
     public function test_manager_is_singleton(): void
