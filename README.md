@@ -10,7 +10,7 @@
 
 A drop-in AI chatbox widget for Laravel. One Blade directive — no build tools required in your application.
 
-Connect to any **OpenAI-compatible API** including Ollama, OpenAI, Groq, LM Studio, and OpenRouter — plus native **Anthropic (Claude)** support via the Messages API. Includes real-time token streaming, conversation memory, a full **RAG (Retrieval-Augmented Generation)** system, an admin dashboard, and a PHP facade for calling AI from anywhere in your codebase.
+Connect to any **OpenAI-compatible API** including Ollama, OpenAI, Google Gemini, Groq, LM Studio, and OpenRouter — plus native **Anthropic (Claude)** support via the Messages API. Includes real-time token streaming, conversation memory, a full **RAG (Retrieval-Augmented Generation)** system, an admin dashboard, and a PHP facade for calling AI from anywhere in your codebase.
 
 <p align="center">
   <img src="art/chatbox.png" alt="AI Chatbox widget" width="360">
@@ -58,7 +58,7 @@ Connect to any **OpenAI-compatible API** including Ollama, OpenAI, Groq, LM Stud
 - Messages persist across page refresh via `localStorage` or `sessionStorage`
 
 **AI & Streaming**
-- Supports Ollama, OpenAI, Groq, LM Studio, OpenRouter, and any OpenAI-compatible endpoint
+- Supports Ollama, OpenAI, Google Gemini, Groq, LM Studio, OpenRouter, and any OpenAI-compatible endpoint
 - Native **Anthropic (Claude)** support via the Messages API — auto-selected when the provider URL points at `api.anthropic.com`
 - Real-time token streaming via Server-Sent Events (SSE) with a blinking cursor
 - Configurable system prompt, language enforcement, temperature, and max tokens
@@ -149,7 +149,7 @@ OLLAMA_MODEL=gpt-oss:120b
 AI_CHATBOX_LANGUAGE=English
 ```
 
-See [AI Providers](#ai-providers) for examples covering OpenAI, Groq, LM Studio, and more.
+See [AI Providers](#ai-providers) for examples covering OpenAI, Google Gemini, Anthropic, Groq, LM Studio, and more.
 
 > **Running Ollama in WSL?** `localhost` from a Windows host may not reach WSL. Find your WSL IP and use it:
 > ```bash
@@ -336,12 +336,21 @@ Named providers are defined under the `providers` key in `config/ai-chatbox.php`
         'rag_embedding_model' => env('ANTH_EMBEDDING_MODEL',     ''),
         'rag_embedding_token' => env('ANTH_EMBEDDING_TOKEN',     ''), // separate token for the embedding service
     ],
+    'gemini'   => [
+        'api_url'             => env('GEMINI_URL',               'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'),
+        'api_token'           => env('GEMINI_API_KEY',           ''),
+        'api_model'           => env('GEMINI_MODEL',             'gemini-2.5-flash'),
+        'rag_embedding_url'   => env('GEMINI_EMBEDDING_URL',     'https://generativelanguage.googleapis.com/v1beta/openai/embeddings'),
+        'rag_embedding_model' => env('GEMINI_EMBEDDING_MODEL',   'gemini-embedding-001'),
+    ],
 ],
 ```
 
 > `groq` and other providers are not in the default config — add them as custom entries after publishing (see [OpenRouter example](#openrouter-custom-provider) below for the pattern).
 
 > **Anthropic is not OpenAI-compatible.** The package selects `AnthropicEngine` when a provider has `engine: 'anthropic'` **or** its `api_url` contains `anthropic.com` — no manual binding required. Anthropic has no embeddings endpoint; set `ANTH_EMBEDDING_URL` and `ANTH_EMBEDDING_TOKEN` to point at a separate OpenAI-compatible embeddings service (Ollama, LM Studio, OpenAI), or leave them empty to use keyword-only RAG retrieval.
+
+> **Google Gemini is OpenAI-compatible.** The `gemini` provider talks to Google's OpenAI-compatible endpoint (`/v1beta/openai/…`), so it runs through the standard `OpenAiCompatibleEngine` — no `engine` key, no extra binding. Chat, streaming, tool calling, and embeddings all work with the same Bearer-token auth as OpenAI. Gemini has its own embedding models, so RAG vector search needs no separate service.
 
 **Env var reference per provider:**
 
@@ -351,6 +360,7 @@ Named providers are defined under the `providers` key in `config/ai-chatbox.php`
 | `openai` | `OPENAI_URL` | `OPENAI_API_KEY` | `OPENAI_MODEL` | `OPENAI_EMBEDDING_URL` | `OPENAI_EMBEDDING_MODEL` | — |
 | `lmstudio` | `LMSTUDIO_URL` | `LMSTUDIO_TOKEN` | `LMSTUDIO_MODEL` | `LMSTUDIO_EMBEDDING_URL` | `LMSTUDIO_EMBEDDING_MODEL` | — |
 | `anthropic` | `ANTH_URL` | `ANTH_API_KEY` | `ANTH_MODEL` | `ANTH_EMBEDDING_URL` | `ANTH_EMBEDDING_MODEL` | `ANTH_EMBEDDING_TOKEN` |
+| `gemini` | `GEMINI_URL` | `GEMINI_API_KEY` | `GEMINI_MODEL` | `GEMINI_EMBEDDING_URL` | `GEMINI_EMBEDDING_MODEL` | — |
 
 > `rag_embedding_timeout` (`AI_CHATBOX_EMBEDDING_TIMEOUT`) is a universal setting — it applies to all providers and is not overridable per provider. Configure it once in the RAG section.
 
@@ -415,6 +425,24 @@ ANTH_EMBEDDING_TOKEN=sk-openai-key-here
 Or use a local model (Ollama, LM Studio) — just set `ANTH_EMBEDDING_TOKEN` to whatever token that service expects (or leave it empty for Ollama).
 
 > When `ANTH_EMBEDDING_URL` is empty, the chatbox falls back to keyword search automatically (controlled by `AI_CHATBOX_RAG_KEYWORD_FALLBACK`). Documents can be uploaded and searched by keyword without any embedding service configured.
+
+#### Google Gemini
+
+Gemini ships in the default config as the `gemini` provider. It uses Google's **OpenAI-compatible endpoint**, so no engine switch is needed — chat, streaming, tool calling, and embeddings all go through the standard OpenAI-compatible engine. Create an API key at [Google AI Studio](https://aistudio.google.com/apikey) (a free tier is available).
+
+```env
+AI_CHATBOX_ACTIVE_PROVIDER=gemini
+GEMINI_API_KEY=AIza...
+GEMINI_MODEL=gemini-2.5-flash
+# Optional — these are the defaults:
+# GEMINI_URL=https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+# GEMINI_EMBEDDING_URL=https://generativelanguage.googleapis.com/v1beta/openai/embeddings
+# GEMINI_EMBEDDING_MODEL=gemini-embedding-001
+```
+
+Unlike Anthropic, Gemini has native embedding models, so RAG vector search works with the same API key and no separate embedding service. Set `GEMINI_EMBEDDING_URL` to an empty string to use keyword-only retrieval instead.
+
+> Google's OpenAI-compatible layer is a subset of the native Gemini API. Native-only features (Google Search grounding, context caching, thinking budgets) are not reachable through it. Use the [Admin Diagnostics panel](#admin-dashboard) after switching to confirm chat and embeddings are reachable.
 
 #### Groq (custom provider)
 
@@ -921,6 +949,7 @@ Embedding settings are configured **per named provider** via `rag_embedding_url`
 | Ollama | `OLLAMA_EMBEDDING_URL` | `OLLAMA_EMBEDDING_MODEL` | — |
 | LM Studio | `LMSTUDIO_EMBEDDING_URL` | `LMSTUDIO_EMBEDDING_MODEL` | — |
 | OpenAI | `OPENAI_EMBEDDING_URL` | `OPENAI_EMBEDDING_MODEL` | — |
+| Google Gemini | `GEMINI_EMBEDDING_URL` | `GEMINI_EMBEDDING_MODEL` | — |
 | Anthropic (via OpenAI) | `ANTH_EMBEDDING_URL` | `ANTH_EMBEDDING_MODEL` | `ANTH_EMBEDDING_TOKEN` |
 
 | Provider | Example URL | Example model |
@@ -928,6 +957,7 @@ Embedding settings are configured **per named provider** via `rag_embedding_url`
 | Ollama | `http://localhost:11434/v1/embeddings` | `nomic-embed-text`, `mxbai-embed-large` |
 | LM Studio | `http://127.0.0.1:1234/v1/embeddings` | your loaded embedding model name |
 | OpenAI | `https://api.openai.com/v1/embeddings` | `text-embedding-3-small`, `text-embedding-3-large` |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai/embeddings` | `gemini-embedding-001` |
 
 > **`rag_embedding_token`** — only set this when the embedding service requires a different API key from the chat provider (e.g. Anthropic chat + OpenAI embeddings). For Ollama/LM Studio this can be left empty.
 

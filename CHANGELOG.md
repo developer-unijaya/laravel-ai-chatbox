@@ -8,7 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.5.6] — 2026-09-10
+
 ### Added
+- **Google Gemini named provider** — a new `gemini` entry ships in the default `providers` block of `config/ai-chatbox.php`, pointing at Google's **OpenAI-compatible endpoint** (`https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`). Because that endpoint accepts the standard chat-completions request shape and Bearer-token auth, it runs through the existing `OpenAiCompatibleEngine` with **no engine changes** — chat, SSE streaming, orchestrator tool calling, and RAG embeddings all work as-is. Gemini exposes its own embedding models, so `rag_embedding_url` defaults to the matching `/v1beta/openai/embeddings` endpoint with `gemini-embedding-001` and vector RAG needs no separate embedding service (unlike the `anthropic` provider). Env vars: `GEMINI_URL`, `GEMINI_API_KEY`, `GEMINI_MODEL` (default `gemini-2.5-flash`), `GEMINI_EMBEDDING_URL`, `GEMINI_EMBEDDING_MODEL`. Activate with `AI_CHATBOX_ACTIVE_PROVIDER=gemini` or `AI::provider('gemini')`. README gains a **Google Gemini** provider example plus rows in the env-var and embedding-provider tables
 - **Resizable chat window (1× / 2× / 3×)** — a new resize button in the widget header cycles the chat window through three sizes: default **1×** (360 × 480), **2×** (720 × 760), and **3×** (1040 × 980). The window is viewport-capped (`min(var(--chatbox-width), calc(100vw - 48px))` for width, and the same for height) so the largest size never overflows the screen, and it transitions smoothly between steps. The chosen size is **persisted per user in the browser** — the same `localStorage` / `sessionStorage` driver as the chat history, under the storage key suffix `_size` — and restored on the next visit; when no valid saved size is found the window opens at the smallest (**1×**). Implemented consistently across all three rendered drivers — **Vue**, **Blade (vanilla JS)**, and **Livewire (Alpine)** — sharing the same `.ai-chatbox--size-2x` / `.ai-chatbox--size-3x` CSS classes on `#ai-chatbox-wrapper`. Override those classes' `--chatbox-width` / `--chatbox-height` variables to change the 2× / 3× dimensions. The Vue bundle and shared stylesheet (`vendor/ai-chatbox/js/chatbox.js`, `css/chatbox.css`) were rebuilt
 - **AI Orchestrator — agentic tool (function) calling** — the chatbox can now run a multi-step tool-calling loop instead of a single model call: the model may call tools you allow-list, the package executes them, feeds the results back, and repeats until the model returns a final answer. **OFF by default** — when disabled (or the active provider's engine cannot do tool calling, or no tools are allow-listed) the chatbox behaves exactly as before (one model call per message), so existing installs are unaffected. Introduces a new **Orchestration layer (1.5)** between the UI and the Engine:
   - **`Orchestrator`** — owns the agentic loop with hard safety limits: `orchestrator_max_steps` (runaway guard) and `orchestrator_timeout` (wall-clock cap). Per-tool problems become error results fed back to the model rather than aborting the request; only loop-level failures raise `OrchestrationException`. Prompt assembly (incl. RAG injection) is still delegated to `PromptBuilder` and engine selection to `AiManager` — the orchestrator is a consumer of those layers, never a replacement
@@ -523,7 +528,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Configurable API URL, token, and model via `.env`
 - Service provider with auto-discovery, asset publishing, and view publishing
 
-[Unreleased]: https://github.com/developer-unijaya/laravel-ai-chatbox/compare/0.4.0...HEAD
+[Unreleased]: https://github.com/developer-unijaya/laravel-ai-chatbox/compare/0.5.6...HEAD
+[0.5.6]: https://github.com/developer-unijaya/laravel-ai-chatbox/compare/0.4.0...0.5.6
 [0.4.0]: https://github.com/developer-unijaya/laravel-ai-chatbox/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/developer-unijaya/laravel-ai-chatbox/compare/0.2.9...0.3.0
 [0.2.9]: https://github.com/developer-unijaya/laravel-ai-chatbox/compare/0.2.7...0.2.9

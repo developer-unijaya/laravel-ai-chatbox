@@ -605,6 +605,14 @@ return [
             'rag_embedding_model' => env('ANTH_EMBEDDING_MODEL', ''),
             'rag_embedding_token' => env('ANTH_EMBEDDING_TOKEN', ''),
         ],
+
+        'gemini' => [
+            'api_url' => env('GEMINI_URL', 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'),
+            'api_token' => env('GEMINI_API_KEY', ''),
+            'api_model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+            'rag_embedding_url' => env('GEMINI_EMBEDDING_URL', 'https://generativelanguage.googleapis.com/v1beta/openai/embeddings'),
+            'rag_embedding_model' => env('GEMINI_EMBEDDING_MODEL', 'gemini-embedding-001'),
+        ],
     ],
 
 ];
